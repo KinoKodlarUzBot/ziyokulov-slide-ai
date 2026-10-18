@@ -34,9 +34,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if not os.path.exists("static"):
-    os.makedirs("static")
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Statik papkani mutlaq yo'l (absolute path) orqali to'g'ri ulash
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+if not os.path.exists(STATIC_DIR):
+    os.makedirs(STATIC_DIR)
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 logging.basicConfig(level=logging.INFO)
 
@@ -198,7 +203,6 @@ async def start_cmd(message: types.Message):
 # =========================================================
 @app.on_event("startup")
 async def startup_event():
-    # Eski webhooklarni tozalab, pollingni fonda ishga tushiramiz
     await bot.delete_webhook(drop_pending_updates=True)
     asyncio.create_task(dp.start_polling(bot))
 
