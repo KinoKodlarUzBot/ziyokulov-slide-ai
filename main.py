@@ -3,6 +3,7 @@ import logging
 import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from aiogram import Bot, Dispatcher, types
@@ -34,7 +35,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Statik papkani mutlaq yo'l (absolute path) orqali to'g'ri ulash
+# Statik papkani mutlaq yo'l orqali ulash
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
@@ -42,6 +43,11 @@ if not os.path.exists(STATIC_DIR):
     os.makedirs(STATIC_DIR)
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# Asosiy manzilga kirganda index.html ni ochish
+@app.get("/")
+async def serve_index():
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 logging.basicConfig(level=logging.INFO)
 
@@ -189,7 +195,7 @@ async def start_cmd(message: types.Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
             text="✨ Mini App’da Slayd Yaratish", 
-            web_app=WebAppInfo(url=f"{WEBAPP_URL}/static/index.html")
+            web_app=WebAppInfo(url=WEBAPP_URL)
         )]
     ])
     await message.answer(
