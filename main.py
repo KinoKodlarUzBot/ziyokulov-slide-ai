@@ -1,7 +1,6 @@
 import os
 import logging
 import asyncio
-from typing import List
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,7 +20,6 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 GEMINI_API_KEY = "AQ.Ab8RN6LFJncfEDhOhwRfCqqVIxkX2CfgSK0QniYsPIhtSgOeWg"
 WEBAPP_URL = "https://ziyokulov-slide-ai-production.up.railway.app"
 
-# Google Gemini AI ni bevosita kalit bilan ishga tushirish
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 bot = Bot(token=BOT_TOKEN)
@@ -36,7 +34,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Frontend fayllarni ulash
 if not os.path.exists("static"):
     os.makedirs("static")
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -180,7 +177,7 @@ async def api_generate_slide(req: SlideRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # =========================================================
-# 5. TELEGRAM BOT VA FASTAPI SERVERNI ISHGA TUSHIRISH
+# 5. TELEGRAM BOT HANDLERLARI
 # =========================================================
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message):
@@ -196,8 +193,13 @@ async def start_cmd(message: types.Message):
         reply_markup=keyboard
     )
 
+# =========================================================
+# 6. SERVER VA BOTNI BIRGA FONDA ISHGA TUSHIRISH
+# =========================================================
 @app.on_event("startup")
-async def on_startup():
+async def startup_event():
+    # Eski webhooklarni tozalab, pollingni fonda ishga tushiramiz
+    await bot.delete_webhook(drop_pending_updates=True)
     asyncio.create_task(dp.start_polling(bot))
 
 if __name__ == "__main__":
