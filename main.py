@@ -19,7 +19,7 @@ from google import genai
 # =========================================================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GEMINI_API_KEY = "AQ.Ab8RN6LFJncfEDhOhwRfCqqVIxkX2CfgSK0QniYsPIhtSgOeWg"
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-railway-app.up.railway.app")
+WEBAPP_URL = "https://ziyokulov-slide-ai-production.up.railway.app"
 
 # Google Gemini AI ni bevosita kalit bilan ishga tushirish
 client = genai.Client(api_key=GEMINI_API_KEY)
