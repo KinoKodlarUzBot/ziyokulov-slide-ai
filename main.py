@@ -180,7 +180,7 @@ async def api_generate_slide(req: SlideRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # =========================================================
-# 5. TELEGRAM BOT HANDLERLARI
+# 5. TELEGRAM BOT VA FASTAPI SERVERNI ISHGA TUSHIRISH
 # =========================================================
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message):
@@ -199,3 +199,8 @@ async def start_cmd(message: types.Message):
 @app.on_event("startup")
 async def on_startup():
     asyncio.create_task(dp.start_polling(bot))
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
