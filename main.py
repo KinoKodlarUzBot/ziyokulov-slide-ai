@@ -12,7 +12,7 @@ from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
-import google.generativeai as genai
+from google import genai
 
 # =========================================================
 # 1. SOZLAMALAR VA ENVIRONMENT O'ZGARUVCHILARI
@@ -21,9 +21,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY")
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-railway-app.up.railway.app")
 
-# Google Gemini AI sozlash
-genai.configure(api_key=GEMINI_API_KEY)
-ai_model = genai.GenerativeModel('gemini-pro')
+# Google Gemini AI yangi SDK orqali sozlash
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -80,7 +79,7 @@ def generate_pptx(topic: str, slide_data: list, template_style: str = "classic")
     for data in slide_data:
         slide = prs.slides.add_slide(prs.slide_layouts[6]) # Bo'sh slayd shabloni
         
-        # Fon rangini (Ramkasini) o'rnating
+        # Fon rangini o'rnating
         background = slide.background
         fill = background.fill
         fill.solid()
@@ -141,7 +140,12 @@ async def api_generate_slide(req: SlideRequest):
         - [Nuqta 2]
         - [Nuqta 3]
         """
-        response = ai_model.generate_content(prompt)
+        
+        # Yangi client.models.generate_content usuli
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
         ai_text = response.text
 
         # AI javobini bo'limlarga ajratish
