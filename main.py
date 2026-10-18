@@ -21,8 +21,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY")
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-railway-app.up.railway.app")
 
-# Google Gemini AI yangi SDK orqali sozlash
-client = genai.Client(api_key=GEMINI_API_KEY)
+# Google Gemini AI yangi SDK client sozlamasi (API kalitni avtomatik o'qiydi)
+client = genai.Client()
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
