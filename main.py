@@ -1,4 +1,4 @@
-import os
+ import os
 import logging
 import asyncio
 from typing import List
@@ -21,8 +21,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY")
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-railway-app.up.railway.app")
 
-# Google Gemini AI yangi SDK client sozlamasi (API kalitni avtomatik o'qiydi)
-client = genai.Client()
+# Google Gemini AI ni to'g'ridan-to'g'ri API kalit bilan ishga tushirish
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -48,24 +48,24 @@ logging.basicConfig(level=logging.INFO)
 # =========================================================
 TEMPLATE_STYLES = {
     "classic": {
-        "bg_color": RGBColor(255, 255, 255),      # Oq fon
-        "title_color": RGBColor(20, 20, 20),       # Qora sarlavha
-        "text_color": RGBColor(60, 60, 60)         # To'q kulrang matn
+        "bg_color": RGBColor(255, 255, 255),
+        "title_color": RGBColor(20, 20, 20),
+        "text_color": RGBColor(60, 60, 60)
     },
     "business": {
-        "bg_color": RGBColor(240, 244, 248),    # Och ko'k-kulrang fon
-        "title_color": RGBColor(30, 58, 138),     # To'q ko'k sarlavha
-        "text_color": RGBColor(31, 41, 55)        # Kulrang matn
+        "bg_color": RGBColor(240, 244, 248),
+        "title_color": RGBColor(30, 58, 138),
+        "text_color": RGBColor(31, 41, 55)
     },
     "dark": {
-        "bg_color": RGBColor(24, 24, 27),         # Qora / To'q fon
-        "title_color": RGBColor(255, 255, 255),   # Oq sarlavha
-        "text_color": RGBColor(228, 228, 231)     # Och matn
+        "bg_color": RGBColor(24, 24, 27),
+        "title_color": RGBColor(255, 255, 255),
+        "text_color": RGBColor(228, 228, 231)
     },
     "minimal": {
-        "bg_color": RGBColor(240, 253, 244),    # Och yashil fon
-        "title_color": RGBColor(22, 101, 52),     # Zümrad yashil sarlavha
-        "text_color": RGBColor(20, 83, 45)        # To'q yashil matn
+        "bg_color": RGBColor(240, 253, 244),
+        "title_color": RGBColor(22, 101, 52),
+        "text_color": RGBColor(20, 83, 45)
     }
 }
 
@@ -77,15 +77,13 @@ def generate_pptx(topic: str, slide_data: list, template_style: str = "classic")
     style = TEMPLATE_STYLES.get(template_style, TEMPLATE_STYLES["classic"])
     
     for data in slide_data:
-        slide = prs.slides.add_slide(prs.slide_layouts[6]) # Bo'sh slayd shabloni
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
         
-        # Fon rangini o'rnating
         background = slide.background
         fill = background.fill
         fill.solid()
         fill.fore_color.rgb = style["bg_color"]
 
-        # Sarlavha bloki
         tx_box = slide.shapes.add_textbox(Inches(0.8), Inches(0.8), Inches(8.4), Inches(1))
         tf = tx_box.text_frame
         tf.word_wrap = True
@@ -95,7 +93,6 @@ def generate_pptx(topic: str, slide_data: list, template_style: str = "classic")
         p.font.size = Pt(28)
         p.font.color.rgb = style["title_color"]
         
-        # Asosiy matn (Punktlar) bloki
         tx_box_body = slide.shapes.add_textbox(Inches(0.8), Inches(2.0), Inches(8.4), Inches(4.5))
         tf_body = tx_box_body.text_frame
         tf_body.word_wrap = True
@@ -141,14 +138,12 @@ async def api_generate_slide(req: SlideRequest):
         - [Nuqta 3]
         """
         
-        # Yangi client.models.generate_content usuli
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt,
         )
         ai_text = response.text
 
-        # AI javobini bo'limlarga ajratish
         slides_raw = ai_text.split("SLAYD")
         slide_list = []
 
@@ -166,10 +161,8 @@ async def api_generate_slide(req: SlideRequest):
             if bullets or title != "Taqdimot":
                 slide_list.append({"title": title, "content": bullets})
 
-        # PPTX faylni yaratish
         file_path = generate_pptx(req.topic, slide_list, req.template)
 
-        # Faylni foydalanuvchiga Telegram orqali yuborish
         file_to_send = types.FSInputFile(file_path)
         await bot.send_document(
             chat_id=req.user_id,
