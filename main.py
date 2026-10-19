@@ -51,7 +51,16 @@ WEBAPP_URL = os.getenv(
     "https://ziyokulov-slide-ai-production.up.railway.app",
 ).strip().rstrip("/")
 PORT = int(os.getenv("PORT", "8080"))
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+# Asosiy model va zaxira modellar. Asosiysi topilmasa (404) yoki limiti tugasa (429),
+# keyingisi sinab ko'riladi. Railway Variables orqali o'zgartirish mumkin:
+# GEMINI_MODEL, GEMINI_FALLBACK_MODELS (vergul bilan ajratilgan).
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite").strip()
+GEMINI_FALLBACK_MODELS = [
+    m.strip()
+    for m in os.getenv("GEMINI_FALLBACK_MODELS", "gemini-3.6-flash,gemini-2.5-flash").split(",")
+    if m.strip()
+]
+GEMINI_MODELS = [GEMINI_MODEL] + [m for m in GEMINI_FALLBACK_MODELS if m != GEMINI_MODEL]
 MAX_CONCURRENT_GENERATIONS = int(os.getenv("MAX_CONCURRENT_GENERATIONS", "3"))
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "5"))
 RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "3600"))
@@ -303,29 +312,48 @@ async def call_gemini(prompt: str) -> str:
         )
 
     try:
-        response = await asyncio.wait_for(
-            gemini_client.aio.models.generate_content(
-                model=GEMINI_MODEL,
-                contents=prompt,
-                config=genai_types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    temperature=0.5,
-                ),
-            ),
-            timeout=GEMINI_TIMEOUT_SECONDS,
-        )
-    except asyncio.TimeoutError:
-        logger.error("Gemini so'rovi %s soniyada javob bermadi", GEMINI_TIMEOUT_SECONDS)
-        raise HTTPException(
-            status_code=504,
-            detail="AI javob berishga ulgurmadi. Qayta urinib ko'ring.",
-        )
-    except Exception as exc:
-        logger.exception("Gemini API so'rovi muvaffaqiyatsiz tugadi")
-        raise HTTPException(
-            status_code=502,
-            detail="AI hozir javob bera olmadi. Birozdan keyin qayta urinib ko'ring.",
-        ) from exc
+        response = None
+        for model_name in GEMINI_MODELS:
+            try:
+                response = await asyncio.wait_for(
+                    gemini_client.aio.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=genai_types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            temperature=0.5,
+                        ),
+                    ),
+                    timeout=GEMINI_TIMEOUT_SECONDS,
+                )
+                break
+            except asyncio.TimeoutError:
+                logger.error(
+                    "Gemini (%s) %s soniyada javob bermadi", model_name, GEMINI_TIMEOUT_SECONDS
+                )
+                raise HTTPException(
+                    status_code=504,
+                    detail="AI javob berishga ulgurmadi. Qayta urinib ko'ring.",
+                )
+            except Exception as exc:
+                code = getattr(exc, "code", None)
+                logger.warning(
+                    "Gemini modeli %r xato berdi (kod=%s): %s", model_name, code, exc
+                )
+                # 404: model topilmadi, 429: limit tugadi -> keyingi modelni sinaymiz.
+                if code in (404, 429):
+                    continue
+                raise HTTPException(
+                    status_code=502,
+                    detail="AI hozir javob bera olmadi. Birozdan keyin qayta urinib ko'ring.",
+                ) from exc
+
+        if response is None:
+            logger.error("Hech bir Gemini modeli javob bermadi: %s", GEMINI_MODELS)
+            raise HTTPException(
+                status_code=502,
+                detail="AI hozir javob bera olmadi. Birozdan keyin qayta urinib ko'ring.",
+            )
     finally:
         generation_semaphore.release()
 
