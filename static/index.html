@@ -1,122 +1,423 @@
 <!DOCTYPE html>
 <html lang="uz">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ziyokulov Slide AI</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            margin: 0; 
-            padding: 20px; 
-            background: var(--tg-theme-bg-color, #f4f6f8); 
-            color: var(--tg-theme-text-color, #111); 
-        }
-        .card { 
-            max-width: 520px; 
-            margin: 0 auto; 
-            padding: 20px; 
-            border-radius: 16px; 
-            background: var(--tg-theme-secondary-bg-color, #fff); 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-        h2 { margin-top: 0; }
-        label { display: block; margin: 14px 0 6px; font-weight: 700; }
-        input, select, button { 
-            box-sizing: border-box; 
-            width: 100%; 
-            padding: 12px; 
-            border-radius: 10px; 
-            border: 1px solid #bbb; 
-            font-size: 16px; 
-        }
-        button { 
-            margin-top: 18px; 
-            border: 0; 
-            background: #1687e8; 
-            color: white; 
-            font-weight: 700; 
-            cursor: pointer;
-        }
-        button:disabled { opacity: .6; cursor: not-allowed; }
-        #status { white-space: pre-wrap; margin-top: 14px; font-weight: 500; }
-        .note { font-size: 13px; opacity: .8; margin-top: 10px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Slayd AI</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #ffffff);
+      --text: var(--tg-theme-text-color, #111111);
+      --hint: var(--tg-theme-hint-color, #707579);
+      --accent: var(--tg-theme-button-color, #2481cc);
+      --accent-text: var(--tg-theme-button-text-color, #ffffff);
+      --card: var(--tg-theme-secondary-bg-color, #f1f3f5);
+      --danger: #e53935;
+      --ok: #2e9e4f;
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.4;
+    }
+
+    .app {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 20px 16px calc(28px + env(safe-area-inset-bottom, 0px));
+    }
+
+    h1 { font-size: 24px; margin: 4px 0 4px; }
+    .subtitle { color: var(--hint); margin: 0 0 20px; font-size: 15px; }
+
+    .label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-weight: 600;
+      font-size: 14px;
+      margin: 18px 0 8px;
+    }
+    .counter { color: var(--hint); font-weight: 400; font-size: 13px; }
+    .counter.limit { color: var(--danger); }
+
+    textarea {
+      width: 100%;
+      min-height: 96px;
+      resize: none;
+      padding: 12px 14px;
+      border: 2px solid transparent;
+      border-radius: var(--radius);
+      background: var(--card);
+      color: var(--text);
+      font: inherit;
+      outline: none;
+      transition: border-color .15s;
+    }
+    textarea:focus { border-color: var(--accent); }
+    textarea::placeholder { color: var(--hint); }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .chip {
+      border: none;
+      background: var(--card);
+      color: var(--text);
+      padding: 7px 12px;
+      border-radius: 999px;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .chip:active { opacity: .6; }
+
+    .templates {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .template { position: relative; }
+    .template input { position: absolute; opacity: 0; pointer-events: none; }
+    .template label {
+      display: block;
+      padding: 10px;
+      border-radius: var(--radius);
+      background: var(--card);
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: border-color .15s;
+    }
+    .template input:checked + label { border-color: var(--accent); }
+    .template input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .preview {
+      height: 64px;
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border: 1px solid rgba(128, 128, 128, .25);
+    }
+    .preview .t { height: 8px; width: 60%; border-radius: 4px; }
+    .preview .l { height: 5px; border-radius: 3px; opacity: .8; }
+    .preview .l:nth-child(2) { width: 90%; }
+    .preview .l:nth-child(3) { width: 75%; }
+    .preview .l:nth-child(4) { width: 82%; }
+    .template .name { margin-top: 8px; font-size: 14px; font-weight: 600; }
+    .template .desc { font-size: 12px; color: var(--hint); }
+
+    .submit {
+      width: 100%;
+      margin-top: 24px;
+      padding: 15px;
+      border: none;
+      border-radius: var(--radius);
+      background: var(--accent);
+      color: var(--accent-text);
+      font: inherit;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: opacity .15s;
+    }
+    .submit:disabled { opacity: .55; cursor: default; }
+    .submit:not(:disabled):active { opacity: .8; }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 3px solid rgba(255, 255, 255, .4);
+      border-top-color: var(--accent-text);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      display: none;
+    }
+    .loading .spinner { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .message {
+      display: none;
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      font-size: 14px;
+    }
+    .message.show { display: block; }
+    .message.error { background: rgba(229, 57, 53, .12); color: var(--danger); }
+    .message.info { background: var(--card); color: var(--hint); }
+    .message.success { background: rgba(46, 158, 79, .12); color: var(--ok); }
+
+    .close-btn {
+      display: none;
+      width: 100%;
+      margin-top: 10px;
+      padding: 13px;
+      border: none;
+      border-radius: var(--radius);
+      background: var(--card);
+      color: var(--text);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .close-btn.show { display: block; }
+
+    .note { color: var(--hint); font-size: 12px; text-align: center; margin-top: 18px; }
+  </style>
 </head>
 <body>
-    <div class="card">
-        <h2>✨ Ziyokulov Slide AI</h2>
-        <p>Mavzuni kiriting — AI 5 ta slayd tayyorlab, Telegram chatiga yuboradi.</p>
-        
-        <form id="form">
-            <label for="topic">Taqdimot mavzusi</label>
-            <input id="topic" minlength="3" maxlength="200" required placeholder="Masalan: Sun'iy intellekt">
-            
-            <label for="template">Dizayn uslubi</label>
-            <select id="template">
-                <option value="classic">Classic</option>
-                <option value="business">Business</option>
-                <option value="dark">Dark</option>
-                <option value="minimal">Minimal</option>
-            </select>
-            
-            <button id="submit" type="submit">Slayd yaratish</button>
-        </form>
-        
-        <div id="status" role="status"></div>
-        <p class="note">Fayl bot chatiga yuboriladi. Avval botga /start yuboring.</p>
+  <main class="app">
+    <h1>✨ Slayd AI</h1>
+    <p class="subtitle">Mavzuni yozing, tayyor PowerPoint taqdimot Telegram chatingizga yuboriladi.</p>
+
+    <div class="label">
+      <span>Taqdimot mavzusi</span>
+      <span class="counter" id="counter">0 / 200</span>
     </div>
+    <textarea id="topic" maxlength="200" placeholder="Masalan: Sun'iy intellektning kelajagi" autocomplete="off"></textarea>
+    <div class="chips" id="chips"></div>
 
-    <script>
-        const tg = window.Telegram && window.Telegram.WebApp;
+    <div class="label"><span>Uslub</span></div>
+    <div class="templates" id="templates"></div>
 
-        if (tg) { 
-            tg.ready(); 
-            tg.expand(); 
+    <button class="submit" id="submit" type="button">
+      <span class="spinner"></span>
+      <span id="submit-text">Slayd yaratish</span>
+    </button>
+
+    <div class="message" id="message" role="status" aria-live="polite"></div>
+    <button class="close-btn" id="close" type="button">Mini App'ni yopish</button>
+
+    <p class="note">Taqdimot 6 ta slayddan iborat: muqova va 5 ta mazmunli slayd.</p>
+  </main>
+
+  <script>
+    (function () {
+      var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+      if (tg) {
+        tg.ready();
+        tg.expand();
+      }
+      var initData = tg ? tg.initData : "";
+
+      var MAX_LEN = 200;
+      var MIN_LEN = 3;
+      var REQUEST_TIMEOUT_MS = 150000;
+
+      var TEMPLATES = [
+        { id: "classic",  name: "Klassik",  desc: "Oq fon, oddiy",   bg: "#ffffff", title: "#141414", text: "#3c3c3c" },
+        { id: "business", name: "Biznes",   desc: "Ko'k ranglar",    bg: "#f0f4f8", title: "#1e3a8a", text: "#1f2937" },
+        { id: "dark",     name: "Qorong'i", desc: "Tungi rejim",     bg: "#18181b", title: "#ffffff", text: "#e4e4e7" },
+        { id: "minimal",  name: "Minimal",  desc: "Yashil, yengil",  bg: "#f0fdf4", title: "#166534", text: "#14532d" }
+      ];
+
+      var EXAMPLES = [
+        "Sun'iy intellekt kelajagi",
+        "Sog'lom turmush tarzi",
+        "O'zbekiston turizmi",
+        "Iqlim o'zgarishi"
+      ];
+
+      var topicEl = document.getElementById("topic");
+      var counterEl = document.getElementById("counter");
+      var chipsEl = document.getElementById("chips");
+      var templatesEl = document.getElementById("templates");
+      var submitEl = document.getElementById("submit");
+      var submitTextEl = document.getElementById("submit-text");
+      var messageEl = document.getElementById("message");
+      var closeEl = document.getElementById("close");
+
+      var busy = false;
+
+      // ---------- Yordamchi funksiyalar ----------
+      function haptic(type) {
+        try {
+          if (tg && tg.HapticFeedback) {
+            if (type === "select") tg.HapticFeedback.selectionChanged();
+            else tg.HapticFeedback.notificationOccurred(type);
+          }
+        } catch (e) { /* e'tiborsiz */ }
+      }
+
+      function showMessage(kind, text) {
+        messageEl.className = "message show " + kind;
+        messageEl.textContent = text;
+      }
+
+      function hideMessage() {
+        messageEl.className = "message";
+        messageEl.textContent = "";
+      }
+
+      function setBusy(value) {
+        busy = value;
+        submitEl.disabled = value;
+        submitEl.classList.toggle("loading", value);
+        submitTextEl.textContent = value ? "Tayyorlanmoqda..." : "Slayd yaratish";
+        topicEl.disabled = value;
+      }
+
+      function updateCounter() {
+        var len = topicEl.value.length;
+        counterEl.textContent = len + " / " + MAX_LEN;
+        counterEl.classList.toggle("limit", len >= MAX_LEN);
+      }
+
+      function selectedTemplate() {
+        var checked = document.querySelector('input[name="template"]:checked');
+        return checked ? checked.value : "classic";
+      }
+
+      function extractError(data, status) {
+        if (data && typeof data.detail === "string") return data.detail;
+        if (data && Array.isArray(data.detail)) return "Kiritilgan ma'lumot noto'g'ri. Mavzuni tekshirib ko'ring.";
+        return "Xatolik yuz berdi (" + status + "). Qayta urinib ko'ring.";
+      }
+
+      // ---------- Interfeysni yig'ish ----------
+      EXAMPLES.forEach(function (text) {
+        var chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "chip";
+        chip.textContent = text;
+        chip.addEventListener("click", function () {
+          if (busy) return;
+          topicEl.value = text;
+          updateCounter();
+          haptic("select");
+        });
+        chipsEl.appendChild(chip);
+      });
+
+      TEMPLATES.forEach(function (tpl, index) {
+        var wrap = document.createElement("div");
+        wrap.className = "template";
+
+        var input = document.createElement("input");
+        input.type = "radio";
+        input.name = "template";
+        input.id = "tpl-" + tpl.id;
+        input.value = tpl.id;
+        if (index === 0) input.checked = true;
+        input.addEventListener("change", function () { haptic("select"); });
+
+        var label = document.createElement("label");
+        label.setAttribute("for", input.id);
+
+        var preview = document.createElement("div");
+        preview.className = "preview";
+        preview.style.background = tpl.bg;
+
+        var bar = document.createElement("div");
+        bar.className = "t";
+        bar.style.background = tpl.title;
+        preview.appendChild(bar);
+        for (var i = 0; i < 3; i++) {
+          var line = document.createElement("div");
+          line.className = "l";
+          line.style.background = tpl.text;
+          preview.appendChild(line);
         }
 
-        const form = document.getElementById('form');
-        const button = document.getElementById('submit');
-        const status = document.getElementById('status');
+        var name = document.createElement("div");
+        name.className = "name";
+        name.textContent = tpl.name;
 
-        form.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            
-            if (!tg || !tg.initData) {
-                status.textContent = "Mini App'ni Telegram ichidan oching. Oddiy brauzer orqali autentifikatsiya ishlamaydi.";
-                return;
-            }
+        var desc = document.createElement("div");
+        desc.className = "desc";
+        desc.textContent = tpl.desc;
 
-            const topic = document.getElementById('topic').value.trim();
-            const template = document.getElementById('template').value;
+        label.appendChild(preview);
+        label.appendChild(name);
+        label.appendChild(desc);
+        wrap.appendChild(input);
+        wrap.appendChild(label);
+        templatesEl.appendChild(wrap);
+      });
 
-            if (topic.length < 3 || topic.length > 200) {
-                status.textContent = "Mavzu 3 dan 200 ta belgidan iborat bo'lishi kerak.";
-                return;
-            }
+      // ---------- Hodisalar ----------
+      topicEl.addEventListener("input", updateCounter);
 
-            button.disabled = true;
-            status.textContent = "⏳ Slayd tayyorlanmoqda...";
+      closeEl.addEventListener("click", function () {
+        if (tg) tg.close();
+      });
 
-            try {
-                const response = await fetch('/api/generate-slide', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ init_data: tg.initData, topic, template })
-                });
+      submitEl.addEventListener("click", async function () {
+        if (busy) return;
+        hideMessage();
+        closeEl.classList.remove("show");
 
-                const result = await response.json();
+        var topic = topicEl.value.trim();
 
-                if (!response.ok) throw new Error(result.detail || "Noma'lum xatolik");
+        if (!initData) {
+          showMessage("error", "Bu sahifani Telegram ichidagi bot orqali oching (botda /start bosing).");
+          haptic("error");
+          return;
+        }
+        if (topic.length < MIN_LEN) {
+          showMessage("error", "Mavzu kamida " + MIN_LEN + " ta belgidan iborat bo'lsin.");
+          haptic("error");
+          topicEl.focus();
+          return;
+        }
 
-                status.textContent = "✅ " + (result.message || "Slayd Telegram'ga yuborildi.");
-            } catch (error) {
-                status.textContent = "❌ " + error.message;
-            } finally {
-                button.disabled = false;
-            }
-        });
-    </script>
+        setBusy(true);
+        showMessage("info", "Slayd tayyorlanmoqda, bu 20-60 soniya olishi mumkin. Sahifani yopmang.");
+
+        var controller = new AbortController();
+        var timer = setTimeout(function () { controller.abort(); }, REQUEST_TIMEOUT_MS);
+
+        try {
+          var response = await fetch("/api/generate-slide", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              init_data: initData,
+              topic: topic,
+              template: selectedTemplate()
+            }),
+            signal: controller.signal
+          });
+
+          var data = null;
+          try { data = await response.json(); } catch (e) { /* JSON bo'lmasligi mumkin */ }
+
+          if (!response.ok) {
+            showMessage("error", extractError(data, response.status));
+            haptic("error");
+            return;
+          }
+
+          showMessage("success", "✅ Slayd tayyor! Telegram chatingizga fayl yuborildi.");
+          closeEl.classList.add("show");
+          haptic("success");
+        } catch (err) {
+          if (err && err.name === "AbortError") {
+            showMessage("error", "Kutish vaqti tugadi. Telegram chatini tekshiring, kerak bo'lsa qayta urinib ko'ring.");
+          } else {
+            showMessage("error", "Serverga ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring.");
+          }
+          haptic("error");
+        } finally {
+          clearTimeout(timer);
+          setBusy(false);
+        }
+      });
+
+      updateCounter();
+    })();
+  </script>
 </body>
 </html>
