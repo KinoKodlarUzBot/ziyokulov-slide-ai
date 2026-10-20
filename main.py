@@ -23,6 +23,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
+    BotCommand,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
@@ -87,6 +88,12 @@ GEMINI_DOC_TIMEOUT_SECONDS = float(os.getenv("GEMINI_DOC_TIMEOUT_SECONDS", "120"
 QUEUE_TIMEOUT_SECONDS = float(os.getenv("QUEUE_TIMEOUT_SECONDS", "45"))
 GEMINI_MAX_ATTEMPTS = int(os.getenv("GEMINI_MAX_ATTEMPTS", "2"))
 ENABLE_BOT_POLLING = os.getenv("ENABLE_BOT_POLLING", "1").strip() not in {"0", "false", "False"}
+# Adminlar (Telegram ID, vergul bilan): /stats buyrug'i va xato ogohlantirishlari shularga boradi.
+ADMIN_IDS = {
+    int(x) for x in os.getenv("ADMIN_IDS", "").replace(" ", "").split(",") if x.isdigit()
+}
+# Foydalanuvchilar murojaat qiladigan kontakt (masalan @username), ixtiyoriy.
+SUPPORT_CONTACT = os.getenv("SUPPORT_CONTACT", "").strip()
 
 MAX_TOPIC_LENGTH = 200
 MAX_BULLETS = 5
@@ -224,6 +231,26 @@ class RateLimiter:
         self._conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_requests_user_ts ON requests(user_id, ts)"
         )
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS users ("
+            "user_id INTEGER PRIMARY KEY, "
+            "first_name TEXT, "
+            "username TEXT, "
+            "first_seen REAL NOT NULL, "
+            "last_seen REAL NOT NULL, "
+            "free_used INTEGER NOT NULL DEFAULT 0, "
+            "credits INTEGER NOT NULL DEFAULT 0)"
+        )
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS orders ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "user_id INTEGER NOT NULL, "
+            "kind TEXT NOT NULL, "
+            "ok INTEGER NOT NULL, "
+            "created REAL NOT NULL, "
+            "duration REAL NOT NULL DEFAULT 0)"
+        )
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created)")
         self._conn.commit()
 
     def reserve(self, user_id: int) -> int | None:
@@ -243,6 +270,52 @@ class RateLimiter:
             )
             self._conn.commit()
             return cursor.lastrowid
+
+    def touch_user(self, user_id: int, first_name: str | None, username: str | None) -> None:
+        now = time.time()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO users (user_id, first_name, username, first_seen, last_seen) "
+                "VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT(user_id) DO UPDATE SET first_name = excluded.first_name, "
+                "username = excluded.username, last_seen = excluded.last_seen",
+                (user_id, (first_name or "")[:100], (username or "")[:100], now, now),
+            )
+            self._conn.commit()
+
+    def log_order(self, user_id: int, kind: str, ok: bool, duration: float) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO orders (user_id, kind, ok, created, duration) VALUES (?, ?, ?, ?, ?)",
+                (user_id, kind, 1 if ok else 0, time.time(), duration),
+            )
+            self._conn.commit()
+
+    def stats(self) -> dict:
+        day_ago = time.time() - 86400
+        with self._lock:
+            (total_users,) = self._conn.execute("SELECT COUNT(*) FROM users").fetchone()
+            (new_24h,) = self._conn.execute(
+                "SELECT COUNT(*) FROM users WHERE first_seen >= ?", (day_ago,)
+            ).fetchone()
+            (active_24h,) = self._conn.execute(
+                "SELECT COUNT(*) FROM users WHERE last_seen >= ?", (day_ago,)
+            ).fetchone()
+            (total_ok,) = self._conn.execute("SELECT COUNT(*) FROM orders WHERE ok = 1").fetchone()
+            rows = self._conn.execute(
+                "SELECT kind, ok, COUNT(*) FROM orders WHERE created >= ? GROUP BY kind, ok",
+                (day_ago,),
+            ).fetchall()
+        by_kind: dict[str, list[int]] = {}
+        for kind, ok, count in rows:
+            by_kind.setdefault(kind, [0, 0])[0 if ok else 1] += count
+        return {
+            "total_users": total_users,
+            "new_24h": new_24h,
+            "active_24h": active_24h,
+            "total_ok": total_ok,
+            "by_kind": by_kind,
+        }
 
     def remaining(self, user_id: int) -> int:
         """Foydalanuvchida qolgan so'rovlar soni."""
@@ -283,6 +356,47 @@ async def refund_rate_limit(reservation_id: int) -> None:
         await asyncio.to_thread(rate_limiter.refund, reservation_id)
     except Exception:
         logger.exception("Limitni qaytarib bo'lmadi")
+
+
+async def track_user(user_id: int, first_name: str | None, username: str | None) -> None:
+    """Foydalanuvchini bazaga yozadi. Xato bo'lsa ham asosiy ishni to'xtatmaydi."""
+    try:
+        await asyncio.to_thread(rate_limiter.touch_user, user_id, first_name, username)
+    except Exception:
+        logger.exception("Foydalanuvchini saqlab bo'lmadi")
+
+
+async def track_order(user_id: int, kind: str, ok: bool, duration: float) -> None:
+    try:
+        await asyncio.to_thread(rate_limiter.log_order, user_id, kind, ok, duration)
+    except Exception:
+        logger.exception("Buyurtmani saqlab bo'lmadi")
+
+
+# Bir foydalanuvchi bir vaqtda bitta ish bajartira oladi (spam va limit aylanib o'tishdan himoya).
+_active_users: set[int] = set()
+_last_alert_at = 0.0
+
+
+async def notify_admins(text: str) -> None:
+    """Adminlarga ogohlantirish yuboradi (10 daqiqada ko'pi bilan bitta)."""
+    global _last_alert_at
+    now = time.monotonic()
+    if not ADMIN_IDS or (_last_alert_at and now - _last_alert_at < 600):
+        return
+    _last_alert_at = now
+    for admin_id in ADMIN_IDS:
+        try:
+            await bot.send_message(admin_id, text)
+        except Exception:
+            logger.warning("Adminga xabar yuborib bo'lmadi: %s", admin_id)
+
+
+async def safe_edit(message, text: str) -> None:
+    try:
+        await message.edit_text(text)
+    except Exception:
+        pass
 
 
 # =========================================================
@@ -931,6 +1045,8 @@ def format_window(seconds: int) -> str:
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message, state: FSMContext):
     await state.clear()
+    if message.from_user:
+        await track_user(message.from_user.id, message.from_user.first_name, message.from_user.username)
     name = html.escape(message.from_user.first_name) if message.from_user else "do'st"
     await message.answer(
         f"👋 <b>Xush kelibsiz, {name}!</b>\n\n"
@@ -987,7 +1103,8 @@ async def help_btn(message: types.Message, state: FSMContext):
         "📱 <b>Slayd faylini</b> PowerPoint, WPS Office yoki Google Slides orqali oching: "
         "telefonning ichki ko'rish dasturi ba'zan bo'sh ko'rsatadi.\n"
         "📄 <b>Word fayllarni</b> Word, WPS Office yoki Google Docs bilan oching.\n\n"
-        "⚠️ AI xato qilishi mumkin: faktlarni va nomlarni topshirishdan oldin tekshiring.",
+        "⚠️ AI xato qilishi mumkin: faktlarni va nomlarni topshirishdan oldin tekshiring."
+        + (f"\n\n📩 Savol yoki taklif: {html.escape(SUPPORT_CONTACT)}" if SUPPORT_CONTACT else ""),
         parse_mode="HTML",
         reply_markup=main_keyboard(),
     )
@@ -1010,6 +1127,14 @@ async def run_document(message: types.Message, kind: str, topic: str) -> None:
     """Hujjatni yaratib, foydalanuvchiga yuboradi. Muvaffaqiyatsiz bo'lsa limit qaytariladi."""
     user_id = message.from_user.id
     meta = DOC_KINDS[kind]
+    await track_user(user_id, message.from_user.first_name, message.from_user.username)
+
+    if user_id in _active_users:
+        await message.answer(
+            "⏳ Oldingi ishingiz hali tayyor bo'lmadi. U tugagach yangisini boshlashingiz mumkin.",
+            reply_markup=main_keyboard(),
+        )
+        return
 
     try:
         reservation_id = await reserve_rate_limit(user_id)
@@ -1017,8 +1142,10 @@ async def run_document(message: types.Message, kind: str, topic: str) -> None:
         await message.answer(f"❗ {exc.detail}", reply_markup=main_keyboard())
         return
 
+    _active_users.add(user_id)
+    started = time.monotonic()
     status = await message.answer(
-        "⏳ Tayyorlanmoqda, bu 30-90 soniya olishi mumkin...",
+        "⏳ Matn yozilmoqda, bu 30-90 soniya olishi mumkin...",
         reply_markup=main_keyboard(),
     )
     file_path = os.path.join(tempfile.gettempdir(), f"{meta['file']}_{uuid.uuid4().hex}.docx")
@@ -1027,6 +1154,7 @@ async def run_document(message: types.Message, kind: str, topic: str) -> None:
     try:
         await bot.send_chat_action(message.chat.id, "upload_document")
         data = await generate_document_content(kind, topic)
+        await safe_edit(status, "📄 Word fayl tayyorlanmoqda...")
         await asyncio.to_thread(build_docx, kind, topic, data, file_path)
         await message.answer_document(
             types.FSInputFile(file_path, filename=f"{meta['file']}_{uuid.uuid4().hex[:6]}.docx"),
@@ -1035,15 +1163,20 @@ async def run_document(message: types.Message, kind: str, topic: str) -> None:
         success = True
     except HTTPException as exc:
         await message.answer(f"❗ {exc.detail}", reply_markup=main_keyboard())
+        if exc.status_code in (502, 503, 504):
+            await notify_admins(f"⚠️ AI xatosi ({meta['label']}, kod {exc.status_code}): {exc.detail}")
     except Exception:
         logger.exception("Hujjat yaratishda kutilmagan xatolik (%s)", kind)
         await message.answer(
             "❗ Hujjat yaratishda xatolik yuz berdi. Qayta urinib ko'ring.",
             reply_markup=main_keyboard(),
         )
+        await notify_admins(f"⚠️ Kutilmagan xatolik ({meta['label']}). Railway loglarini tekshiring.")
     finally:
+        _active_users.discard(user_id)
         if not success:
             await asyncio.shield(refund_rate_limit(reservation_id))
+        await track_order(user_id, kind, success, time.monotonic() - started)
         try:
             await status.delete()
         except Exception:
@@ -1053,6 +1186,31 @@ async def run_document(message: types.Message, kind: str, topic: str) -> None:
                 os.remove(file_path)
         except OSError:
             logger.warning("Vaqtinchalik faylni o'chirib bo'lmadi: %s", file_path)
+
+
+@dp.message(Command("stats"))
+async def stats_cmd(message: types.Message):
+    """Faqat adminlar uchun: foydalanuvchilar va buyurtmalar statistikasi."""
+    if not message.from_user or message.from_user.id not in ADMIN_IDS:
+        return
+    stats = await asyncio.to_thread(rate_limiter.stats)
+    labels = {"slayd": "Taqdimot"}
+    labels.update({key: meta["label"] for key, meta in DOC_KINDS.items()})
+    lines = [
+        "📈 <b>Statistika</b>",
+        f"👥 Jami foydalanuvchi: <b>{stats['total_users']}</b>",
+        f"🆕 24 soatda yangi: <b>{stats['new_24h']}</b>",
+        f"🟢 24 soatda faol: <b>{stats['active_24h']}</b>",
+        f"✅ Jami tayyor ish: <b>{stats['total_ok']}</b>",
+        "",
+        "<b>Oxirgi 24 soat:</b>",
+    ]
+    if stats["by_kind"]:
+        for kind, (ok_count, fail_count) in sorted(stats["by_kind"].items()):
+            lines.append(f"• {labels.get(kind, kind)}: {ok_count} ta" + (f" (xato: {fail_count})" if fail_count else ""))
+    else:
+        lines.append("• hali buyurtma yo'q")
+    await message.answer("\n".join(lines), parse_mode="HTML")
 
 
 @dp.message(DocOrder.waiting_topic, F.text)
@@ -1076,6 +1234,14 @@ async def receive_topic(message: types.Message, state: FSMContext):
 @dp.message(F.text)
 async def fallback_text(message: types.Message):
     await message.answer("Pastdagi tugmalardan birini tanlang 👇", reply_markup=main_keyboard())
+
+
+@dp.message()
+async def fallback_other(message: types.Message):
+    await message.answer(
+        "Iltimos, matn yuboring yoki pastdagi tugmalardan foydalaning 👇",
+        reply_markup=main_keyboard(),
+    )
 
 
 # =========================================================
@@ -1102,6 +1268,24 @@ async def lifespan(app: FastAPI):
             )
         except Exception:
             logger.exception("Menyu tugmasini o'rnatib bo'lmadi")
+        try:
+            await bot.set_my_commands([
+                BotCommand(command="start", description="Botni boshlash va menyu"),
+                BotCommand(command="help", description="Yordam"),
+                BotCommand(command="cancel", description="Bekor qilish"),
+            ])
+            await bot.set_my_short_description(
+                short_description="AI yordamchi: slayd, referat, mustaqil ish va test tayyorlaydi"
+            )
+            await bot.set_my_description(
+                description=(
+                    "O'zbek tilida tayyor taqdimot (slayd), referat, mustaqil ish va testlar "
+                    "tayyorlaydigan AI yordamchi. Mavzuni yozing, fayl bir necha daqiqada chatga keladi. "
+                    "Boshlash uchun /start ni bosing."
+                )
+            )
+        except Exception:
+            logger.exception("Bot profilini o'rnatib bo'lmadi")
         if ENABLE_BOT_POLLING:
             await bot.delete_webhook(drop_pending_updates=False)
             polling_task = asyncio.create_task(
@@ -1130,7 +1314,7 @@ async def lifespan(app: FastAPI):
         logger.info("Ilova to'xtatildi.")
 
 
-app = FastAPI(title="Ziyokulov Slide AI", version="3.0.0", lifespan=lifespan)
+app = FastAPI(title="Ziyokulov Slide AI", version="3.1.0", lifespan=lifespan)
 
 # CORS kerak emas: Mini App shu domenning o'zidan xizmat qiladi (same-origin).
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -1163,7 +1347,15 @@ async def api_me(req: MeRequest):
 async def api_generate_slide(req: SlideRequest):
     auth = verify_telegram_init_data(req.init_data)
     user_id = auth["user_id"]
+    await track_user(user_id, auth["user"].get("first_name"), auth["user"].get("username"))
+    if user_id in _active_users:
+        raise HTTPException(
+            status_code=429,
+            detail="Oldingi ishingiz hali tayyor bo'lmadi. U tugagach yangisini boshlang.",
+        )
     reservation_id = await reserve_rate_limit(user_id)
+    _active_users.add(user_id)
+    started = time.monotonic()
 
     file_path = os.path.join(tempfile.gettempdir(), f"slide_{uuid.uuid4().hex}.pptx")
     success = False
@@ -1205,18 +1397,23 @@ async def api_generate_slide(req: SlideRequest):
 
         success = True
         return {"success": True, "message": "Slayd Telegram orqali yuborildi."}
-    except HTTPException:
+    except HTTPException as exc:
+        if exc.status_code in (502, 503, 504):
+            await notify_admins(f"⚠️ Slayd xatosi (kod {exc.status_code}): {exc.detail}")
         raise
     except Exception as exc:
         logger.exception("Slayd yaratishda kutilmagan xatolik")
+        await notify_admins("⚠️ Slaydda kutilmagan xatolik. Railway loglarini tekshiring.")
         raise HTTPException(
             status_code=500,
             detail="Slayd yaratishda xatolik yuz berdi.",
         ) from exc
     finally:
+        _active_users.discard(user_id)
         # Muvaffaqiyatsiz urinish foydalanuvchi limitidan ayirilmaydi.
         if not success:
             await asyncio.shield(refund_rate_limit(reservation_id))
+        await track_order(user_id, "slayd", success, time.monotonic() - started)
         try:
             if os.path.exists(file_path):
                 os.remove(file_path)
