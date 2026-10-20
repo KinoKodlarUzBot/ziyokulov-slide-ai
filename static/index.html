@@ -3,143 +3,271 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
   <title>Slayd AI</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
-      --bg: var(--tg-theme-bg-color, #ffffff);
-      --text: var(--tg-theme-text-color, #111111);
-      --hint: var(--tg-theme-hint-color, #707579);
-      --accent: var(--tg-theme-button-color, #2481cc);
-      --accent-text: var(--tg-theme-button-text-color, #ffffff);
-      --card: var(--tg-theme-secondary-bg-color, #f1f3f5);
-      --danger: #e53935;
-      --ok: #2e9e4f;
-      --radius: 14px;
+      --bg: #0d0e1b;
+      --card: #1a1d35;
+      --line: rgba(255, 255, 255, .09);
+      --text: #f3f4fa;
+      --hint: #8f94b3;
+      --gold: #f5b73d;
+      --gold-soft: #ffd27a;
+      --gold-ink: #231a05;
+      --danger: #ff7b7b;
+      --ok: #4ade80;
     }
 
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
     html, body {
       margin: 0;
+      min-height: 100%;
       background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-size: 16px;
       line-height: 1.4;
     }
+    body { background: linear-gradient(180deg, #0d0e1b 0%, #131226 60%, #0d0e1b 100%) fixed; }
 
     .app {
       max-width: 560px;
       margin: 0 auto;
-      padding: 20px 16px calc(28px + env(safe-area-inset-bottom, 0px));
+      padding: 14px 14px calc(34px + env(safe-area-inset-bottom, 0px));
     }
 
-    h1 { font-size: 24px; margin: 4px 0 4px; }
-    .subtitle { color: var(--hint); margin: 0 0 20px; font-size: 15px; }
+    /* ---------- Yuqori qator: tablar + limit ---------- */
+    .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 
-    .label {
+    .tabs {
       display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      font-weight: 600;
-      font-size: 14px;
-      margin: 18px 0 8px;
+      gap: 2px;
+      padding: 5px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .05);
+      border: 1px solid var(--line);
     }
-    .counter { color: var(--hint); font-weight: 400; font-size: 13px; }
-    .counter.limit { color: var(--danger); }
-
-    textarea {
-      width: 100%;
-      min-height: 96px;
-      resize: none;
-      padding: 12px 14px;
-      border: 2px solid transparent;
-      border-radius: var(--radius);
-      background: var(--card);
-      color: var(--text);
-      font: inherit;
-      outline: none;
-      transition: border-color .15s;
-    }
-    textarea:focus { border-color: var(--accent); }
-    textarea::placeholder { color: var(--hint); }
-
-    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-    .chip {
+    .tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
       border: none;
-      background: var(--card);
-      color: var(--text);
-      padding: 7px 12px;
+      background: transparent;
+      color: var(--hint);
+      padding: 9px 13px;
       border-radius: 999px;
       font: inherit;
-      font-size: 13px;
+      font-weight: 700;
+      font-size: 15px;
       cursor: pointer;
+      transition: background .15s, color .15s;
     }
-    .chip:active { opacity: .6; }
+    .tab .lb { display: none; }
+    .tab.active { background: var(--gold); color: var(--gold-ink); }
+    .tab.active .lb { display: inline; }
 
-    .templates {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-    }
-    .template { position: relative; }
-    .template input { position: absolute; opacity: 0; pointer-events: none; }
-    .template label {
-      display: block;
-      padding: 10px;
-      border-radius: var(--radius);
-      background: var(--card);
-      border: 2px solid transparent;
-      cursor: pointer;
-      transition: border-color .15s;
-    }
-    .template input:checked + label { border-color: var(--accent); }
-    .template input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-    .preview {
-      height: 64px;
-      border-radius: 8px;
-      padding: 10px;
+    .limit {
       display: flex;
-      flex-direction: column;
-      gap: 6px;
-      border: 1px solid rgba(128, 128, 128, .25);
+      align-items: center;
+      gap: 7px;
+      padding: 11px 15px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--gold-soft), var(--gold));
+      color: var(--gold-ink);
+      font-weight: 800;
+      font-size: 15px;
+      box-shadow: 0 6px 20px rgba(245, 183, 61, .28);
+      white-space: nowrap;
     }
-    .preview .t { height: 8px; width: 60%; border-radius: 4px; }
-    .preview .l { height: 5px; border-radius: 3px; opacity: .8; }
-    .preview .l:nth-child(2) { width: 90%; }
-    .preview .l:nth-child(3) { width: 75%; }
-    .preview .l:nth-child(4) { width: 82%; }
-    .template .name { margin-top: 8px; font-size: 14px; font-weight: 600; }
-    .template .desc { font-size: 12px; color: var(--hint); }
 
+    .count { color: var(--hint); margin: 16px 2px 12px; font-size: 15px; }
+
+    /* ---------- Qidiruv ko'rinishidagi kiritish ---------- */
+    .search {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 8px 8px 16px;
+      border-radius: 22px;
+      background: rgba(255, 255, 255, .05);
+      border: 1px solid var(--line);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .search:focus-within { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(245, 183, 61, .15); }
+    .search input {
+      flex: 1;
+      min-width: 0;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: 16px;
+      padding: 10px 0;
+    }
+    .search input::placeholder { color: var(--hint); }
+    .gobtn {
+      width: 50px;
+      height: 50px;
+      flex: none;
+      border: none;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--gold-soft), var(--gold));
+      color: var(--gold-ink);
+      font-size: 22px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .gobtn:disabled { opacity: .5; }
+    .counter { text-align: right; color: var(--hint); font-size: 12px; margin: 6px 6px 0; }
+    .counter.limit-hit { color: var(--danger); }
+
+    /* ---------- Sarlavhalar ---------- */
+    .sec-head { display: flex; align-items: baseline; justify-content: space-between; margin: 0 2px 12px; }
+    .sec-head h2 { margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -.2px; }
+    .sec-head span { color: var(--hint); font-size: 13px; }
+
+    .band {
+      margin: 22px -14px 0;
+      padding: 20px 14px 10px;
+      border-top: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(150, 40, 70, .30), rgba(150, 40, 70, 0));
+    }
+    .block { margin-top: 22px; }
+
+    /* ---------- Gorizontal lenta ---------- */
+    .rail {
+      display: flex;
+      gap: 13px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      margin: 0 -14px;
+      padding: 2px 14px 8px;
+      scrollbar-width: none;
+    }
+    .rail::-webkit-scrollbar { display: none; }
+
+    /* ---------- Poster kartalari ---------- */
+    .poster { display: flex; flex-direction: column; justify-content: flex-start; flex: none; width: 150px; scroll-snap-align: start; border: none; background: none; padding: 0; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+    .grid .poster { width: 100%; align-self: start; }
+    .art {
+      position: relative;
+      height: 205px;
+      border-radius: 20px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, .35);
+      transition: transform .12s;
+    }
+    .poster:active .art { transform: scale(.97); }
+    .art::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0) 55%),
+                  linear-gradient(180deg, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, .45));
+    }
+    .art .emoji { font-size: 66px; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .35)); position: relative; z-index: 1; }
+    .badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 2;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(20, 20, 35, .7);
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .pill {
+      position: absolute;
+      left: 10px;
+      bottom: 10px;
+      z-index: 2;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(20, 20, 35, .72);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .ptitle {
+      margin: 9px 3px 0;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.25;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* ---------- Uslub kartalari ---------- */
+    .sty { display: flex; flex-direction: column; justify-content: flex-start; flex: none; width: 150px; scroll-snap-align: start; border: none; background: none; padding: 0; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+    .pv {
+      position: relative;
+      height: 100px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 3px solid transparent;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, .3);
+    }
+    .sty.sel .pv { border-color: var(--gold); }
+    .pv .bar { position: absolute; top: 0; left: 0; right: 0; height: 7px; }
+    .pv .ttl { position: absolute; top: 20px; left: 14px; height: 7px; width: 48%; border-radius: 4px; }
+    .pv .row { position: absolute; left: 14px; right: 14px; height: 13px; border-radius: 5px; }
+    .pv .row i { position: absolute; left: 5px; top: 3px; width: 7px; height: 7px; border-radius: 50%; }
+    .check {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--gold);
+      color: var(--gold-ink);
+      font-weight: 900;
+      font-size: 14px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+    }
+    .sty.sel .check { display: flex; }
+    .sname { margin: 9px 3px 0; font-size: 14px; font-weight: 800; }
+    .sdesc { margin: 1px 3px 0; font-size: 12px; color: var(--hint); }
+
+    /* ---------- Asosiy tugma ---------- */
     .submit {
       width: 100%;
       margin-top: 24px;
-      padding: 15px;
+      padding: 17px;
       border: none;
-      border-radius: var(--radius);
-      background: var(--accent);
-      color: var(--accent-text);
+      border-radius: 20px;
+      background: linear-gradient(135deg, var(--gold-soft), var(--gold));
+      color: var(--gold-ink);
       font: inherit;
-      font-weight: 600;
-      font-size: 16px;
-      cursor: pointer;
+      font-weight: 800;
+      font-size: 17px;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 10px;
-      transition: opacity .15s;
+      cursor: pointer;
+      box-shadow: 0 10px 28px rgba(245, 183, 61, .3);
+      transition: opacity .15s, transform .1s;
     }
-    .submit:disabled { opacity: .55; cursor: default; }
-    .submit:not(:disabled):active { opacity: .8; }
-
+    .submit:disabled { opacity: .6; cursor: default; }
+    .submit:not(:disabled):active { transform: scale(.98); }
     .spinner {
       width: 18px;
       height: 18px;
-      border: 3px solid rgba(255, 255, 255, .4);
-      border-top-color: var(--accent-text);
+      border: 3px solid rgba(35, 26, 5, .3);
+      border-top-color: var(--gold-ink);
       border-radius: 50%;
       animation: spin .8s linear infinite;
       display: none;
@@ -147,60 +275,123 @@
     .loading .spinner { display: block; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .message {
-      display: none;
-      margin-top: 16px;
-      padding: 12px 14px;
-      border-radius: var(--radius);
-      font-size: 14px;
-    }
+    .message { display: none; margin-top: 16px; padding: 13px 15px; border-radius: 16px; font-size: 14px; }
     .message.show { display: block; }
-    .message.error { background: rgba(229, 57, 53, .12); color: var(--danger); }
-    .message.info { background: var(--card); color: var(--hint); }
-    .message.success { background: rgba(46, 158, 79, .12); color: var(--ok); }
+    .message.error { background: rgba(255, 123, 123, .13); color: var(--danger); }
+    .message.info { background: rgba(255, 255, 255, .06); color: var(--hint); }
+    .message.success { background: rgba(74, 222, 128, .13); color: var(--ok); }
 
     .close-btn {
       display: none;
       width: 100%;
       margin-top: 10px;
-      padding: 13px;
-      border: none;
-      border-radius: var(--radius);
-      background: var(--card);
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, .05);
       color: var(--text);
       font: inherit;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
     }
     .close-btn.show { display: block; }
 
-    .note { color: var(--hint); font-size: 12px; text-align: center; margin-top: 18px; }
+    /* ---------- Mavzular tabi ---------- */
+    .chips { display: flex; gap: 8px; overflow-x: auto; margin: 0 -14px 16px; padding: 2px 14px; scrollbar-width: none; }
+    .chips::-webkit-scrollbar { display: none; }
+    .chip {
+      flex: none;
+      padding: 10px 17px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, .05);
+      color: var(--text);
+      font: inherit;
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .chip.active { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px 13px; }
+
+    /* ---------- Yordam tabi ---------- */
+    .help-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+    .help-list li {
+      display: flex;
+      gap: 14px;
+      padding: 15px;
+      border-radius: 18px;
+      background: var(--card);
+      border: 1px solid var(--line);
+    }
+    .help-list .hi { font-size: 26px; line-height: 1; }
+    .help-list b { display: block; font-size: 16px; margin-bottom: 2px; }
+    .help-list span { color: var(--hint); font-size: 14px; }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .note { color: var(--hint); font-size: 12px; text-align: center; margin-top: 20px; }
   </style>
 </head>
 <body>
   <main class="app">
-    <h1>✨ Slayd AI</h1>
-    <p class="subtitle">Mavzuni yozing, tayyor PowerPoint taqdimot Telegram chatingizga yuboriladi.</p>
+    <header class="top">
+      <nav class="tabs" id="tabs" aria-label="Bo'limlar">
+        <button class="tab active" type="button" data-tab="create"><span class="ic">✨</span><span class="lb">Yaratish</span></button>
+        <button class="tab" type="button" data-tab="topics"><span class="ic">🔥</span><span class="lb">Mavzular</span></button>
+        <button class="tab" type="button" data-tab="help"><span class="ic">❓</span><span class="lb">Yordam</span></button>
+      </nav>
+      <div class="limit" id="limit" title="Qolgan so'rovlar"><span>⚡</span><span id="limit-text">—</span></div>
+    </header>
 
-    <div class="label">
-      <span>Taqdimot mavzusi</span>
-      <span class="counter" id="counter">0 / 200</span>
-    </div>
-    <textarea id="topic" maxlength="200" placeholder="Masalan: Sun'iy intellektning kelajagi" autocomplete="off"></textarea>
-    <div class="chips" id="chips"></div>
+    <p class="count" id="count"></p>
 
-    <div class="label"><span>Uslub</span></div>
-    <div class="templates" id="templates"></div>
+    <!-- ===== Yaratish ===== -->
+    <section class="panel active" id="panel-create">
+      <div class="search">
+        <input id="topic" type="text" maxlength="200" enterkeyhint="go" autocomplete="off"
+               placeholder="Taqdimot mavzusini yozing...">
+        <button class="gobtn" id="go" type="button" aria-label="Slayd yaratish">➜</button>
+      </div>
+      <div class="counter" id="counter">0 / 200</div>
 
-    <button class="submit" id="submit" type="button">
-      <span class="spinner"></span>
-      <span id="submit-text">Slayd yaratish</span>
-    </button>
+      <div class="band">
+        <div class="sec-head"><h2>🔥 Top mavzular</h2><span>bosib tanlang</span></div>
+        <div class="rail" id="top-rail"></div>
+      </div>
 
-    <div class="message" id="message" role="status" aria-live="polite"></div>
-    <button class="close-btn" id="close" type="button">Mini App'ni yopish</button>
+      <div class="block">
+        <div class="sec-head"><h2>🎨 Uslub</h2><span>4 ta variant</span></div>
+        <div class="rail" id="styles"></div>
+      </div>
 
-    <p class="note">Taqdimot 6 ta slayddan iborat: muqova va 5 ta mazmunli slayd.</p>
+      <button class="submit" id="submit" type="button">
+        <span class="spinner"></span>
+        <span id="submit-text">Slayd yaratish</span>
+      </button>
+      <div class="message" id="message" role="status" aria-live="polite"></div>
+      <button class="close-btn" id="close" type="button">Mini App'ni yopish</button>
+      <p class="note">Taqdimot 6 ta slayddan iborat: muqova va 5 ta mazmunli slayd.</p>
+    </section>
+
+    <!-- ===== Mavzular ===== -->
+    <section class="panel" id="panel-topics">
+      <div class="chips" id="cats"></div>
+      <div class="grid" id="grid"></div>
+    </section>
+
+    <!-- ===== Yordam ===== -->
+    <section class="panel" id="panel-help">
+      <div class="sec-head"><h2>Nimalar qila olaman</h2></div>
+      <ul class="help-list">
+        <li><span class="hi">✨</span><div><b>Slayd yaratish</b><span>Mavzuni yozasiz, 6 slaydli PowerPoint fayl Telegram chatingizga keladi.</span></div></li>
+        <li><span class="hi">🎨</span><div><b>4 xil uslub</b><span>Klassik, biznes, qorong'i va minimal.</span></div></li>
+        <li><span class="hi">🔥</span><div><b>Tayyor mavzular</b><span>Mavzular bo'limidan birini bosing, u avtomatik yoziladi.</span></div></li>
+        <li><span class="hi">📄</span><div><b>Referat, mustaqil ish, test</b><span>Botdagi tugmalar orqali: mavzuni chatga yozasiz, Word fayl keladi. Limit umumiy.</span></div></li>
+        <li><span class="hi">⚡</span><div><b id="help-limit-title">So'rovlar limiti</b><span id="help-limit-text">Limit tepada ko'rinib turadi.</span></div></li>
+        <li><span class="hi">📱</span><div><b>Faylni qanday ochaman?</b><span>PowerPoint, WPS Office yoki Google Slides ilovasi orqali oching. Telefonning ichki ko'rish dasturi ba'zan bo'sh ko'rsatadi.</span></div></li>
+      </ul>
+    </section>
   </main>
 
   <script>
@@ -209,6 +400,7 @@
       if (tg) {
         tg.ready();
         tg.expand();
+        try { tg.setHeaderColor("#0d0e1b"); tg.setBackgroundColor("#0d0e1b"); } catch (e) { /* eski versiya */ }
       }
       var initData = tg ? tg.initData : "";
 
@@ -216,32 +408,54 @@
       var MIN_LEN = 3;
       var REQUEST_TIMEOUT_MS = 150000;
 
-      var TEMPLATES = [
-        { id: "classic",  name: "Klassik",  desc: "Oq fon, oddiy",   bg: "#ffffff", title: "#141414", text: "#3c3c3c" },
-        { id: "business", name: "Biznes",   desc: "Ko'k ranglar",    bg: "#f0f4f8", title: "#1e3a8a", text: "#1f2937" },
-        { id: "dark",     name: "Qorong'i", desc: "Tungi rejim",     bg: "#18181b", title: "#ffffff", text: "#e4e4e7" },
-        { id: "minimal",  name: "Minimal",  desc: "Yashil, yengil",  bg: "#f0fdf4", title: "#166534", text: "#14532d" }
+      var STYLES = [
+        { id: "classic",  name: "Klassik",  desc: "Oq fon, binafsha",  bg: "#ffffff", accent: "#4f46e5", card: "#f3f4f6", text: "#374151" },
+        { id: "business", name: "Biznes",   desc: "Ko'k, qat'iy",      bg: "#f0f4f8", accent: "#1e3a8a", card: "#ffffff", text: "#1f2937" },
+        { id: "dark",     name: "Qorong'i", desc: "Tungi rejim",       bg: "#18181b", accent: "#8b5cf6", card: "#27272a", text: "#e4e4e7" },
+        { id: "minimal",  name: "Minimal",  desc: "Yashil, yengil",    bg: "#f0fdf4", accent: "#16a34a", card: "#ffffff", text: "#14532d" }
       ];
 
-      var EXAMPLES = [
-        "Sun'iy intellekt kelajagi",
-        "Sog'lom turmush tarzi",
-        "O'zbekiston turizmi",
-        "Iqlim o'zgarishi"
+      var CATS = ["Hammasi", "Ta'lim", "Texnologiya", "Biznes", "Sog'liq", "Tabiat"];
+
+      var TOPICS = [
+        { cat: "Texnologiya", top: true, title: "Sun'iy intellekt kelajagi",   emoji: "🤖", g: ["#7f00ff", "#e100ff"] },
+        { cat: "Biznes",      top: true, title: "Startap qanday boshlanadi",   emoji: "🚀", g: ["#ff512f", "#dd2476"] },
+        { cat: "Sog'liq",     top: true, title: "Sog'lom turmush tarzi",       emoji: "🥗", g: ["#56ab2f", "#a8e063"] },
+        { cat: "Tabiat",      top: true, title: "Iqlim o'zgarishi",            emoji: "🌍", g: ["#00b09b", "#96c93d"] },
+        { cat: "Ta'lim",      top: true, title: "Zamonaviy ta'lim usullari",   emoji: "🎓", g: ["#6a11cb", "#2575fc"] },
+        { cat: "Tabiat",      top: true, title: "O'zbekiston turizmi",         emoji: "🕌", g: ["#2193b0", "#6dd5ed"] },
+        { cat: "Ta'lim",      title: "Xorijiy tillarni tez o'rganish",        emoji: "🗣️", g: ["#f7971e", "#e8a600"] },
+        { cat: "Ta'lim",      title: "Kitob o'qishning foydasi",              emoji: "📚", g: ["#11998e", "#38b86d"] },
+        { cat: "Texnologiya", title: "Kiberxavfsizlik asoslari",              emoji: "🛡️", g: ["#0f2027", "#2c5364"] },
+        { cat: "Texnologiya", title: "Blokcheyn va kriptovalyuta",            emoji: "⛓️", g: ["#f12711", "#f5af19"] },
+        { cat: "Biznes",      title: "Marketing asoslari",                    emoji: "📈", g: ["#1d976c", "#3fc38a"] },
+        { cat: "Biznes",      title: "Vaqtni to'g'ri boshqarish",             emoji: "⏰", g: ["#396afc", "#2948ff"] },
+        { cat: "Sog'liq",     title: "Uyqu va salomatlik",                    emoji: "😴", g: ["#4b6cb7", "#182848"] },
+        { cat: "Sog'liq",     title: "Stressni yengish usullari",             emoji: "🧘", g: ["#c471f5", "#fa71cd"] },
+        { cat: "Tabiat",      title: "Qayta tiklanuvchi energiya",            emoji: "☀️", g: ["#f2994a", "#f2c94c"] }
       ];
 
       var topicEl = document.getElementById("topic");
       var counterEl = document.getElementById("counter");
-      var chipsEl = document.getElementById("chips");
-      var templatesEl = document.getElementById("templates");
       var submitEl = document.getElementById("submit");
       var submitTextEl = document.getElementById("submit-text");
+      var goEl = document.getElementById("go");
       var messageEl = document.getElementById("message");
       var closeEl = document.getElementById("close");
+      var limitTextEl = document.getElementById("limit-text");
+      var countEl = document.getElementById("count");
 
       var busy = false;
+      var selectedStyle = "classic";
 
-      // ---------- Yordamchi funksiyalar ----------
+      // ---------- Yordamchilar ----------
+      function el(tag, className, text) {
+        var node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+
       function haptic(type) {
         try {
           if (tg && tg.HapticFeedback) {
@@ -255,7 +469,6 @@
         messageEl.className = "message show " + kind;
         messageEl.textContent = text;
       }
-
       function hideMessage() {
         messageEl.className = "message";
         messageEl.textContent = "";
@@ -264,20 +477,16 @@
       function setBusy(value) {
         busy = value;
         submitEl.disabled = value;
+        goEl.disabled = value;
+        topicEl.disabled = value;
         submitEl.classList.toggle("loading", value);
         submitTextEl.textContent = value ? "Tayyorlanmoqda..." : "Slayd yaratish";
-        topicEl.disabled = value;
       }
 
       function updateCounter() {
         var len = topicEl.value.length;
         counterEl.textContent = len + " / " + MAX_LEN;
-        counterEl.classList.toggle("limit", len >= MAX_LEN);
-      }
-
-      function selectedTemplate() {
-        var checked = document.querySelector('input[name="template"]:checked');
-        return checked ? checked.value : "classic";
+        counterEl.classList.toggle("limit-hit", len >= MAX_LEN);
       }
 
       function extractError(data, status) {
@@ -286,75 +495,143 @@
         return "Xatolik yuz berdi (" + status + "). Qayta urinib ko'ring.";
       }
 
-      // ---------- Interfeysni yig'ish ----------
-      EXAMPLES.forEach(function (text) {
-        var chip = document.createElement("button");
-        chip.type = "button";
-        chip.className = "chip";
-        chip.textContent = text;
-        chip.addEventListener("click", function () {
+      function formatWindow(minutes) {
+        if (minutes >= 60 && minutes % 60 === 0) return (minutes / 60) + " soat";
+        return minutes + " daqiqa";
+      }
+
+      // ---------- Tablar ----------
+      function switchTab(name) {
+        var tabs = document.querySelectorAll(".tab");
+        for (var i = 0; i < tabs.length; i++) {
+          tabs[i].classList.toggle("active", tabs[i].getAttribute("data-tab") === name);
+        }
+        var panels = document.querySelectorAll(".panel");
+        for (var j = 0; j < panels.length; j++) {
+          panels[j].classList.toggle("active", panels[j].id === "panel-" + name);
+        }
+        countEl.style.display = name === "help" ? "none" : "";
+        window.scrollTo(0, 0);
+        haptic("select");
+      }
+
+      document.getElementById("tabs").addEventListener("click", function (event) {
+        var btn = event.target.closest(".tab");
+        if (btn) switchTab(btn.getAttribute("data-tab"));
+      });
+
+      // ---------- Poster kartalari ----------
+      function makePoster(topic, rank) {
+        var btn = el("button", "poster");
+        btn.type = "button";
+        var art = el("div", "art");
+        art.style.background = "linear-gradient(145deg, " + topic.g[0] + ", " + topic.g[1] + ")";
+        art.appendChild(el("span", "badge", "#" + rank));
+        art.appendChild(el("span", "emoji", topic.emoji));
+        art.appendChild(el("span", "pill", "6 slayd"));
+        btn.appendChild(art);
+        btn.appendChild(el("div", "ptitle", topic.title));
+        btn.addEventListener("click", function () {
           if (busy) return;
-          topicEl.value = text;
+          topicEl.value = topic.title;
           updateCounter();
+          hideMessage();
+          switchTab("create");
+        });
+        return btn;
+      }
+
+      var topRail = document.getElementById("top-rail");
+      TOPICS.forEach(function (topic, index) {
+        if (topic.top) topRail.appendChild(makePoster(topic, index + 1));
+      });
+
+      var gridEl = document.getElementById("grid");
+      var catsEl = document.getElementById("cats");
+      var activeCat = "Hammasi";
+
+      function renderGrid() {
+        gridEl.textContent = "";
+        TOPICS.forEach(function (topic, index) {
+          if (activeCat === "Hammasi" || topic.cat === activeCat) {
+            gridEl.appendChild(makePoster(topic, index + 1));
+          }
+        });
+      }
+
+      CATS.forEach(function (cat) {
+        var chip = el("button", "chip" + (cat === activeCat ? " active" : ""), cat);
+        chip.type = "button";
+        chip.addEventListener("click", function () {
+          activeCat = cat;
+          var chips = catsEl.children;
+          for (var i = 0; i < chips.length; i++) chips[i].classList.toggle("active", chips[i] === chip);
+          renderGrid();
           haptic("select");
         });
-        chipsEl.appendChild(chip);
+        catsEl.appendChild(chip);
+      });
+      renderGrid();
+
+      countEl.textContent = TOPICS.length + " ta tayyor mavzu · posterini bosing";
+
+      // ---------- Uslub kartalari ----------
+      var stylesEl = document.getElementById("styles");
+      STYLES.forEach(function (st) {
+        var btn = el("button", "sty" + (st.id === selectedStyle ? " sel" : ""));
+        btn.type = "button";
+        btn.setAttribute("data-style", st.id);
+
+        var pv = el("div", "pv");
+        pv.style.background = st.bg;
+        var bar = el("div", "bar"); bar.style.background = st.accent; pv.appendChild(bar);
+        var ttl = el("div", "ttl"); ttl.style.background = st.accent; pv.appendChild(ttl);
+        [38, 62].forEach(function (top) {
+          var row = el("div", "row");
+          row.style.top = top + "px";
+          row.style.background = st.card;
+          row.style.boxShadow = "0 0 0 1px rgba(128,128,128,.18)";
+          var dot = el("i"); dot.style.background = st.accent; row.appendChild(dot);
+          pv.appendChild(row);
+        });
+        pv.appendChild(el("div", "check", "✓"));
+
+        btn.appendChild(pv);
+        btn.appendChild(el("div", "sname", st.name));
+        btn.appendChild(el("div", "sdesc", st.desc));
+        btn.addEventListener("click", function () {
+          if (busy) return;
+          selectedStyle = st.id;
+          var all = stylesEl.children;
+          for (var i = 0; i < all.length; i++) all[i].classList.toggle("sel", all[i] === btn);
+          haptic("select");
+        });
+        stylesEl.appendChild(btn);
       });
 
-      TEMPLATES.forEach(function (tpl, index) {
-        var wrap = document.createElement("div");
-        wrap.className = "template";
+      // ---------- Limitni ko'rsatish ----------
+      function applyLimit(data) {
+        if (!data || typeof data.remaining !== "number") return;
+        limitTextEl.textContent = data.remaining + "/" + data.limit;
+        document.getElementById("help-limit-title").textContent = "Limit: " + data.remaining + " / " + data.limit;
+        document.getElementById("help-limit-text").textContent =
+          "Har " + formatWindow(data.window_minutes) + "da " + data.limit + " tagacha slayd yaratish mumkin.";
+      }
 
-        var input = document.createElement("input");
-        input.type = "radio";
-        input.name = "template";
-        input.id = "tpl-" + tpl.id;
-        input.value = tpl.id;
-        if (index === 0) input.checked = true;
-        input.addEventListener("change", function () { haptic("select"); });
+      async function loadLimit() {
+        if (!initData) return;
+        try {
+          var response = await fetch("/api/me", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ init_data: initData })
+          });
+          if (response.ok) applyLimit(await response.json());
+        } catch (e) { /* limit ko'rinmasa ham ilova ishlayveradi */ }
+      }
 
-        var label = document.createElement("label");
-        label.setAttribute("for", input.id);
-
-        var preview = document.createElement("div");
-        preview.className = "preview";
-        preview.style.background = tpl.bg;
-
-        var bar = document.createElement("div");
-        bar.className = "t";
-        bar.style.background = tpl.title;
-        preview.appendChild(bar);
-        for (var i = 0; i < 3; i++) {
-          var line = document.createElement("div");
-          line.className = "l";
-          line.style.background = tpl.text;
-          preview.appendChild(line);
-        }
-
-        var name = document.createElement("div");
-        name.className = "name";
-        name.textContent = tpl.name;
-
-        var desc = document.createElement("div");
-        desc.className = "desc";
-        desc.textContent = tpl.desc;
-
-        label.appendChild(preview);
-        label.appendChild(name);
-        label.appendChild(desc);
-        wrap.appendChild(input);
-        wrap.appendChild(label);
-        templatesEl.appendChild(wrap);
-      });
-
-      // ---------- Hodisalar ----------
-      topicEl.addEventListener("input", updateCounter);
-
-      closeEl.addEventListener("click", function () {
-        if (tg) tg.close();
-      });
-
-      submitEl.addEventListener("click", async function () {
+      // ---------- Slayd yaratish ----------
+      async function generate() {
         if (busy) return;
         hideMessage();
         closeEl.classList.remove("show");
@@ -383,11 +660,7 @@
           var response = await fetch("/api/generate-slide", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              init_data: initData,
-              topic: topic,
-              template: selectedTemplate()
-            }),
+            body: JSON.stringify({ init_data: initData, topic: topic, template: selectedStyle }),
             signal: controller.signal
           });
 
@@ -413,10 +686,21 @@
         } finally {
           clearTimeout(timer);
           setBusy(false);
+          loadLimit();
         }
+      }
+
+      // ---------- Hodisalar ----------
+      topicEl.addEventListener("input", updateCounter);
+      topicEl.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") { event.preventDefault(); topicEl.blur(); generate(); }
       });
+      submitEl.addEventListener("click", generate);
+      goEl.addEventListener("click", generate);
+      closeEl.addEventListener("click", function () { if (tg) tg.close(); });
 
       updateCounter();
+      loadLimit();
     })();
   </script>
 </body>
