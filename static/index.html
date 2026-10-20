@@ -146,6 +146,7 @@
       scroll-snap-type: x mandatory;
       margin: 0 -14px;
       padding: 2px 14px 8px;
+      scroll-padding: 0 14px;
       scrollbar-width: none;
     }
     .rail::-webkit-scrollbar { display: none; }
@@ -328,6 +329,7 @@
     .help-list b { display: block; font-size: 16px; margin-bottom: 2px; }
     .help-list span { color: var(--hint); font-size: 14px; }
 
+    #panel-help { padding-top: 16px; }
     .panel { display: none; }
     .panel.active { display: block; }
     .note { color: var(--hint); font-size: 12px; text-align: center; margin-top: 20px; }
@@ -615,7 +617,7 @@
         limitTextEl.textContent = data.remaining + "/" + data.limit;
         document.getElementById("help-limit-title").textContent = "Limit: " + data.remaining + " / " + data.limit;
         document.getElementById("help-limit-text").textContent =
-          "Har " + formatWindow(data.window_minutes) + "da " + data.limit + " tagacha slayd yaratish mumkin.";
+          "Har " + formatWindow(data.window_minutes) + "da " + data.limit + " tagacha ish yaratish mumkin (slayd, referat, mustaqil ish va test uchun umumiy).";
       }
 
       async function loadLimit() {
