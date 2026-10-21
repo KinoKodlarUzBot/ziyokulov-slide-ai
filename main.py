@@ -97,7 +97,7 @@ TELEGRAM_INIT_DATA_MAX_AGE = int(os.getenv("TELEGRAM_INIT_DATA_MAX_AGE", "86400"
 GEMINI_TIMEOUT_SECONDS = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "60"))
 GEMINI_DOC_TIMEOUT_SECONDS = float(os.getenv("GEMINI_DOC_TIMEOUT_SECONDS", "120"))
 QUEUE_TIMEOUT_SECONDS = float(os.getenv("QUEUE_TIMEOUT_SECONDS", "45"))
-GEMINI_MAX_ATTEMPTS = int(os.getenv("GEMINI_MAX_ATTEMPTS", "2"))
+GEMINI_MAX_ATTEMPTS = int(os.getenv("GEMINI_MAX_ATTEMPTS", "1"))
 ENABLE_BOT_POLLING = os.getenv("ENABLE_BOT_POLLING", "1").strip() not in {"0", "false", "False"}
 # Adminlar (Telegram ID, vergul bilan): /stats buyrug'i va xato ogohlantirishlari shularga boradi.
 ADMIN_IDS = {
