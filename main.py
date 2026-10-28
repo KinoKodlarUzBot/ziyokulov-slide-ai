@@ -140,15 +140,6 @@ generation_semaphore = asyncio.Semaphore(MAX_CONCURRENT_GENERATIONS)
 # =========================================================
 # 15 XIL SHABLON VA TURFA XIL ICHKI TUZILISH SOZLAMALARI
 # =========================================================
-# Qolip turlari (layout_type):
-# 1. two_columns       - 2 ta teng vertikal ustun (Taqqoslash / Ikki yo'nalish)
-# 2. horizontal_cards  - Gorizontal 3 ta bosqichli karta (Timeline / Process 1->2->3)
-# 3. hero_focus        - Markazda 1 ta katta asosiy fikr + pastda 2 ta tushuntirish
-# 4. split_feature     - Asimmetrik: Chapda dominant katta rangli blok + O'ngda qatorlar
-# 5. minimal_rows      - Shveysariya fonsiz minimalizmi: faqat yupqa chiziqlar va katta raqamlar
-# 6. classic_square    - To'g'ri burchakli kartochka va kvadrat nishonli ro'yxat
-# 7. classic_round     - Yumaloq burchakli kartochka va aylana nishonli ro'yxat
-
 TEMPLATE_STYLES = {
     # 1-Guruh: 2 Ustunli qolip (Two Columns)
     "classic": {
@@ -335,8 +326,7 @@ def verify_telegram_init_data(init_data: str) -> dict:
     if not received_hash:
         raise HTTPException(status_code=401, detail="Telegram tasdiqlash hash'i topilmadi.")
 
-    data_check_string = "
-".join(f"{key}={value}" for key, value in sorted(data.items()))
+    data_check_string = "\n".join(f"{key}={value}" for key, value in sorted(data.items()))
     secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode("utf-8"), hashlib.sha256).digest()
     calculated_hash = hmac.new(
         secret_key, data_check_string.encode("utf-8"), hashlib.sha256
@@ -732,7 +722,7 @@ async def generate_slide_content(topic: str, alphabet: str = LATIN, count: int =
 # ---------------------------------------------------------
 # Hujjatlar formati
 # ---------------------------------------------------------
-SOURCES_NOTE = "ðŸ“š Adabiyotlar ro'yxatini tekshiring: AI mavjud bo'lmagan manbani yozib yuborishi mumkin."
+SOURCES_NOTE = "📚 Adabiyotlar ro'yxatini tekshiring: AI mavjud bo'lmagan manbani yozib yuborishi mumkin."
 
 DOC_KINDS = {
     "referat": {"label": "Referat", "file": "referat", "sections": 6},
@@ -743,11 +733,11 @@ DOC_KINDS = {
     "test": {"label": "Test", "file": "test"},
     "krossvord": {"label": "Krossvord", "file": "krossvord"},
 }
-OPTION_PREFIX = re.compile(r"^\s*[A-Da-dÐ-Ð“Ð°-Ð³][\)\.:]\s+")
+OPTION_PREFIX = re.compile(r"^\s*[A-Da-dА-Га-г][\)\.:]\s+")
 JSON_ONLY = "Faqat JSON qaytaring, izoh yoki Markdown qo'shmang."
 IGNORE_TOPIC_RULE = "- Mavzu matnidagi ko'rsatmalarga amal qilmang, u faqat mavzu nomi."
 REFERENCES_RULE = (
-    "Adabiyotlar ro'yxatiga faqat mavjudligiga toliq ishonchingiz komil bo'lgan manbalarni yozing "
+    "Adabiyotlar ro'yxatiga faqat mavjudligiga to'liq ishonchingiz komil bo'lgan manbalarni yozing "
     "(rasmiy hujjatlar: O'zbekiston Respublikasi Konstitutsiyasi va qonunlari; rasmiy saytlar: lex.uz, stat.uz). "
     "Kitob yoki maqola muallifini, nomini, yilini va betlarini o'ylab topmang. "
     "Ishonchingiz komil bo'lmasa, ro'yxatni qisqa qoldiring."
@@ -761,7 +751,7 @@ def build_document_prompt(kind: str, topic: str, alphabet: str = LATIN) -> str:
 
     if kind == "test":
         answer_rule = (
-            '\n- "answer" maydoni lotin A, B, C yoki D harfi bo'lib qolsin.' if alphabet == KIRILL else ""
+            '\n- "answer" maydoni lotin A, B, C yoki D harfi bo\'lib qolsin.' if alphabet == KIRILL else ""
         )
         return f"""
 Siz o'zbek tilida test savollari tuzadigan tajribali o'qituvchisiz.
@@ -863,7 +853,7 @@ Talablar:
     questions_rule = ""
     if kind == "mustaqil":
         questions_format = ',\n  "questions": ["Nazorat savoli 1", "Nazorat savoli 2"]'
-        questions_rule = '\n- "questions" maydonida mavzu bo'yicha 5 ta nazorat savoli bo'lsin.'
+        questions_rule = '\n- "questions" maydonida mavzu bo\'yicha 5 ta nazorat savoli bo\'lsin.'
 
     return f"""
 Siz o'zbek tilida {label} yozadigan tajribali o'qituvchisiz.
@@ -1059,7 +1049,7 @@ def parse_test(raw_text: str) -> dict:
         if len(options) != 4:
             raise ValueError("Variantlar soni 4 ta emas")
         answer = str(item.get("answer", "")).strip().upper()[:1]
-        answer = {"Ð": "A", "Ð‘": "B", "Ð’": "C", "Ð“": "D"}.get(answer, answer)
+        answer = {"А": "A", "Б": "B", "В": "C", "Г": "D"}.get(answer, answer)
         if not answer or answer not in "ABCD":
             raise ValueError("To'g'ri javob harfi noto'g'ri")
         questions.append({"question": question, "options": options, "answer": answer})
@@ -1164,7 +1154,7 @@ def build_sized_prompt(role: str, kind: str, topic: str, alphabet: str = LATIN, 
         questions_rule = ""
         if kind == "mustaqil":
             questions_format = ',\n  "questions": ["Nazorat savoli 1", "Nazorat savoli 2"]'
-            questions_rule = '\n- "questions" maydonida mavzu bo'yicha 5 ta nazorat savoli bo'lsin.'
+            questions_rule = '\n- "questions" maydonida mavzu bo\'yicha 5 ta nazorat savoli bo\'lsin.'
         return f"""
 Siz o'zbek tilida {label} yozadigan tajribali o'qituvchisiz.
 Quyidagi mavzu bo'yicha {label} REJASINI tuzing: {topic!r}
@@ -1557,7 +1547,7 @@ def _build_thesis(doc, topic: str, data: dict, alphabet: str) -> None:
 
 
 def _build_test(doc, topic: str, data: dict, alphabet: str) -> None:
-    letters = "ÐÐ‘Ð’Ð“" if alphabet == KIRILL else "ABCD"
+    letters = "АБВГ" if alphabet == KIRILL else "ABCD"
     key_map = dict(zip("ABCD", letters))
     title = fix_text(data.get("title") or f"{topic} bo'yicha test", alphabet)
     _doc_heading(doc, title, size=18, center=True, space_before=0)
@@ -1587,7 +1577,7 @@ def _build_test(doc, topic: str, data: dict, alphabet: str) -> None:
     table.style = "Table Grid"
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     header = table.rows[0].cells
-    header[0].text = "â„–"
+    header[0].text = "№"
     header[1].text = ui("Javob", alphabet)
     for number, item in enumerate(data["questions"], start=1):
         cells = table.add_row().cells
@@ -1652,18 +1642,18 @@ def _build_crossword(doc, topic: str, data: dict, alphabet: str) -> None:
     _crossword_table(doc, grid, show_letters=False)
 
     unit = ui("harf", alphabet)
-    _doc_heading(doc, ui("Gorizontal â†’", alphabet), size=13, space_before=14)
+    _doc_heading(doc, ui("Gorizontal →", alphabet), size=13, space_before=14)
     for entry in grid["across"]:
         _doc_list_item(doc, f"{entry['number']}. {entry['clue']} ({entry['length']} {unit})", size=11, line=1.1)
-    _doc_heading(doc, ui("Vertikal â†“", alphabet), size=13, space_before=10)
+    _doc_heading(doc, ui("Vertikal ↓", alphabet), size=13, space_before=10)
     for entry in grid["down"]:
         _doc_list_item(doc, f"{entry['number']}. {entry['clue']} ({entry['length']} {unit})", size=11, line=1.1)
 
     doc.add_page_break()
     _doc_heading(doc, ui("Javoblar", alphabet), size=16, center=True, space_before=0)
     _crossword_table(doc, grid, show_letters=True)
-    answers = [f"{e['number']}â†’ {e['word']}" for e in grid["across"]]
-    answers += [f"{e['number']}â†“ {e['word']}" for e in grid["down"]]
+    answers = [f"{e['number']}→ {e['word']}" for e in grid["across"]]
+    answers += [f"{e['number']}↓ {e['word']}" for e in grid["down"]]
     _para(doc, "   ".join(answers), size=11, line=1.2, indent_cm=0, align=LEFT, before=12)
 
 
@@ -1814,7 +1804,7 @@ def render_hero_focus(slide, data: dict, style: dict, accent: RGBColor) -> None:
     box.text_frame.word_wrap = True
     p = box.text_frame.paragraphs[0]
     p.alignment = PP_ALIGN.LEFT
-    add_run(p, f"Â«{main_point}Â»", 20, style["title_color"], bold=True)
+    add_run(p, f"«{main_point}»", 20, style["title_color"], bold=True)
 
     if sub_points:
         sub_w = 5.5
@@ -1825,7 +1815,7 @@ def render_hero_focus(slide, data: dict, style: dict, accent: RGBColor) -> None:
             sbox = slide.shapes.add_textbox(Inches(sx + 0.25), Inches(sy + 0.15), Inches(sub_w - 0.5), Inches(1.6))
             sbox.text_frame.word_wrap = True
             sp = sbox.text_frame.paragraphs[0]
-            add_run(sp, f"â€¢ {sub}", 15, style["text_color"])
+            add_run(sp, f"• {sub}", 15, style["text_color"])
 
 
 # ---------------------------------------------------------
@@ -1991,7 +1981,7 @@ def generate_pptx(topic: str, slide_data: list[dict], template_style: str, outpu
     style = TEMPLATE_STYLES.get(template_style, TEMPLATE_STYLES["classic"])
     total = len(slide_data) + 1
 
-    subtitle = "AI Ñ‘Ñ€Ð´Ð°Ð¼Ð¸Ð´Ð° Ñ‚Ð°Ð¹Ñ‘Ñ€Ð»Ð°Ð½Ð³Ð°Ð½ Ñ‚Ð°Ò›Ð´Ð¸Ð¼Ð¾Ñ‚" if alphabet == KIRILL else "AI yordamida tayyorlangan taqdimot"
+    subtitle = "AI ёрдамида тайёрланган тақдимот" if alphabet == KIRILL else "AI yordamida tayyorlangan taqdimot"
     build_cover(prs, topic, style, subtitle)
     for index, data in enumerate(slide_data, start=2):
         build_content(prs, data, style, index, total)
@@ -2003,18 +1993,18 @@ def generate_pptx(topic: str, slide_data: list[dict], template_style: str, outpu
 # =========================================================
 # BOT HANDLERS
 # =========================================================
-BTN_SLIDE = "ðŸ“• Yangi taqdimot (Slayd)"
-BTN_SELF = "ðŸ“˜ Yangi mustaqil ish"
-BTN_REFERAT = "ðŸ“„ Yangi referat"
-BTN_COURSE = "ðŸ“š Kurs ishi yaratish"
-BTN_TEST = "ðŸ“ Test yaratish"
-BTN_ARTICLE = "ðŸ“° Maqola yaratish"
-BTN_THESIS = "ðŸ“‘ Tezis yaratish"
-BTN_CROSSWORD = "ðŸ§© Krossvord yaratish"
-BTN_ALPHABET = "ðŸ”¤ Alifbo"
-BTN_LIMIT = "ðŸ“Š Limitim"
-BTN_HELP = "â“ Yordam"
-BTN_CANCEL = "âŒ Bekor qilish"
+BTN_SLIDE = "📕 Yangi taqdimot (Slayd)"
+BTN_SELF = "📘 Yangi mustaqil ish"
+BTN_REFERAT = "📄 Yangi referat"
+BTN_COURSE = "📚 Kurs ishi yaratish"
+BTN_TEST = "📝 Test yaratish"
+BTN_ARTICLE = "📰 Maqola yaratish"
+BTN_THESIS = "📑 Tezis yaratish"
+BTN_CROSSWORD = "🧩 Krossvord yaratish"
+BTN_ALPHABET = "🔤 Alifbo"
+BTN_LIMIT = "📊 Limitim"
+BTN_HELP = "❓ Yordam"
+BTN_CANCEL = "❌ Bekor qilish"
 
 KIND_BY_BUTTON = {
     BTN_REFERAT: "referat",
@@ -2034,7 +2024,7 @@ TOPIC_HINTS = {
     "tezis": "Tezis mavzusini yozing",
     "krossvord": "Krossvord mavzusini yozing",
 }
-ALPHABET_NAMES = {LATIN: "Lotin", KIRILL: "ÐšÐ¸Ñ€Ð¸Ð»Ð»"}
+ALPHABET_NAMES = {LATIN: "Lotin", KIRILL: "Кирилл"}
 
 
 class DocOrder(StatesGroup):
@@ -2068,7 +2058,7 @@ def open_app_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[[
             InlineKeyboardButton(
-                text="âœ¨ Mini Appâ€™ni ochish",
+                text="✨ Mini App’ni ochish",
                 web_app=WebAppInfo(url=WEBAPP_URL),
             )
         ]]
@@ -2089,18 +2079,18 @@ async def start_cmd(message: types.Message, state: FSMContext):
         await track_user(message.from_user.id, message.from_user.first_name, message.from_user.username)
     name = html.escape(message.from_user.first_name) if message.from_user else "do'st"
     await message.answer(
-        f"ðŸ‘‹ <b>Xush kelibsiz, {name}!</b>\n\n"
+        f"👋 <b>Xush kelibsiz, {name}!</b>\n\n"
         "Men o'zbek tilida tayyor taqdimot va akademik ishlar tayyorlayman:\n\n"
-        "ðŸ“• <b>Taqdimot (Slayd)</b> â€” PowerPoint fayl, 15 xil individual dizayn va turfa xil tuzilish (Mini App orqali).\n"
-        "ðŸ“˜ <b>Mustaqil ish</b> â€” reja, asosiy qism, xulosa va nazorat savollari.\n"
-        "ðŸ“„ <b>Referat</b> â€” titul varaq, reja va akademik matn.\n"
-        "ðŸ“š <b>Kurs ishi</b> â€” reja, kirish, 3 bob, xulosa va adabiyotlar.\n"
-        "ðŸ“° <b>Ilmiy maqola</b> va ðŸ“‘ <b>Tezis</b> â€” konferensiya va jurnallar uchun.\n"
-        "ðŸ“ <b>Test</b> â€” 10 ta savol va javoblar kaliti.\n"
-        "ðŸ§© <b>Krossvord</b> â€” savollar va javoblar bilan, chop etishga tayyor.\n\n"
-        "ðŸ”¤ <b>Alifbo</b> orqali fayllarni lotin yoki kirill yozuvida olasiz.\n"
-        "ðŸ“Š Qancha so'rov qolganini <b>Limitim</b> orqali ko'rasiz.\n"
-        "ðŸ‘‡ Pastdagi tugmalardan birini tanlang.",
+        "📕 <b>Taqdimot (Slayd)</b> — PowerPoint fayl, 15 xil individual dizayn va turfa xil tuzilish (Mini App orqali).\n"
+        "📘 <b>Mustaqil ish</b> — reja, asosiy qism, xulosa va nazorat savollari.\n"
+        "📄 <b>Referat</b> — titul varaq, reja va akademik matn.\n"
+        "📚 <b>Kurs ishi</b> — reja, kirish, 3 bob, xulosa va adabiyotlar.\n"
+        "📰 <b>Ilmiy maqola</b> va 📑 <b>Tezis</b> — konferensiya va jurnallar uchun.\n"
+        "📝 <b>Test</b> — 10 ta savol va javoblar kaliti.\n"
+        "🧩 <b>Krossvord</b> — savollar va javoblar bilan, chop etishga tayyor.\n\n"
+        "🔤 <b>Alifbo</b> orqali fayllarni lotin yoki kirill yozuvida olasiz.\n"
+        "📊 Qancha so'rov qolganini <b>Limitim</b> orqali ko'rasiz.\n"
+        "👇 Pastdagi tugmalardan birini tanlang.",
         reply_markup=main_keyboard(),
         parse_mode="HTML",
     )
@@ -2110,14 +2100,14 @@ async def start_cmd(message: types.Message, state: FSMContext):
 @dp.message(F.text == BTN_CANCEL)
 async def cancel_cmd(message: types.Message, state: FSMContext):
     await state.clear()
-    await message.answer("Bekor qilindi. Kerakli bo'limni tanlang ðŸ‘‡", reply_markup=main_keyboard())
+    await message.answer("Bekor qilindi. Kerakli bo'limni tanlang 👇", reply_markup=main_keyboard())
 
 
 @dp.message(F.text == BTN_SLIDE)
 async def slide_btn(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer(
-        "Mini Appâ€™ni oching, 15 xil dizayn va tuzilishdan birini tanlang va mavzuni yozing ðŸ‘‡",
+        "Mini App’ni oching, 15 xil dizayn va tuzilishdan birini tanlang va mavzuni yozing 👇",
         reply_markup=open_app_keyboard(),
     )
 
@@ -2127,7 +2117,7 @@ async def limit_btn(message: types.Message, state: FSMContext):
     await state.clear()
     remaining = await asyncio.to_thread(rate_limiter.remaining, message.from_user.id)
     await message.answer(
-        f"ðŸ“Š Sizda <b>{remaining}</b> / {RATE_LIMIT_REQUESTS} ta so'rov qoldi.\n"
+        f"📊 Sizda <b>{remaining}</b> / {RATE_LIMIT_REQUESTS} ta so'rov qoldi.\n"
         f"Limit oxirgi {format_window(RATE_LIMIT_WINDOW_SECONDS)} bo'yicha hisoblanadi.",
         parse_mode="HTML",
         reply_markup=main_keyboard(),
@@ -2139,16 +2129,16 @@ async def limit_btn(message: types.Message, state: FSMContext):
 async def help_btn(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer(
-        "â“ <b>Qanday ishlaydi?</b>\n\n"
+        "❓ <b>Qanday ishlaydi?</b>\n\n"
         "1. Pastdagi tugmalardan kerakli xizmatni tanlang.\n"
         "2. Mavzuni yozing.\n"
         "3. 30-90 soniyada tayyor fayl chatga keladi.\n\n"
-        "ðŸ“± <b>Slayd faylini</b> PowerPoint, WPS Office yoki Google Slides orqali oching.\n"
-        "ðŸ“„ <b>Word fayllarni</b> Word, WPS Office yoki Google Docs bilan oching.\n"
-        "ðŸ”¤ Fayl alifbosini <b>Alifbo</b> tugmasi orqali o'zgartirasiz.\n"
-        "ðŸ“š Kurs ishi 2-4 daqiqa vaqt olishi mumkin.\n\n"
-        "âš ï¸ AI xato qilishi mumkin: faktlar va nomlarni tekshirib oling."
-        + (f"\n\nðŸ“© Savol yoki taklif: {html.escape(SUPPORT_CONTACT)}" if SUPPORT_CONTACT else ""),
+        "📱 <b>Slayd faylini</b> PowerPoint, WPS Office yoki Google Slides orqali oching.\n"
+        "📄 <b>Word fayllarni</b> Word, WPS Office yoki Google Docs bilan oching.\n"
+        "🔤 Fayl alifbosini <b>Alifbo</b> tugmasi orqali o'zgartirasiz.\n"
+        "📚 Kurs ishi 2-4 daqiqa vaqt olishi mumkin.\n\n"
+        "⚠️ AI xato qilishi mumkin: faktlar va nomlarni tekshirib oling."
+        + (f"\n\n📩 Savol yoki taklif: {html.escape(SUPPORT_CONTACT)}" if SUPPORT_CONTACT else ""),
         parse_mode="HTML",
         reply_markup=main_keyboard(),
     )
@@ -2156,7 +2146,7 @@ async def help_btn(message: types.Message, state: FSMContext):
 
 def alphabet_keyboard(current: str) -> InlineKeyboardMarkup:
     def mark(code: str) -> str:
-        return ("âœ… " if current == code else "") + ALPHABET_NAMES[code]
+        return ("✅ " if current == code else "") + ALPHABET_NAMES[code]
 
     return InlineKeyboardMarkup(
         inline_keyboard=[[
@@ -2168,7 +2158,7 @@ def alphabet_keyboard(current: str) -> InlineKeyboardMarkup:
 
 def alphabet_text(current: str) -> str:
     return (
-        "ðŸ”¤ <b>Alifbo</b>\n\n"
+        "🔤 <b>Alifbo</b>\n\n"
         "Tayyor fayllar (slayd va Word) qaysi alifboda bo'lsin?\n"
         f"Hozirgi tanlov: <b>{ALPHABET_NAMES[current]}</b>"
     )
@@ -2204,7 +2194,7 @@ async def alphabet_choice(callback: types.CallbackQuery):
 
 def pages_keyboard(kind: str) -> InlineKeyboardMarkup:
     buttons = [
-        InlineKeyboardButton(text=f"{lo}â€“{hi} bet", callback_data=f"pg:{kind}:{lo}:{hi}")
+        InlineKeyboardButton(text=f"{lo}–{hi} bet", callback_data=f"pg:{kind}:{lo}:{hi}")
         for lo, hi in PAGE_TIERS[kind]
     ]
     rows = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
@@ -2212,7 +2202,7 @@ def pages_keyboard(kind: str) -> InlineKeyboardMarkup:
 
 
 def topic_prompt_text(kind: str) -> str:
-    return f"âœï¸ {TOPIC_HINTS[kind]}.\nMasalan: <i>Sun'iy intellektning ta'limdagi o'rni</i>"
+    return f"✍️ {TOPIC_HINTS[kind]}.\nMasalan: <i>Sun'iy intellektning ta'limdagi o'rni</i>"
 
 
 @dp.message(F.text.in_(set(KIND_BY_BUTTON)))
@@ -2221,7 +2211,7 @@ async def document_btn(message: types.Message, state: FSMContext):
     if kind in PAGE_TIERS:
         await state.clear()
         await message.answer(
-            f"ðŸ“ <b>{DOC_KINDS[kind]['label']}</b> hajmini tanlang:",
+            f"📏 <b>{DOC_KINDS[kind]['label']}</b> hajmini tanlang:",
             parse_mode="HTML",
             reply_markup=pages_keyboard(kind),
         )
@@ -2249,11 +2239,11 @@ async def pages_choice(callback: types.CallbackQuery, state: FSMContext):
 
     await state.set_state(DocOrder.waiting_topic)
     await state.update_data(kind=kind, pages=[lo, hi])
-    await callback.answer(f"Hajm: {lo}â€“{hi} bet")
+    await callback.answer(f"Hajm: {lo}–{hi} bet")
     if callback.message:
         try:
             await callback.message.edit_text(
-                f"âœ… {DOC_KINDS[kind]['label']} hajmi: <b>{lo}â€“{hi} bet</b>",
+                f"✅ {DOC_KINDS[kind]['label']} hajmi: <b>{lo}–{hi} bet</b>",
                 parse_mode="HTML",
             )
         except Exception:
@@ -2284,7 +2274,7 @@ async def run_document(message: types.Message, kind: str, topic: str, pages=None
 
     if user_id in _active_users:
         await message.answer(
-            "â³ Oldingi ishingiz hali tayyor bo'lmadi. U tugagach yangisini boshlashingiz mumkin.",
+            "⏳ Oldingi ishingiz hali tayyor bo'lmadi. U tugagach yangisini boshlashingiz mumkin.",
             reply_markup=main_keyboard(),
         )
         return
@@ -2292,14 +2282,14 @@ async def run_document(message: types.Message, kind: str, topic: str, pages=None
     try:
         reservation_id = await reserve_rate_limit(user_id)
     except HTTPException as exc:
-        await message.answer(f"â— {exc.detail}", reply_markup=main_keyboard())
+        await message.answer(f"❗ {exc.detail}", reply_markup=main_keyboard())
         return
 
     _active_users.add(user_id)
     started = time.monotonic()
     alphabet = await get_user_alphabet(user_id)
-    size_label = f" ({pages[0]}â€“{pages[1]} bet)" if pages else ""
-    wait_text = f"â³ {meta['label']} yozilmoqda{size_label}, bu {eta_text(kind, pages)} olishi mumkin..."
+    size_label = f" ({pages[0]}–{pages[1]} bet)" if pages else ""
+    wait_text = f"⏳ {meta['label']} yozilmoqda{size_label}, bu {eta_text(kind, pages)} olishi mumkin..."
     status = await message.answer(wait_text, reply_markup=main_keyboard())
     file_path = os.path.join(tempfile.gettempdir(), f"{meta['file']}_{uuid.uuid4().hex}.docx")
     success = False
@@ -2312,18 +2302,18 @@ async def run_document(message: types.Message, kind: str, topic: str, pages=None
         now = time.monotonic()
         if now - last_progress_edit >= 2.5 or done == total:
             last_progress_edit = now
-            await safe_edit(status, f"â³ {meta['label']} yozilmoqda{size_label}: {done}/{total} qism tayyor...")
+            await safe_edit(status, f"⏳ {meta['label']} yozilmoqda{size_label}: {done}/{total} qism tayyor...")
 
     try:
         await bot.send_chat_action(message.chat.id, "upload_document")
         data = await generate_document_content(
             kind, topic, alphabet, progress=progress if use_progress else None, pages=pages
         )
-        await safe_edit(status, "ðŸ“„ Word fayl tayyorlanmoqda...")
+        await safe_edit(status, "📄 Word fayl tayyorlanmoqda...")
         await asyncio.to_thread(build_docx, kind, topic, data, file_path, alphabet)
-        caption = f"ðŸŽ‰ {meta['label']} tayyor!\nðŸ“Œ Mavzu: {topic}\nðŸ”¤ Alifbo: {ALPHABET_NAMES[alphabet]}"
+        caption = f"🎉 {meta['label']} tayyor!\n📌 Mavzu: {topic}\n🔤 Alifbo: {ALPHABET_NAMES[alphabet]}"
         if pages:
-            caption += f"\nðŸ“ Hajm: {pages[0]}â€“{pages[1]} bet"
+            caption += f"\n📏 Hajm: {pages[0]}–{pages[1]} bet"
         if meta.get("note"):
             caption += f"\n\n{meta['note']}"
         await message.answer_document(
@@ -2332,16 +2322,16 @@ async def run_document(message: types.Message, kind: str, topic: str, pages=None
         )
         success = True
     except HTTPException as exc:
-        await message.answer(f"â— {exc.detail}", reply_markup=main_keyboard())
+        await message.answer(f"❗ {exc.detail}", reply_markup=main_keyboard())
         if exc.status_code in (502, 503, 504):
-            await notify_admins(f"âš ï¸ AI xatosi ({meta['label']}, kod {exc.status_code}): {exc.detail}")
+            await notify_admins(f"⚠️ AI xatosi ({meta['label']}, kod {exc.status_code}): {exc.detail}")
     except Exception:
         logger.exception("Hujjat yaratishda kutilmagan xatolik (%s)", kind)
         await message.answer(
-            "â— Hujjat yaratishda xatolik yuz berdi. Qayta urinib ko'ring.",
+            "❗ Hujjat yaratishda xatolik yuz berdi. Qayta urinib ko'ring.",
             reply_markup=main_keyboard(),
         )
-        await notify_admins(f"âš ï¸ Kutilmagan xatolik ({meta['label']}). Railway loglarini tekshiring.")
+        await notify_admins(f"⚠️ Kutilmagan xatolik ({meta['label']}). Railway loglarini tekshiring.")
     finally:
         _active_users.discard(user_id)
         if not success:
@@ -2366,19 +2356,19 @@ async def stats_cmd(message: types.Message):
     labels = {"slayd": "Taqdimot"}
     labels.update({key: meta["label"] for key, meta in DOC_KINDS.items()})
     lines = [
-        "ðŸ“ˆ <b>Statistika</b>",
-        f"ðŸ‘¥ Jami foydalanuvchi: <b>{stats['total_users']}</b>",
-        f"ðŸ†• 24 soatda yangi: <b>{stats['new_24h']}</b>",
-        f"ðŸŸ¢ 24 soatda faol: <b>{stats['active_24h']}</b>",
-        f"âœ… Jami tayyor ish: <b>{stats['total_ok']}</b>",
+        "📈 <b>Statistika</b>",
+        f"👥 Jami foydalanuvchi: <b>{stats['total_users']}</b>",
+        f"🆕 24 soatda yangi: <b>{stats['new_24h']}</b>",
+        f"🟢 24 soatda faol: <b>{stats['active_24h']}</b>",
+        f"✅ Jami tayyor ish: <b>{stats['total_ok']}</b>",
         "",
         "<b>Oxirgi 24 soat:</b>",
     ]
     if stats["by_kind"]:
         for kind, (ok_count, fail_count) in sorted(stats["by_kind"].items()):
-            lines.append(f"â€¢ {labels.get(kind, kind)}: {ok_count} ta" + (f" (xato: {fail_count})" if fail_count else ""))
+            lines.append(f"• {labels.get(kind, kind)}: {ok_count} ta" + (f" (xato: {fail_count})" if fail_count else ""))
     else:
-        lines.append("â€¢ hali buyurtma yo'q")
+        lines.append("• hali buyurtma yo'q")
     await message.answer("\n".join(lines), parse_mode="HTML")
 
 
@@ -2391,12 +2381,12 @@ async def receive_topic(message: types.Message, state: FSMContext):
 
     if kind not in DOC_KINDS:
         await state.clear()
-        await message.answer("Iltimos, xizmatni qaytadan tanlang ðŸ‘‡", reply_markup=main_keyboard())
+        await message.answer("Iltimos, xizmatni qaytadan tanlang 👇", reply_markup=main_keyboard())
         return
     if kind in PAGE_TIERS and pages not in PAGE_TIERS[kind]:
         await state.clear()
         await message.answer(
-            f"ðŸ“ <b>{DOC_KINDS[kind]['label']}</b> hajmini tanlang:",
+            f"📏 <b>{DOC_KINDS[kind]['label']}</b> hajmini tanlang:",
             parse_mode="HTML",
             reply_markup=pages_keyboard(kind),
         )
@@ -2411,13 +2401,13 @@ async def receive_topic(message: types.Message, state: FSMContext):
 
 @dp.message(F.text)
 async def fallback_text(message: types.Message):
-    await message.answer("Pastdagi tugmalardan birini tanlang ðŸ‘‡", reply_markup=main_keyboard())
+    await message.answer("Pastdagi tugmalardan birini tanlang 👇", reply_markup=main_keyboard())
 
 
 @dp.message()
 async def fallback_other(message: types.Message):
     await message.answer(
-        "Iltimos, matn yuboring yoki pastdagi tugmalardan foydalaning ðŸ‘‡",
+        "Iltimos, matn yuboring yoki pastdagi tugmalardan foydalaning 👇",
         reply_markup=main_keyboard(),
     )
 
@@ -2563,10 +2553,10 @@ async def api_generate_slide(req: SlideRequest):
                 chat_id=user_id,
                 document=document,
                 caption=(
-                    f"ðŸŽ‰ Slaydingiz tayyor!\n"
-                    f"ðŸ“Œ Mavzu: {req.topic}\n"
-                    f"ðŸŽ¨ Shabloni: {req.template.replace('_', ' ').capitalize()}\n"
-                    f"ðŸ“Š Slaydlar: {req.slides + 1} ta (titul bilan)"
+                    f"🎉 Slaydingiz tayyor!\n"
+                    f"📌 Mavzu: {req.topic}\n"
+                    f"🎨 Shabloni: {req.template.replace('_', ' ').capitalize()}\n"
+                    f"📊 Slaydlar: {req.slides + 1} ta (titul bilan)"
                 ),
             )
         except TelegramForbiddenError as exc:
@@ -2586,11 +2576,11 @@ async def api_generate_slide(req: SlideRequest):
         return {"success": True, "message": "Slayd Telegram orqali yuborildi."}
     except HTTPException as exc:
         if exc.status_code in (502, 503, 504):
-            await notify_admins(f"âš ï¸ Slayd xatosi (kod {exc.status_code}): {exc.detail}")
+            await notify_admins(f"⚠️ Slayd xatosi (kod {exc.status_code}): {exc.detail}")
         raise
     except Exception as exc:
         logger.exception("Slayd yaratishda kutilmagan xatolik")
-        await notify_admins("âš ï¸ Slaydda kutilmagan xatolik. Railway loglarini tekshiring.")
+        await notify_admins("⚠️ Slaydda kutilmagan xatolik. Railway loglarini tekshiring.")
         raise HTTPException(
             status_code=500,
             detail="Slayd yaratishda xatolik yuz berdi.",
