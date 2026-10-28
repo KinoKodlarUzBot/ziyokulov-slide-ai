@@ -368,7 +368,7 @@
       </div>
 
       <div class="block">
-        <div class="sec-head"><h2>🎨 Uslub</h2><span>4 ta variant</span></div>
+        <div class="sec-head"><h2>🎨 Uslub</h2><span>15 ta variant</span></div>
         <div class="rail" id="styles"></div>
       </div>
 
@@ -400,7 +400,7 @@
       <div class="sec-head"><h2>Nimalar qila olaman</h2></div>
       <ul class="help-list">
         <li><span class="hi">✨</span><div><b>Slayd yaratish</b><span>Mavzuni yozasiz, 6 slaydli PowerPoint fayl Telegram chatingizga keladi.</span></div></li>
-        <li><span class="hi">🎨</span><div><b>4 xil uslub</b><span>Klassik, biznes, qorong'i va minimal.</span></div></li>
+        <li><span class="hi">🎨</span><div><b>15 xil uslub va tuzilish</b><span>2 ustun, gorizontal bosqichlar, iqtibos, asimmetrik va minimal ro'yxatlar.</span></div></li>
         <li><span class="hi">🔤</span><div><b>Lotin yoki Кирилл</b><span>Alifboni tanlang, slayd va Word fayllar shu yozuvda tayyorlanadi.</span></div></li>
         <li><span class="hi">🔥</span><div><b>Tayyor mavzular</b><span>Mavzular bo'limidan birini bosing, u avtomatik yoziladi.</span></div></li>
         <li><span class="hi">📄</span><div><b>Referat, kurs ishi, maqola, tezis, test, krossvord</b><span>Botdagi tugmalar orqali: mavzuni chatga yozasiz, Word fayl keladi. Limit umumiy.</span></div></li>
@@ -424,11 +424,23 @@
       var MIN_LEN = 3;
       var REQUEST_TIMEOUT_MS = 150000;
 
+      // ---------- 15 XIL SHABLON ----------
       var STYLES = [
-        { id: "classic",  name: "Klassik",  desc: "Oq fon, binafsha",  bg: "#ffffff", accent: "#4f46e5", card: "#f3f4f6", text: "#374151" },
-        { id: "business", name: "Biznes",   desc: "Ko'k, qat'iy",      bg: "#f0f4f8", accent: "#1e3a8a", card: "#ffffff", text: "#1f2937" },
-        { id: "dark",     name: "Qorong'i", desc: "Tungi rejim",       bg: "#18181b", accent: "#8b5cf6", card: "#27272a", text: "#e4e4e7" },
-        { id: "minimal",  name: "Minimal",  desc: "Yashil, yengil",    bg: "#f0fdf4", accent: "#16a34a", card: "#ffffff", text: "#14532d" }
+        { id: "classic",         name: "Klassik",     desc: "2 ustun, indigo",      bg: "#ffffff", accent: "#4f46e5", card: "#f3f4f6" },
+        { id: "business",        name: "Biznes",      desc: "Gorizontal 3 bosqich", bg: "#f0f4f8", accent: "#0284c7", card: "#ffffff" },
+        { id: "dark",            name: "Qorong'i",    desc: "Katta asosiy g'oya",   bg: "#111827", accent: "#a855f7", card: "#1f2937" },
+        { id: "minimal",         name: "Minimal",     desc: "Chiziqli, eko yashil", bg: "#f0fdf4", accent: "#22c55e", card: "#ffffff" },
+        { id: "swiss_clean",     name: "Shveysariya", desc: "Chap dominant blok",   bg: "#ffffff", accent: "#e11d48", card: "#f5f5f5" },
+        { id: "cyber_tech",      name: "Cyber Tech",  desc: "Neon kvadrat nishon",  bg: "#0a0f1e", accent: "#06b6d4", card: "#131d38" },
+        { id: "warm_editorial",  name: "Editorial",   desc: "2 ustun, qahva",       bg: "#fefcf7", accent: "#d97706", card: "#fff7ed" },
+        { id: "sunset_punch",    name: "Sunset",      desc: "Olovrang bosqichlar",  bg: "#fffaf5", accent: "#f97316", card: "#ffedd5" },
+        { id: "ocean_breeze",    name: "Ocean",       desc: "Moviy asimmetriya",    bg: "#f0f9ff", accent: "#0ea5e9", card: "#ffffff" },
+        { id: "monochrome",      name: "Monoxrom",    desc: "Qora-oq minimalizm",   bg: "#f5f5f5", accent: "#000000", card: "#ffffff" },
+        { id: "emerald_wealth",  name: "Zumrad",      desc: "2 ustun, moliya",      bg: "#f0fdfa", accent: "#0d9488", card: "#ffffff" },
+        { id: "berry_creative",  name: "Berry",       desc: "Magenta iqtibos",      bg: "#fdf2f8", accent: "#db2777", card: "#ffffff" },
+        { id: "titanium_slate",  name: "Titanium",    desc: "Muhandislik 3 karta",  bg: "#f1f5f9", accent: "#64748b", card: "#ffffff" },
+        { id: "midnight_gold",   name: "Tungi Oltin", desc: "Premium asimmetrik",   bg: "#0f172a", accent: "#eab308", card: "#1e293b" },
+        { id: "nordic_frost",    name: "Nordic",      desc: "Aylana ro'yxat",       bg: "#f8fafc", accent: "#38bdf8", card: "#ffffff" }
       ];
 
       var CATS = ["Hammasi", "Ta'lim", "Texnologiya", "Biznes", "Sog'liq", "Tabiat"];
@@ -592,7 +604,7 @@
 
       countEl.textContent = TOPICS.length + " ta tayyor mavzu · posterini bosing";
 
-      // ---------- Uslub kartalari ----------
+      // ---------- Uslub kartalari (15 ta) ----------
       var stylesEl = document.getElementById("styles");
       STYLES.forEach(function (st) {
         var btn = el("button", "sty" + (st.id === selectedStyle ? " sel" : ""));
