@@ -1665,218 +1665,53 @@ def build_cover(prs, topic: str, style: dict, subtitle: str) -> None:
     add_text(slide, 5.0, 5.2, 7.8, 0.6, subtitle, 18, style["text_color"])
 
 
-# =========================================================
-# 15 XIL TURLI XIL SLAYD DIZAYN QOLIPLARI (LAYOUTS)
-# =========================================================
-
-def add_card_block(slide, x, y, w, h, bg_color, radius=0.15):
-    shape = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(x), Inches(y), Inches(w), Inches(h))
-    shape.fill.solid()
-    shape.fill.fore_color.rgb = bg_color
-    shape.line.fill.background()
-    shape.shadow.inherit = False
-    shape.adjustments[0] = radius
-    return shape
-
-def draw_design_1(slide, data, style, page, total):
-    accent = style["accent"]
-    bullets = data["content"][:MAX_BULLETS]
-    y_start, h, gap = 1.95, 1.1, 0.18
-    for i, b in enumerate(bullets):
-        y = y_start + i * (h + gap)
-        add_card_block(slide, 0.7, y, 11.93, h, style["card"])
-        circle = add_shape(slide, MSO_SHAPE.OVAL, 0.95, y + 0.25, 0.6, 0.6, accent)
-        c_p = circle.text_frame.paragraphs[0]
-        c_p.alignment = PP_ALIGN.CENTER
-        add_run(c_p, str(i + 1), 14, WHITE, bold=True)
-        add_text(slide, 1.8, y + 0.2, 10.5, 0.7, b, 16, style["text_color"])
-
-def draw_design_2(slide, data, style, page, total):
-    accent = style["accent"]
-    bullets = data["content"][:4]
-    for i, b in enumerate(bullets):
-        col, row = i % 2, i // 2
-        x = 0.7 if col == 0 else 6.8
-        y = 2.0 + row * 2.4
-        add_card_block(slide, x, y, 5.8, 2.2, style["card"])
-        add_shape(slide, MSO_SHAPE.RECTANGLE, x, y, 0.15, 2.2, accent)
-        add_text(slide, x + 0.4, y + 0.3, 5.1, 1.6, b, 16, style["text_color"])
-
-def draw_design_3(slide, data, style, page, total):
-    accent = style["accent"]
-    add_card_block(slide, 0.7, 1.9, 3.8, 4.9, accent)
-    add_text(slide, 1.0, 2.2, 3.2, 4.3, data["title"], 22, WHITE, bold=True)
-    bullets = data["content"][:MAX_BULLETS]
-    for i, b in enumerate(bullets):
-        y = 1.9 + i * 1.0
-        add_card_block(slide, 4.8, y, 7.8, 0.85, style["card"])
-        add_text(slide, 5.1, y + 0.15, 7.3, 0.6, b, 15, style["text_color"])
-
-def draw_design_4(slide, data, style, page, total):
-    accent = style["accent"]
-    bullets = data["content"][:3]
-    w = 3.8
-    for i, b in enumerate(bullets):
-        x = 0.7 + i * 4.1
-        add_card_block(slide, x, 2.0, w, 4.8, style["card"])
-        add_shape(slide, MSO_SHAPE.RECTANGLE, x, 2.0, w, 0.15, accent)
-        circle = add_shape(slide, MSO_SHAPE.OVAL, x + w/2 - 0.3, 2.3, 0.6, 0.6, accent)
-        c_p = circle.text_frame.paragraphs[0]
-        c_p.alignment = PP_ALIGN.CENTER
-        add_run(c_p, str(i + 1), 14, WHITE, bold=True)
-        add_text(slide, x + 0.3, 3.1, w - 0.6, 3.5, b, 16, style["text_color"], align=PP_ALIGN.CENTER)
-
-def draw_design_5(slide, data, style, page, total):
-    accent = style["accent"]
-    bullets = data["content"][:4]
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 1.0, 4.0, 11.3, 0.08, accent)
-    w = 2.6
-    for i, b in enumerate(bullets):
-        x = 0.7 + i * 3.0
-        circle = add_shape(slide, MSO_SHAPE.OVAL, x + w/2 - 0.25, 3.75, 0.5, 0.5, accent)
-        c_p = circle.text_frame.paragraphs[0]
-        c_p.alignment = PP_ALIGN.CENTER
-        add_run(c_p, str(i + 1), 12, WHITE, bold=True)
-        add_card_block(slide, x, 4.5, w, 2.2, style["card"])
-        add_text(slide, x + 0.2, 4.6, w - 0.4, 2.0, b, 14, style["text_color"], align=PP_ALIGN.CENTER)
-
-def draw_design_6(slide, data, style, page, total):
-    accent = style["accent"]
-    bullets = data["content"][:MAX_BULLETS]
-    for i, b in enumerate(bullets):
-        y = 1.9 + i * 1.0
-        add_card_block(slide, 0.7, y, 11.9, 0.85, style["card"])
-        add_shape(slide, MSO_SHAPE.RECTANGLE, 0.7, y, 0.1, 0.85, accent)
-        add_text(slide, 1.1, y + 0.15, 11.2, 0.6, b, 16, style["text_color"])
-
-def draw_design_7(slide, data, style, page, total):
-    accent = style["accent"]
-    bullets = data["content"][:2]
-    for i, b in enumerate(bullets):
-        x = 0.7 if i == 0 else 6.8
-        add_card_block(slide, x, 2.0, 5.8, 4.8, style["card"])
-        add_text(slide, x + 0.5, 2.3, 1.0, 1.0, f"0{i+1}", 48, accent, bold=True)
-        add_text(slide, x + 0.5, 3.6, 4.8, 2.8, b, 18, style["text_color"])
-
-def draw_design_8(slide, data, style, page, total):
-    accent = style["accent"]
-    bullets = data["content"][:3]
-    for i, b in enumerate(bullets):
-        y = 2.0 + i * 1.6
-        x = 0.7 if i % 2 == 0 else 3.7
-        w = 8.9
-        add_card_block(slide, x, y, w, 1.4, style["card"])
-        add_shape(slide, MSO_SHAPE.RECTANGLE, x if i % 2 == 0 else x + w - 0.15, y, 0.15, 1.4, accent)
-        add_text(slide, x + 0.4, y + 0.3, w - 0.8, 1.0, b, 16, style["text_color"])
-
-def draw_design_9(slide, data, style, page, total):
-    accent = style["accent"]
-    bullets = data["content"][:4]
-    for i, b in enumerate(bullets):
-        x = 0.7 if i < 2 else 6.8
-        row_y = (1.9 + i * 1.25) if i < 2 else (1.9 + (i - 2) * 1.25)
-        add_card_block(slide, x, row_y, 5.8, 1.1, style["card"])
-        circle = add_shape(slide, MSO_SHAPE.OVAL, x + 0.3, row_y + 0.3, 0.5, 0.5, accent)
-        c_p = circle.text_frame.paragraphs[0]
-        c_p.alignment = PP_ALIGN.CENTER
-        add_run(c_p, str(i + 1), 12, WHITE, bold=True)
-        add_text(slide, x + 1.0, row_y + 0.2, 4.6, 0.8, b, 15, style["text_color"])
-
-def draw_design_10(slide, data, style, page, total):
-    accent = style["accent"]
-    bullets = data["content"][:MAX_BULLETS]
-    for i, b in enumerate(bullets):
-        y = 2.0 + i * 1.0
-        add_shape(slide, MSO_SHAPE.RECTANGLE, 0.7, y + 0.8, 11.9, 0.02, blend(style["text_color"], style["bg_color"], 0.7))
-        add_text(slide, 0.7, y, 0.8, 0.7, "•", 24, accent, bold=True)
-        add_text(slide, 1.4, y + 0.15, 11.2, 0.6, b, 16, style["text_color"])
-
-def draw_design_11(slide, data, style, page, total):
-    accent = style["accent"]
-    bullets = data["content"][:4]
-    for i, b in enumerate(bullets):
-        col, row = i % 2, i // 2
-        x = 0.7 if col == 0 else 6.8
-        y = 2.0 + row * 2.4
-        add_card_block(slide, x, y, 5.8, 2.2, style["card"])
-        add_shape(slide, MSO_SHAPE.OVAL, x + 0.3, y + 0.3, 0.4, 0.4, accent)
-        add_text(slide, x + 0.9, y + 0.3, 4.6, 1.6, b, 15, style["text_color"])
-
-def draw_design_12(slide, data, style, page, total):
-    accent = style["accent"]
-    add_card_block(slide, 0.7, 1.9, 11.9, 1.0, accent)
-    add_text(slide, 1.0, 2.1, 11.3, 0.7, data["title"], 18, WHITE, bold=True)
-    bullets = data["content"][:3]
-    for i, b in enumerate(bullets):
-        y = 3.1 + i * 1.3
-        add_card_block(slide, 0.7, y, 11.9, 1.1, style["card"])
-        add_text(slide, 1.0, y + 0.25, 11.3, 0.8, b, 15, style["text_color"])
-
-def draw_design_13(slide, data, style, page, total):
-    accent = style["accent"]
-    bullets = data["content"][:3]
-    w = 3.8
-    for i, b in enumerate(bullets):
-        x = 0.7 + i * 4.1
-        add_card_block(slide, x, 2.0, w, 4.8, style["card"])
-        add_shape(slide, MSO_SHAPE.RECTANGLE, x + 0.4, 2.3, 0.8, 0.08, accent)
-        add_text(slide, x + 0.4, 2.6, w - 0.8, 4.0, b, 16, style["text_color"])
-
-def draw_design_14(slide, data, style, page, total):
-    accent = style["accent"]
-    add_card_block(slide, 0.7, 1.9, 11.9, 4.9, style["card"])
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 0.7, 1.9, 11.9, 0.1, accent)
-    bullets = data["content"][:4]
-    for i, b in enumerate(bullets):
-        y = 2.2 + i * 1.15
-        add_text(slide, 1.2, y, 0.4, 0.8, "✔", 18, accent, bold=True)
-        add_text(slide, 1.8, y + 0.1, 10.4, 0.8, b, 16, style["text_color"])
-
-def draw_design_15(slide, data, style, page, total):
-    accent = style["accent"]
-    add_card_block(slide, 9.5, 1.9, 3.1, 4.9, accent)
-    add_text(slide, 9.8, 2.2, 2.5, 4.3, "MUHIM ESLATMA", 20, WHITE, bold=True, align=PP_ALIGN.CENTER)
-    bullets = data["content"][:3]
-    for i, b in enumerate(bullets):
-        y = 1.9 + i * 1.6
-        add_card_block(slide, 0.7, y, 8.5, 1.4, style["card"])
-        add_text(slide, 1.1, y + 0.3, 7.8, 1.0, b, 16, style["text_color"])
-
-# Har bir dizayn nechta punktni sig'diradi (ortiqcha punkt kesilib ketmasligi uchun)
-DESIGN_CAPACITY = {
-    1: 5, 2: 4, 3: 5, 4: 3, 5: 4, 6: 5, 7: 2, 8: 3,
-    9: 4, 10: 5, 11: 4, 12: 3, 13: 3, 14: 4, 15: 3,
-}
-
-def pick_design(page: int, bullet_count: int) -> int:
-    """Navbat bilan 1..15 dizaynni tanlaydi, lekin punktlar sig'maydigan dizaynni o'tkazib yuboradi."""
-    start = (page - 2) % 15
-    for step in range(15):
-        index = (start + step) % 15 + 1
-        if DESIGN_CAPACITY[index] >= bullet_count:
-            return index
-    return 1
-
 def build_content(prs, data: dict, style: dict, page: int, total: int) -> None:
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     slide.background.fill.solid()
     slide.background.fill.fore_color.rgb = style["bg_color"]
     accent = style["accent"]
 
+    add_shape(slide, MSO_SHAPE.RECTANGLE, 0, 0, 13.333, 0.16, accent)
     title = data["title"]
-    add_text(slide, 0.7, 0.45, 11.9, 1.1, title, 28 if len(title) <= 45 else 24,
+    add_text(slide, 0.7, 0.45, 11.9, 1.1, title, 30 if len(title) <= 45 else 26,
              style["title_color"], bold=True, anchor=MSO_ANCHOR.MIDDLE)
     add_shape(slide, MSO_SHAPE.RECTANGLE, 0.7, 1.62, 1.2, 0.06, accent)
 
-    designs = {
-        1: draw_design_1, 2: draw_design_2, 3: draw_design_3,
-        4: draw_design_4, 5: draw_design_5, 6: draw_design_6,
-        7: draw_design_7, 8: draw_design_8, 9: draw_design_9,
-        10: draw_design_10, 11: draw_design_11, 12: draw_design_12,
-        13: draw_design_13, 14: draw_design_14, 15: draw_design_15
-    }
-    design_index = pick_design(page, len(data["content"][:MAX_BULLETS]))
-    designs[design_index](slide, data, style, page, total)
+    bullets = data["content"][:MAX_BULLETS]
+    count = len(bullets)
+    area_top, area_h, gap = 1.95, 4.85, 0.18
+    card_h = min((area_h - gap * (count - 1)) / count, 1.3)
+    card_x, card_w = 0.7, 11.93
+    diameter = min(0.62, card_h - 0.3)
+    pad = 0.25
+    text_left = pad + diameter + 0.25
+    text_w = card_w - text_left - 0.3
+    font_size = pick_card_font(bullets, card_h, text_w)
+
+    for i, bullet in enumerate(bullets):
+        y = area_top + i * (card_h + gap)
+        card = add_shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, card_x, y, card_w, card_h,
+                         style["card"], radius=0.18)
+        frame = card.text_frame
+        frame.word_wrap = True
+        frame.vertical_anchor = MSO_ANCHOR.MIDDLE
+        frame.margin_left = Inches(text_left)
+        frame.margin_right = Inches(0.3)
+        frame.margin_top = Inches(0.04)
+        frame.margin_bottom = Inches(0.04)
+        paragraph = frame.paragraphs[0]
+        paragraph.alignment = PP_ALIGN.LEFT
+        add_run(paragraph, bullet, font_size, style["text_color"])
+
+        circle = add_shape(slide, MSO_SHAPE.OVAL, card_x + pad, y + (card_h - diameter) / 2,
+                           diameter, diameter, accent)
+        circle_frame = circle.text_frame
+        circle_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
+        circle_frame.margin_left = circle_frame.margin_right = 0
+        circle_frame.margin_top = circle_frame.margin_bottom = 0
+        circle_paragraph = circle_frame.paragraphs[0]
+        circle_paragraph.alignment = PP_ALIGN.CENTER
+        add_run(circle_paragraph, str(i + 1), 16, WHITE, bold=True)
 
     add_text(slide, 11.4, 7.02, 1.3, 0.3, f"{page} / {total}", 11,
              blend(style["text_color"], style["bg_color"], 0.35), align=PP_ALIGN.RIGHT)
@@ -2511,4 +2346,11 @@ async def api_generate_slide(req: SlideRequest):
         try:
             if os.path.exists(file_path):
                 os.remove(file_path)
-        except OSErr
+        except OSError:
+            logger.warning("Vaqtinchalik faylni o'chirib bo'lmadi: %s", file_path)
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=PORT, workers=1)
