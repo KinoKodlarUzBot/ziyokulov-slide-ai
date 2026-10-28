@@ -79,13 +79,15 @@ WEBAPP_URL = os.getenv(
 ).strip().rstrip("/")
 PORT = int(os.getenv("PORT", "8080"))
 
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+# ASOSIY VA ZAXIRA MODELLAR (Oldingi to'g'ri ishlagan holati):
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite").strip()
 GEMINI_FALLBACK_MODELS = [
     m.strip()
-    for m in os.getenv("GEMINI_FALLBACK_MODELS", "gemini-2.5-pro,gemini-1.5-flash").split(",")
+    for m in os.getenv("GEMINI_FALLBACK_MODELS", "gemini-3.6-flash,gemini-2.5-flash").split(",")
     if m.strip()
 ]
 GEMINI_MODELS = [GEMINI_MODEL] + [m for m in GEMINI_FALLBACK_MODELS if m != GEMINI_MODEL]
+
 MAX_CONCURRENT_GENERATIONS = int(os.getenv("MAX_CONCURRENT_GENERATIONS", "3"))
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "5"))
 RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "3600"))
@@ -141,7 +143,7 @@ generation_semaphore = asyncio.Semaphore(MAX_CONCURRENT_GENERATIONS)
 # 15 XIL SHABLON VA TURFA XIL ICHKI TUZILISH SOZLAMALARI
 # =========================================================
 TEMPLATE_STYLES = {
-    # 1-Guruh: 2 Ustunli qolip (Two Columns)
+    # 1. 2 Ustunli qolip
     "classic": {
         "layout_type": "two_columns",
         "bg_color": RGBColor(255, 255, 255),
@@ -170,7 +172,7 @@ TEMPLATE_STYLES = {
         "cover_accent": RGBColor(17, 94, 89),
     },
 
-    # 2-Guruh: Gorizontal bosqichlar (Horizontal Cards / Process)
+    # 2. Gorizontal bosqichlar (3 ta karta)
     "business": {
         "layout_type": "horizontal_cards",
         "bg_color": RGBColor(248, 250, 252),
@@ -199,7 +201,7 @@ TEMPLATE_STYLES = {
         "cover_accent": RGBColor(51, 65, 85),
     },
 
-    # 3-Guruh: Katta g'oya + Quyi izohlar (Hero Focus)
+    # 3. Katta g'oya (Hero)
     "dark": {
         "layout_type": "hero_focus",
         "bg_color": RGBColor(17, 24, 39),
@@ -219,7 +221,7 @@ TEMPLATE_STYLES = {
         "cover_accent": RGBColor(190, 24, 93),
     },
 
-    # 4-Guruh: Asimmetrik split (Chap katta blok + O'ng qatorlar)
+    # 4. Asimmetrik split (Chap dominant)
     "swiss_clean": {
         "layout_type": "split_feature",
         "bg_color": RGBColor(255, 255, 255),
@@ -248,7 +250,7 @@ TEMPLATE_STYLES = {
         "cover_accent": RGBColor(202, 138, 4),
     },
 
-    # 5-Guruh: Chiziqli va Shaklli Ro'yxatlar (Minimal & Modern Lists)
+    # 5. Chiziqli va ro'yxat qoliplari
     "minimal": {
         "layout_type": "minimal_rows",
         "bg_color": RGBColor(240, 253, 244),
@@ -299,16 +301,16 @@ TemplateNameType = Literal[
 # REQUEST MODELS
 # =========================================================
 class SlideRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
     init_data: str = Field(min_length=1, max_length=10_000)
     topic: str = Field(min_length=3, max_length=MAX_TOPIC_LENGTH)
-    template: TemplateNameType = "classic"
+    template: str = "classic"
     alphabet: Literal["latin", "kirill"] | None = None
     slides: int = Field(default=SLIDE_COUNT, ge=MIN_SLIDES, le=MAX_SLIDES)
 
 
 class MeRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
     init_data: str = Field(min_length=1, max_length=10_000)
 
 
@@ -357,7 +359,7 @@ def verify_telegram_init_data(init_data: str) -> dict:
 
 
 # =========================================================
-# RATE LIMITER (SQLite)
+# RATE LIMITER
 # =========================================================
 class RateLimiter:
     def __init__(self, db_path: str, limit: int, window_seconds: int):
@@ -1676,7 +1678,7 @@ def build_docx(kind: str, topic: str, data: dict, output_path: str, alphabet: st
 
 
 # =========================================================
-# POWERPOINT (PPTX) GENERATION: 5 XIL STRUKTURA VA 15 DIZAYN
+# POWERPOINT (PPTX) GENERATION: 5 XIL STRUKTURA
 # =========================================================
 WHITE = RGBColor(255, 255, 255)
 
@@ -1727,7 +1729,7 @@ def pick_card_font(bullets: list[str], card_h_in: float, text_w_in: float) -> in
 
 
 # ---------------------------------------------------------
-# QOLIP 1: 2 USTUNLI BLOK (Two Column Split)
+# QOLIP RENDERLAR
 # ---------------------------------------------------------
 def render_two_columns(slide, data: dict, style: dict, accent: RGBColor) -> None:
     bullets = data["content"][:4]
@@ -1763,9 +1765,6 @@ def render_two_columns(slide, data: dict, style: dict, accent: RGBColor) -> None
         add_run(p, b, 15, style["text_color"])
 
 
-# ---------------------------------------------------------
-# QOLIP 2: GORIZONTAL 3 BOSQICHLI KARTALAR (Horizontal Process)
-# ---------------------------------------------------------
 def render_horizontal_cards(slide, data: dict, style: dict, accent: RGBColor) -> None:
     bullets = data["content"][:3]
     count = max(1, len(bullets))
@@ -1789,9 +1788,6 @@ def render_horizontal_cards(slide, data: dict, style: dict, accent: RGBColor) ->
         add_run(p, b, 15, style["text_color"])
 
 
-# ---------------------------------------------------------
-# QOLIP 3: KATTA MARKAZIY FIKR + QUYI BLOKLAR (Hero Focus)
-# ---------------------------------------------------------
 def render_hero_focus(slide, data: dict, style: dict, accent: RGBColor) -> None:
     bullets = data["content"]
     main_point = bullets[0] if bullets else ""
@@ -1818,9 +1814,6 @@ def render_hero_focus(slide, data: dict, style: dict, accent: RGBColor) -> None:
             add_run(sp, f"• {sub}", 15, style["text_color"])
 
 
-# ---------------------------------------------------------
-# QOLIP 4: CHAP KATTA BLOK + O'NG QATORLAR (Split Feature)
-# ---------------------------------------------------------
 def render_split_feature(slide, data: dict, style: dict, accent: RGBColor) -> None:
     bullets = data["content"]
     left_main = bullets[0] if bullets else ""
@@ -1847,9 +1840,6 @@ def render_split_feature(slide, data: dict, style: dict, accent: RGBColor) -> No
         add_run(rp, b, 14, style["text_color"])
 
 
-# ---------------------------------------------------------
-# QOLIP 5: SHVEYSARIYA MINIMAL (Minimal Rows)
-# ---------------------------------------------------------
 def render_minimal_rows(slide, data: dict, style: dict, accent: RGBColor) -> None:
     bullets = data["content"][:MAX_BULLETS]
     count = max(1, len(bullets))
@@ -1868,9 +1858,6 @@ def render_minimal_rows(slide, data: dict, style: dict, accent: RGBColor) -> Non
         add_run(p, bullet, 15, style["text_color"])
 
 
-# ---------------------------------------------------------
-# QOLIP 6 & 7: KLASSIK QATORLAR (Square / Round Markers)
-# ---------------------------------------------------------
 def render_classic_rows(slide, data: dict, style: dict, accent: RGBColor, square: bool = False) -> None:
     bullets = data["content"][:MAX_BULLETS]
     count = len(bullets)
@@ -1902,7 +1889,7 @@ def render_classic_rows(slide, data: dict, style: dict, accent: RGBColor, square
 
 
 # ---------------------------------------------------------
-# SLIDE COVER & CONTENT BUILDERS
+# SLIDE BUILDERS
 # ---------------------------------------------------------
 def build_cover(prs, topic: str, style: dict, subtitle: str) -> None:
     slide = prs.slides.add_slide(prs.slide_layouts[6])
@@ -2413,7 +2400,7 @@ async def fallback_other(message: types.Message):
 
 
 # =========================================================
-# FASTAPI LIFESPAN VA API ENDPOINTLARI
+# FASTAPI LIFESPAN VA API
 # =========================================================
 def _on_polling_done(task: asyncio.Task) -> None:
     if task.cancelled():
@@ -2535,6 +2522,9 @@ async def api_generate_slide(req: SlideRequest):
     file_path = os.path.join(tempfile.gettempdir(), f"slide_{uuid.uuid4().hex}.pptx")
     success = False
 
+    # Agar tanlangan shablon topilmasa, standart "classic" ishlatiladi
+    template_name = req.template if req.template in TEMPLATE_STYLES else "classic"
+
     try:
         slide_data = await generate_slide_content(req.topic, alphabet, req.slides)
 
@@ -2542,7 +2532,7 @@ async def api_generate_slide(req: SlideRequest):
             generate_pptx,
             req.topic,
             slide_data,
-            req.template,
+            template_name,
             file_path,
             alphabet,
         )
@@ -2555,7 +2545,7 @@ async def api_generate_slide(req: SlideRequest):
                 caption=(
                     f"🎉 Slaydingiz tayyor!\n"
                     f"📌 Mavzu: {req.topic}\n"
-                    f"🎨 Shabloni: {req.template.replace('_', ' ').capitalize()}\n"
+                    f"🎨 Shabloni: {template_name.replace('_', ' ').capitalize()}\n"
                     f"📊 Slaydlar: {req.slides + 1} ta (titul bilan)"
                 ),
             )
