@@ -207,8 +207,8 @@
       overflow: hidden;
     }
 
-    /* ---------- Uslub kartalari ---------- */
-    .sty { display: flex; flex-direction: column; justify-content: flex-start; flex: none; width: 150px; scroll-snap-align: start; border: none; background: none; padding: 0; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+    /* ---------- Uslub kartalari va ICHKI PREVIEW DIZAYNLARI ---------- */
+    .sty { display: flex; flex-direction: column; justify-content: flex-start; flex: none; width: 154px; scroll-snap-align: start; border: none; background: none; padding: 0; color: inherit; text-align: left; font: inherit; cursor: pointer; }
     .pv {
       position: relative;
       height: 100px;
@@ -219,9 +219,89 @@
     }
     .sty.sel .pv { border-color: var(--gold); }
     .pv .bar { position: absolute; top: 0; left: 0; right: 0; height: 7px; }
-    .pv .ttl { position: absolute; top: 20px; left: 14px; height: 7px; width: 48%; border-radius: 4px; }
-    .pv .row { position: absolute; left: 14px; right: 14px; height: 13px; border-radius: 5px; }
-    .pv .row i { position: absolute; left: 5px; top: 3px; width: 7px; height: 7px; border-radius: 50%; }
+    .pv .ttl { position: absolute; top: 16px; left: 12px; height: 6px; width: 45%; border-radius: 3px; }
+    
+    /* Qolip 1: 2 USTUNLI BLOK */
+    .pv .pv-col-wrap {
+      position: absolute; top: 32px; left: 10px; right: 10px; bottom: 10px;
+      display: flex; gap: 8px;
+    }
+    .pv .pv-col {
+      flex: 1; border-radius: 6px; box-shadow: 0 0 0 1px rgba(128,128,128,.15);
+      position: relative; overflow: hidden;
+    }
+    .pv .pv-col::before {
+      content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+      background: var(--acc);
+    }
+
+    /* Qolip 2: GORIZONTAL 3 BOSQICH */
+    .pv .pv-proc-wrap {
+      position: absolute; top: 32px; left: 10px; right: 10px; bottom: 10px;
+      display: flex; gap: 5px;
+    }
+    .pv .pv-proc-col {
+      flex: 1; border-radius: 5px; box-shadow: 0 0 0 1px rgba(128,128,128,.15);
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    .pv .pv-proc-head { height: 10px; background: var(--acc); width: 100%; }
+
+    /* Qolip 3: KATTA IQTIBOS / HERO */
+    .pv .pv-hero-box {
+      position: absolute; top: 30px; left: 10px; right: 10px; height: 32px;
+      border-radius: 6px; box-shadow: 0 0 0 1px rgba(128,128,128,.15);
+      overflow: hidden;
+    }
+    .pv .pv-hero-box::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--acc); }
+    .pv .pv-sub-wrap {
+      position: absolute; top: 68px; left: 10px; right: 10px; height: 22px;
+      display: flex; gap: 6px;
+    }
+    .pv .pv-sub-item { flex: 1; border-radius: 4px; box-shadow: 0 0 0 1px rgba(128,128,128,.15); }
+
+    /* Qolip 4: ASIMMETRIK SPLIT */
+    .pv .pv-split-wrap {
+      position: absolute; top: 30px; left: 10px; right: 10px; bottom: 10px;
+      display: flex; gap: 7px;
+    }
+    .pv .pv-split-left {
+      width: 40px; border-radius: 5px; background: var(--acc);
+    }
+    .pv .pv-split-right {
+      flex: 1; display: flex; flex-direction: column; gap: 6px; justify-content: center;
+    }
+    .pv .pv-split-row { height: 22px; border-radius: 5px; box-shadow: 0 0 0 1px rgba(128,128,128,.15); }
+
+    /* Qolip 5: MINIMAL CHIZIQLI */
+    .pv .pv-min-wrap {
+      position: absolute; top: 32px; left: 12px; right: 12px; bottom: 8px;
+      display: flex; flex-direction: column; justify-content: space-around;
+    }
+    .pv .pv-min-line {
+      height: 2px; width: 100%; opacity: 0.4;
+      background: var(--acc);
+    }
+
+    /* Qolip 6: KVADRAT NISHONLI QATORLAR */
+    .pv .pv-sq-row {
+      position: absolute; left: 10px; right: 10px; height: 24px; border-radius: 5px;
+      box-shadow: 0 0 0 1px rgba(128,128,128,.15);
+    }
+    .pv .pv-sq-badge {
+      position: absolute; left: 5px; top: 5px; width: 14px; height: 14px;
+      background: var(--acc); border-radius: 2px;
+    }
+
+    /* Qolip 7: DOIRA NISHONLI QATORLAR */
+    .pv .pv-rd-row {
+      position: absolute; left: 10px; right: 10px; height: 24px; border-radius: 8px;
+      box-shadow: 0 0 0 1px rgba(128,128,128,.15);
+    }
+    .pv .pv-rd-badge {
+      position: absolute; left: 6px; top: 6px; width: 12px; height: 12px;
+      background: var(--acc); border-radius: 50%;
+    }
+
     .check {
       position: absolute;
       top: 8px;
@@ -368,7 +448,7 @@
       </div>
 
       <div class="block">
-        <div class="sec-head"><h2>🎨 Uslub</h2><span>15 ta variant</span></div>
+        <div class="sec-head"><h2>🎨 Uslub</h2><span>15 xil individual tuzilish</span></div>
         <div class="rail" id="styles"></div>
       </div>
 
@@ -424,23 +504,23 @@
       var MIN_LEN = 3;
       var REQUEST_TIMEOUT_MS = 150000;
 
-      // ---------- 15 XIL SHABLON ----------
+      // ---------- 15 XIL SHABLON VA ULARNING MOS TUZILISHI (layout) ----------
       var STYLES = [
-        { id: "classic",         name: "Klassik",     desc: "2 ustun, indigo",      bg: "#ffffff", accent: "#4f46e5", card: "#f3f4f6" },
-        { id: "business",        name: "Biznes",      desc: "Gorizontal 3 bosqich", bg: "#f0f4f8", accent: "#0284c7", card: "#ffffff" },
-        { id: "dark",            name: "Qorong'i",    desc: "Katta asosiy g'oya",   bg: "#111827", accent: "#a855f7", card: "#1f2937" },
-        { id: "minimal",         name: "Minimal",     desc: "Chiziqli, eko yashil", bg: "#f0fdf4", accent: "#22c55e", card: "#ffffff" },
-        { id: "swiss_clean",     name: "Shveysariya", desc: "Chap dominant blok",   bg: "#ffffff", accent: "#e11d48", card: "#f5f5f5" },
-        { id: "cyber_tech",      name: "Cyber Tech",  desc: "Neon kvadrat nishon",  bg: "#0a0f1e", accent: "#06b6d4", card: "#131d38" },
-        { id: "warm_editorial",  name: "Editorial",   desc: "2 ustun, qahva",       bg: "#fefcf7", accent: "#d97706", card: "#fff7ed" },
-        { id: "sunset_punch",    name: "Sunset",      desc: "Olovrang bosqichlar",  bg: "#fffaf5", accent: "#f97316", card: "#ffedd5" },
-        { id: "ocean_breeze",    name: "Ocean",       desc: "Moviy asimmetriya",    bg: "#f0f9ff", accent: "#0ea5e9", card: "#ffffff" },
-        { id: "monochrome",      name: "Monoxrom",    desc: "Qora-oq minimalizm",   bg: "#f5f5f5", accent: "#000000", card: "#ffffff" },
-        { id: "emerald_wealth",  name: "Zumrad",      desc: "2 ustun, moliya",      bg: "#f0fdfa", accent: "#0d9488", card: "#ffffff" },
-        { id: "berry_creative",  name: "Berry",       desc: "Magenta iqtibos",      bg: "#fdf2f8", accent: "#db2777", card: "#ffffff" },
-        { id: "titanium_slate",  name: "Titanium",    desc: "Muhandislik 3 karta",  bg: "#f1f5f9", accent: "#64748b", card: "#ffffff" },
-        { id: "midnight_gold",   name: "Tungi Oltin", desc: "Premium asimmetrik",   bg: "#0f172a", accent: "#eab308", card: "#1e293b" },
-        { id: "nordic_frost",    name: "Nordic",      desc: "Aylana ro'yxat",       bg: "#f8fafc", accent: "#38bdf8", card: "#ffffff" }
+        { id: "classic",        layout: "two_cols",   name: "Klassik",     desc: "2 ustun, indigo",      bg: "#ffffff", accent: "#4f46e5", card: "#f3f4f6" },
+        { id: "business",       layout: "process",    name: "Biznes",      desc: "Gorizontal 3 bosqich", bg: "#f0f4f8", accent: "#0284c7", card: "#ffffff" },
+        { id: "dark",           layout: "hero",       name: "Qorong'i",    desc: "Katta asosiy g'oya",   bg: "#111827", accent: "#a855f7", card: "#1f2937" },
+        { id: "minimal",        layout: "minimal",    name: "Minimal",     desc: "Chiziqli, eko yashil", bg: "#f0fdf4", accent: "#22c55e", card: "#ffffff" },
+        { id: "swiss_clean",    layout: "split",      name: "Shveysariya", desc: "Chap dominant blok",   bg: "#ffffff", accent: "#e11d48", card: "#f5f5f5" },
+        { id: "cyber_tech",     layout: "square",     name: "Cyber Tech",  desc: "Neon kvadrat nishon",  bg: "#0a0f1e", accent: "#06b6d4", card: "#131d38" },
+        { id: "warm_editorial", layout: "two_cols",   name: "Editorial",   desc: "2 ustun, qahva",       bg: "#fefcf7", accent: "#d97706", card: "#fff7ed" },
+        { id: "sunset_punch",   layout: "process",    name: "Sunset",      desc: "Olovrang bosqichlar",  bg: "#fffaf5", accent: "#f97316", card: "#ffedd5" },
+        { id: "ocean_breeze",   layout: "split",      name: "Ocean",       desc: "Moviy asimmetriya",    bg: "#f0f9ff", accent: "#0ea5e9", card: "#ffffff" },
+        { id: "monochrome",     layout: "minimal",    name: "Monoxrom",    desc: "Qora-oq minimalizm",   bg: "#f5f5f5", accent: "#000000", card: "#ffffff" },
+        { id: "emerald_wealth", layout: "two_cols",   name: "Zumrad",      desc: "2 ustun, moliya",      bg: "#f0fdfa", accent: "#0d9488", card: "#ffffff" },
+        { id: "berry_creative", layout: "hero",       name: "Berry",       desc: "Magenta iqtibos",      bg: "#fdf2f8", accent: "#db2777", card: "#ffffff" },
+        { id: "titanium_slate", layout: "process",    name: "Titanium",    desc: "Muhandislik 3 karta",  bg: "#f1f5f9", accent: "#64748b", card: "#ffffff" },
+        { id: "midnight_gold",  layout: "split",      name: "Tungi Oltin", desc: "Premium asimmetrik",   bg: "#0f172a", accent: "#eab308", card: "#1e293b" },
+        { id: "nordic_frost",   layout: "round",      name: "Nordic",      desc: "Aylana ro'yxat",       bg: "#f8fafc", accent: "#38bdf8", card: "#ffffff" }
       ];
 
       var CATS = ["Hammasi", "Ta'lim", "Texnologiya", "Biznes", "Sog'liq", "Tabiat"];
@@ -477,7 +557,6 @@
       var selectedStyle = "classic";
       var selectedAlphabet = "latin";
 
-      // ---------- Yordamchilar ----------
       function el(tag, className, text) {
         var node = document.createElement(tag);
         if (className) node.className = className;
@@ -491,7 +570,7 @@
             if (type === "select") tg.HapticFeedback.selectionChanged();
             else tg.HapticFeedback.notificationOccurred(type);
           }
-        } catch (e) { /* e'tiborsiz */ }
+        } catch (e) { }
       }
 
       function showMessage(kind, text) {
@@ -604,7 +683,7 @@
 
       countEl.textContent = TOPICS.length + " ta tayyor mavzu · posterini bosing";
 
-      // ---------- Uslub kartalari (15 ta) ----------
+      // ---------- 15 XIL ICHKI TUZILISHGA EGA USLUB KARTALARI ----------
       var stylesEl = document.getElementById("styles");
       STYLES.forEach(function (st) {
         var btn = el("button", "sty" + (st.id === selectedStyle ? " sel" : ""));
@@ -613,16 +692,75 @@
 
         var pv = el("div", "pv");
         pv.style.background = st.bg;
+        pv.style.setProperty("--acc", st.accent);
+
         var bar = el("div", "bar"); bar.style.background = st.accent; pv.appendChild(bar);
         var ttl = el("div", "ttl"); ttl.style.background = st.accent; pv.appendChild(ttl);
-        [38, 62].forEach(function (top) {
-          var row = el("div", "row");
-          row.style.top = top + "px";
-          row.style.background = st.card;
-          row.style.boxShadow = "0 0 0 1px rgba(128,128,128,.18)";
-          var dot = el("i"); dot.style.background = st.accent; row.appendChild(dot);
-          pv.appendChild(row);
-        });
+
+        // HAR BIR QOLIPNI O'ZIGA XOS SHAKLDA CHIZISH:
+        if (st.layout === "two_cols") {
+          // 2 ta vertikal ustun
+          var wrap = el("div", "pv-col-wrap");
+          var c1 = el("div", "pv-col"); c1.style.background = st.card;
+          var c2 = el("div", "pv-col"); c2.style.background = st.card;
+          wrap.appendChild(c1); wrap.appendChild(c2);
+          pv.appendChild(wrap);
+        } else if (st.layout === "process") {
+          // Gorizontal 3 ta bosqich
+          var wrap = el("div", "pv-proc-wrap");
+          for (var k = 0; k < 3; k++) {
+            var col = el("div", "pv-proc-col"); col.style.background = st.card;
+            var h = el("div", "pv-proc-head"); col.appendChild(h);
+            wrap.appendChild(col);
+          }
+          pv.appendChild(wrap);
+        } else if (st.layout === "hero") {
+          // Katta markaziy karta + 2 ta mayda
+          var hero = el("div", "pv-hero-box"); hero.style.background = st.card; pv.appendChild(hero);
+          var subWrap = el("div", "pv-sub-wrap");
+          var s1 = el("div", "pv-sub-item"); s1.style.background = st.card;
+          var s2 = el("div", "pv-sub-item"); s2.style.background = st.card;
+          subWrap.appendChild(s1); subWrap.appendChild(s2);
+          pv.appendChild(subWrap);
+        } else if (st.layout === "split") {
+          // Chap dominant blok + o'ng qatorlar
+          var wrap = el("div", "pv-split-wrap");
+          var l = el("div", "pv-split-left");
+          var r = el("div", "pv-split-right");
+          var r1 = el("div", "pv-split-row"); r1.style.background = st.card;
+          var r2 = el("div", "pv-split-row"); r2.style.background = st.card;
+          r.appendChild(r1); r.appendChild(r2);
+          wrap.appendChild(l); wrap.appendChild(r);
+          pv.appendChild(wrap);
+        } else if (st.layout === "minimal") {
+          // Shveysariya toza gorizontal chiziqlari
+          var wrap = el("div", "pv-min-wrap");
+          wrap.appendChild(el("div", "pv-min-line"));
+          wrap.appendChild(el("div", "pv-min-line"));
+          wrap.appendChild(el("div", "pv-min-line"));
+          pv.appendChild(wrap);
+        } else if (st.layout === "square") {
+          // Kvadrat neon nishon
+          [36, 64].forEach(function (top) {
+            var row = el("div", "pv-sq-row");
+            row.style.top = top + "px";
+            row.style.background = st.card;
+            var sq = el("div", "pv-sq-badge");
+            row.appendChild(sq);
+            pv.appendChild(row);
+          });
+        } else {
+          // Dumaloq nishonli qatorlar (round)
+          [36, 64].forEach(function (top) {
+            var row = el("div", "pv-rd-row");
+            row.style.top = top + "px";
+            row.style.background = st.card;
+            var dot = el("div", "pv-rd-badge");
+            row.appendChild(dot);
+            pv.appendChild(row);
+          });
+        }
+
         pv.appendChild(el("div", "check", "✓"));
 
         btn.appendChild(pv);
@@ -673,7 +811,7 @@
             body: JSON.stringify({ init_data: initData })
           });
           if (response.ok) applyLimit(await response.json());
-        } catch (e) { /* limit ko'rinmasa ham ilova ishlayveradi */ }
+        } catch (e) { }
       }
 
       // ---------- Slayd yaratish ----------
@@ -711,7 +849,7 @@
           });
 
           var data = null;
-          try { data = await response.json(); } catch (e) { /* JSON bo'lmasligi mumkin */ }
+          try { data = await response.json(); } catch (e) { }
 
           if (!response.ok) {
             showMessage("error", extractError(data, response.status));
