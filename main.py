@@ -97,7 +97,7 @@ TELEGRAM_INIT_DATA_MAX_AGE = int(os.getenv("TELEGRAM_INIT_DATA_MAX_AGE", "86400"
 GEMINI_TIMEOUT_SECONDS = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "60"))
 GEMINI_DOC_TIMEOUT_SECONDS = float(os.getenv("GEMINI_DOC_TIMEOUT_SECONDS", "120"))
 QUEUE_TIMEOUT_SECONDS = float(os.getenv("QUEUE_TIMEOUT_SECONDS", "45"))
-GEMINI_MAX_ATTEMPTS = int(os.getenv("GEMINI_MAX_ATTEMPTS", "1"))
+GEMINI_MAX_ATTEMPTS = int(os.getenv("GEMINI_MAX_ATTEMPTS", "2"))
 ENABLE_BOT_POLLING = os.getenv("ENABLE_BOT_POLLING", "1").strip() not in {"0", "false", "False"}
 # Adminlar (Telegram ID, vergul bilan): /stats buyrug'i va xato ogohlantirishlari shularga boradi.
 ADMIN_IDS = {
@@ -112,7 +112,19 @@ MAX_BULLET_CHARS = 200
 MAX_TITLE_CHARS = 100
 SLIDE_COUNT = 5
 MAX_DOC_SECTIONS = 10
-MAX_DOC_PARAGRAPHS = 6
+MAX_DOC_PARAGRAPHS = 8
+MIN_SLIDES = 5
+MAX_SLIDES = 20
+# Bir bet taxminan nechta so'z (Times New Roman 14, 1.5 oraliq). Haqiqiy natijaga qarab
+# Railway Variables orqali o'zgartiring: bet kam chiqsa kamaytiring, ko'p chiqsa oshiring.
+WORDS_PER_PAGE = int(os.getenv("WORDS_PER_PAGE", "230"))
+PARAGRAPH_WORDS = 115
+_TEXT_TIERS = [(5, 10), (10, 15), (15, 20), (20, 25), (25, 30)]
+PAGE_TIERS = {
+    "referat": _TEXT_TIERS,
+    "mustaqil": _TEXT_TIERS,
+    "kurs": [(10, 15), (15, 20), (20, 25), (25, 30), (30, 35), (35, 40), (40, 45)],
+}
 
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN Railway Variables bo'limida sozlanmagan.")
@@ -171,6 +183,7 @@ class SlideRequest(BaseModel):
     topic: str = Field(min_length=3, max_length=MAX_TOPIC_LENGTH)
     template: Literal["classic", "business", "dark", "minimal"] = "classic"
     alphabet: Literal["latin", "kirill"] | None = None
+    slides: int = Field(default=SLIDE_COUNT, ge=MIN_SLIDES, le=MAX_SLIDES)
 
 
 class MeRequest(BaseModel):
@@ -452,10 +465,10 @@ async def safe_edit(message, text: str) -> None:
 # =========================================================
 # AI CONTENT GENERATION
 # =========================================================
-def build_prompt(topic: str, alphabet: str = LATIN) -> str:
+def build_prompt(topic: str, alphabet: str = LATIN, count: int = SLIDE_COUNT) -> str:
     return f"""
 Siz o'zbek tilida sifatli PowerPoint taqdimotlar tayyorlaydigan mutaxassissiz.
-Quyidagi mavzu bo'yicha AYNAN {SLIDE_COUNT} ta slayd uchun ma'lumot tayyorlang: {topic!r}
+Quyidagi mavzu bo'yicha AYNAN {count} ta slayd uchun ma'lumot tayyorlang: {topic!r}
 
 Faqat JSON qaytaring, izoh yoki Markdown qo'shmang. Format:
 {{
@@ -468,7 +481,7 @@ Faqat JSON qaytaring, izoh yoki Markdown qo'shmang. Format:
 }}
 
 Talablar:
-- Aynan {SLIDE_COUNT} ta slayd.
+- Aynan {count} ta slayd.
 - Har slaydda bitta qisqa sarlavha (8 so'zdan oshmasin) va 3-{MAX_BULLETS} ta mazmunli punkt.
 - Har bir punkt qisqa, tushunarli o'zbek tilida bo'lsin va 15 so'zdan oshmasin.
 - Birinchi slayd mavzuga kirish, oxirgi slayd xulosa yoki asosiy tavsiyalar bo'lsin.
@@ -483,7 +496,7 @@ def _strip_code_fences(text: str) -> str:
     return match.group(1) if match else text
 
 
-def parse_slides(raw_text: str) -> list[dict]:
+def parse_slides(raw_text: str, count: int = SLIDE_COUNT) -> list[dict]:
     """Gemini javobini tekshiradi. Xato bo'lsa ValueError ko'taradi."""
     try:
         payload = json.loads(_strip_code_fences(raw_text))
@@ -491,8 +504,8 @@ def parse_slides(raw_text: str) -> list[dict]:
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
         raise ValueError("JSON formati noto'g'ri") from exc
 
-    if not isinstance(slides, list) or len(slides) != SLIDE_COUNT:
-        raise ValueError(f"Aynan {SLIDE_COUNT} ta slayd kutilgan edi")
+    if not isinstance(slides, list) or len(slides) != count:
+        raise ValueError(f"Aynan {count} ta slayd kutilgan edi")
 
     validated = []
     for slide in slides:
@@ -549,8 +562,8 @@ async def call_gemini(prompt: str, timeout: float | None = None) -> str:
                 logger.warning(
                     "Gemini modeli %r xato berdi (kod=%s): %s", model_name, code, exc
                 )
-                # 404: model topilmadi, 429: limit tugadi -> keyingi modelni sinaymiz.
-                if code in (404, 429):
+                # 404: model topilmadi, 429: limit tugadi, 500/503: Gemini band -> keyingi modelni sinaymiz.
+                if code in (404, 429, 500, 503):
                     continue
                 raise HTTPException(
                     status_code=502,
@@ -598,8 +611,12 @@ async def generate_structured(prompt: str, parser, timeout: float | None = None)
     )
 
 
-async def generate_slide_content(topic: str, alphabet: str = LATIN) -> list[dict]:
-    return await generate_structured(build_prompt(topic, alphabet), parse_slides)
+async def generate_slide_content(topic: str, alphabet: str = LATIN, count: int = SLIDE_COUNT) -> list[dict]:
+    return await generate_structured(
+        build_prompt(topic, alphabet, count),
+        lambda raw: parse_slides(raw, count),
+        timeout=GEMINI_DOC_TIMEOUT_SECONDS if count > 10 else None,
+    )
 
 
 # ---------------------------------------------------------
@@ -773,10 +790,19 @@ def _plan_outline(plan: dict) -> str:
 
 
 def build_course_prompt(role: str, topic: str, plan: dict | None, alphabet: str = LATIN,
-                        heading: str = "", number: str = "") -> str:
+                        heading: str = "", number: str = "", shape: list[int] | None = None,
+                        paragraphs: int = 4) -> str:
     rule = alphabet_rule(alphabet)
 
     if role == "plan":
+        counts = shape or [3, 3, 3]
+        if len(counts) == 3:
+            chapter_rule = ("Aynan 3 ta bob: 1-bob nazariy asoslar, 2-bob tahlil yoki amaliy qism, "
+                            "3-bob muammolar, takliflar va istiqbollar.")
+        else:
+            chapter_rule = (f"Aynan {len(counts)} ta bob: 1-bob nazariy asoslar, o'rtadagi boblar tahlil yoki "
+                            "amaliy qism, oxirgi bob muammolar, takliflar va istiqbollar.")
+        sections_rule = ", ".join(f"{i}-bobda aynan {n} ta" for i, n in enumerate(counts, start=1))
         return f"""
 Siz kurs ishlariga rahbarlik qiladigan tajribali o'qituvchisiz.
 Quyidagi mavzu bo'yicha KURS ISHI REJASINI tuzing: {topic!r}
@@ -790,8 +816,8 @@ Quyidagi mavzu bo'yicha KURS ISHI REJASINI tuzing: {topic!r}
 }}
 
 Talablar:
-- Aynan 3 ta bob: 1-bob nazariy asoslar, 2-bob tahlil yoki amaliy qism, 3-bob muammolar, takliflar va istiqbollar.
-- Har bobda aynan 3 ta paragraf (bo'lim) nomi bo'lsin.
+- {chapter_rule}
+- Paragraf (bo'lim) nomlari soni: {sections_rule}.
 - Nomlarni raqamlamang va "bob" so'zini yozmang.{rule}
 {IGNORE_TOPIC_RULE}
 """
@@ -815,7 +841,7 @@ Talablar:
     if role == "section":
         return (
             header + f"Faqat shu bo'limni yozing: {number}. {heading}\n\n" + fmt +
-            "\nTalablar:\n- Aynan 4 ta paragraf, har paragraf 100-130 so'z.\n"
+            f"\nTalablar:\n- Aynan {paragraphs} ta paragraf, har paragraf 100-130 so'z.\n"
             "- Faqat shu bo'limga oid mazmun yozing, boshqa bo'limlarni takrorlamang.\n"
             "- Sarlavhani matn ichida qaytarmang. Rasmiy akademik uslub.\n"
             "- To'qima statistika va iqtiboslarni kiritmang.\n" + tail
@@ -964,8 +990,8 @@ def parse_course_plan(raw_text: str) -> dict:
         if not isinstance(chapter, dict):
             raise ValueError("Bob obyekt emas")
         heading = str(chapter.get("heading", "")).strip()[:150]
-        sections = _clean_list(chapter.get("sections"), 3, 150)
-        if not heading or not 2 <= len(sections) <= 3:
+        sections = _clean_list(chapter.get("sections"), 6, 150)
+        if not heading or not 2 <= len(sections) <= 6:
             raise ValueError("Bob tuzilishi noto'g'ri")
         chapters.append({"heading": heading, "sections": sections})
     return {"title": str(payload.get("title", "")).strip()[:200], "chapters": chapters}
@@ -973,7 +999,7 @@ def parse_course_plan(raw_text: str) -> dict:
 
 def parse_paragraphs(raw_text: str) -> list[str]:
     payload = _load_json(raw_text)
-    paragraphs = _clean_list(payload.get("paragraphs"), 6, 2500)
+    paragraphs = _clean_list(payload.get("paragraphs"), MAX_DOC_PARAGRAPHS, 2500)
     if len(paragraphs) < 2:
         raise ValueError("Paragraflar yetarli emas")
     return paragraphs
@@ -984,14 +1010,175 @@ def parse_references(raw_text: str) -> list[str]:
     return _clean_list(payload.get("references"), 12, 300)
 
 
-async def generate_course_work(topic: str, alphabet: str = LATIN, progress=None) -> dict:
-    """Kurs ishini bosqichma-bosqich yozadi: reja, kirish, har bir bo'lim, xulosa, adabiyotlar."""
+# ---------------------------------------------------------
+# Hajm (bet) bo'yicha hujjatlar: referat, mustaqil ish, kurs ishi
+# ---------------------------------------------------------
+def _clamp(value: int, low: int, high: int) -> int:
+    return max(low, min(high, value))
+
+
+def target_pages(pages) -> int:
+    """Tanlangan oraliqdan (masalan 10-15) maqsad bet sonini topadi: o'rtadan biroz yuqori."""
+    lo, hi = pages
+    return (lo + hi + 1) // 2
+
+
+def plan_text_doc_sizes(pages) -> tuple[int, int]:
+    """Referat / mustaqil ish: (bo'limlar soni, jami paragraflar soni)."""
+    content_pages = max(2, target_pages(pages) - 2)  # titul va reja varaqlari
+    total_par = max(6, round(content_pages * WORDS_PER_PAGE / PARAGRAPH_WORDS))
+    per_section = 4 if total_par >= 16 else 3
+    sections = _clamp(round(total_par / per_section), 4, MAX_DOC_SECTIONS)
+    return sections, total_par
+
+
+def text_doc_paragraphs(total_par: int, sections: int) -> int:
+    return _clamp(round(total_par / max(1, sections)), 2, MAX_DOC_PARAGRAPHS)
+
+
+def plan_course_sizes(pages) -> tuple[int, int, int]:
+    """Kurs ishi: (boblar soni, bo'limlar soni, bo'limlarga ajratilgan so'zlar soni)."""
+    content_pages = max(6, target_pages(pages) - 3)  # titul, mundarija, adabiyotlar
+    sec_words = max(1000, content_pages * WORDS_PER_PAGE - 2 * 4 * 105)  # kirish va xulosa chiqarib tashlandi
+    n_sec = _clamp(round(sec_words / (4 * PARAGRAPH_WORDS)), 6, 20)
+    chapters = 3 if n_sec <= 9 else 4
+    return chapters, n_sec, sec_words
+
+
+def course_shape(chapters: int, n_sec: int) -> list[int]:
+    base, extra = divmod(n_sec, chapters)
+    return [base + (1 if i < extra else 0) for i in range(chapters)]
+
+
+def course_paragraphs(sec_words: int, n_sec: int) -> int:
+    return _clamp(round(sec_words / (max(1, n_sec) * PARAGRAPH_WORDS)), 2, MAX_DOC_PARAGRAPHS)
+
+
+def build_sized_prompt(role: str, kind: str, topic: str, alphabet: str = LATIN, *,
+                       sections: int = 6, paragraphs: int = 3,
+                       plan: dict | None = None, heading: str = "") -> str:
+    rule = alphabet_rule(alphabet)
+    label = DOC_KINDS[kind]["label"].lower()
+
+    if role == "plan":
+        questions_format = ""
+        questions_rule = ""
+        if kind == "mustaqil":
+            questions_format = ',\n  "questions": ["Nazorat savoli 1", "Nazorat savoli 2"]'
+            questions_rule = '\n- "questions" maydonida mavzu bo\'yicha 5 ta nazorat savoli bo\'lsin.'
+        return f"""
+Siz o'zbek tilida {label} yozadigan tajribali o'qituvchisiz.
+Quyidagi mavzu bo'yicha {label} REJASINI tuzing: {topic!r}
+
+{JSON_ONLY} Format:
+{{
+  "title": "Mavzu nomi",
+  "sections": ["Kirish", "Bo'lim nomi", "Xulosa"]{questions_format}
+}}
+
+Talablar:
+- Aynan {sections} ta bo'lim nomi: birinchisi "Kirish", oxirgisi "Xulosa", o'rtadagilari mavzuning asosiy qismlari.
+- Nomlarni raqamlamang.{questions_rule}{rule}
+{IGNORE_TOPIC_RULE}
+"""
+
+    outline = "\n".join(f"{i}. {h}" for i, h in enumerate(plan["sections"], start=1))
+    return f"""
+Siz o'zbek tilida {label} yozadigan tajribali o'qituvchisiz.
+Mavzu: {plan['title']!r}
+Reja:
+{outline}
+
+Faqat shu bo'limni yozing: {heading}
+
+{JSON_ONLY} Format:
+{{"paragraphs": ["Paragraf 1", "Paragraf 2"]}}
+
+Talablar:
+- Aynan {paragraphs} ta paragraf, har paragraf 100-130 so'z.
+- Faqat shu bo'limga oid mazmun yozing, boshqa bo'limlarni takrorlamang.
+- Sarlavhani matn ichida qaytarmang. Rasmiy, ravon akademik o'zbek tili.
+- To'qima statistika, iqtibos, havola va adabiyotlar ro'yxatini kiritmang.{rule}
+{IGNORE_TOPIC_RULE}
+"""
+
+
+def parse_text_plan(raw_text: str, kind: str) -> dict:
+    payload = _load_json(raw_text)
+    sections = _clean_list(payload.get("sections"), MAX_DOC_SECTIONS, 150)
+    if len(sections) < 3:
+        raise ValueError("Reja bo'limlari yetarli emas")
+    questions = _clean_list(payload.get("questions"), 8, 300) if kind == "mustaqil" else []
+    return {
+        "title": str(payload.get("title", "")).strip()[:160],
+        "sections": sections,
+        "questions": questions,
+    }
+
+
+async def generate_text_document(kind: str, topic: str, alphabet: str, pages, progress=None) -> dict:
+    """Referat / mustaqil ishni tanlangan hajmda (bet) bo'lim-bo'lim yozadi."""
+    sections_n, total_par = plan_text_doc_sizes(pages)
     plan = await generate_structured(
-        build_course_prompt("plan", topic, None, alphabet),
+        build_sized_prompt("plan", kind, topic, alphabet, sections=sections_n),
+        lambda raw: parse_text_plan(raw, kind),
+        timeout=GEMINI_DOC_TIMEOUT_SECONDS,
+    )
+    plan["title"] = plan["title"] or topic
+    per = text_doc_paragraphs(total_par, len(plan["sections"]))
+
+    total = len(plan["sections"]) + 1
+    done = 1
+    if progress:
+        await progress(done, total)
+    semaphore = asyncio.Semaphore(max(1, COURSE_PARALLEL))
+
+    async def run(heading: str) -> list[str]:
+        nonlocal done
+        prompt = build_sized_prompt(
+            "section", kind, topic, alphabet, paragraphs=per, plan=plan, heading=heading
+        )
+        async with semaphore:
+            result = await generate_structured(prompt, parse_paragraphs, timeout=GEMINI_DOC_TIMEOUT_SECONDS)
+        done += 1
+        if progress:
+            await progress(done, total)
+        return result
+
+    tasks = [asyncio.create_task(run(heading)) for heading in plan["sections"]]
+    try:
+        results = await asyncio.gather(*tasks)
+    except BaseException:
+        for task in tasks:
+            task.cancel()
+        raise
+
+    return {
+        "title": plan["title"],
+        "sections": [
+            {"heading": heading, "paragraphs": paragraphs}
+            for heading, paragraphs in zip(plan["sections"], results)
+        ],
+        "questions": plan["questions"],
+    }
+
+
+async def generate_course_work(topic: str, alphabet: str = LATIN, progress=None, pages=None) -> dict:
+    """Kurs ishini bosqichma-bosqich yozadi: reja, kirish, har bir bo'lim, xulosa, adabiyotlar."""
+    if pages:
+        chapters_n, n_sec, sec_words = plan_course_sizes(pages)
+        shape = course_shape(chapters_n, n_sec)
+    else:
+        shape, sec_words = None, None
+
+    plan = await generate_structured(
+        build_course_prompt("plan", topic, None, alphabet, shape=shape),
         parse_course_plan,
         timeout=GEMINI_DOC_TIMEOUT_SECONDS,
     )
     plan["title"] = plan["title"] or topic
+    actual_sections = sum(len(chapter["sections"]) for chapter in plan["chapters"])
+    paragraphs = course_paragraphs(sec_words, actual_sections) if sec_words else 4
 
     jobs: list[tuple] = [("intro",)]
     for ci, chapter in enumerate(plan["chapters"]):
@@ -1012,7 +1199,9 @@ async def generate_course_work(topic: str, alphabet: str = LATIN, progress=None)
         if role == "section":
             heading = plan["chapters"][job[1]]["sections"][job[2]]
             number = f"{job[1] + 1}.{job[2] + 1}"
-        prompt = build_course_prompt(role, topic, plan, alphabet, heading=heading, number=number)
+        prompt = build_course_prompt(
+            role, topic, plan, alphabet, heading=heading, number=number, paragraphs=paragraphs
+        )
         parser = parse_references if role == "references" else parse_paragraphs
         async with semaphore:
             try:
@@ -1051,9 +1240,12 @@ async def generate_course_work(topic: str, alphabet: str = LATIN, progress=None)
     }
 
 
-async def generate_document_content(kind: str, topic: str, alphabet: str = LATIN, progress=None) -> dict:
+async def generate_document_content(kind: str, topic: str, alphabet: str = LATIN,
+                                    progress=None, pages=None) -> dict:
     if kind == "kurs":
-        return await generate_course_work(topic, alphabet, progress)
+        return await generate_course_work(topic, alphabet, progress, pages)
+    if pages and kind in ("referat", "mustaqil"):
+        return await generate_text_document(kind, topic, alphabet, pages, progress)
 
     prompt = build_document_prompt(kind, topic, alphabet)
     if kind == "test":
@@ -1751,20 +1943,83 @@ async def alphabet_choice(callback: types.CallbackQuery):
     await callback.answer(f"Tanlandi: {ALPHABET_NAMES[code]}")
 
 
+def pages_keyboard(kind: str) -> InlineKeyboardMarkup:
+    buttons = [
+        InlineKeyboardButton(text=f"{lo}–{hi} bet", callback_data=f"pg:{kind}:{lo}:{hi}")
+        for lo, hi in PAGE_TIERS[kind]
+    ]
+    rows = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def topic_prompt_text(kind: str) -> str:
+    return f"✍️ {TOPIC_HINTS[kind]}.\nMasalan: <i>Sun'iy intellektning ta'limdagi o'rni</i>"
+
+
 @dp.message(F.text.in_(set(KIND_BY_BUTTON)))
 async def document_btn(message: types.Message, state: FSMContext):
     kind = KIND_BY_BUTTON[message.text]
+    if kind in PAGE_TIERS:
+        # Avval hajm (bet) tanlanadi, keyin mavzu so'raladi.
+        await state.clear()
+        await message.answer(
+            f"📏 <b>{DOC_KINDS[kind]['label']}</b> hajmini tanlang:",
+            parse_mode="HTML",
+            reply_markup=pages_keyboard(kind),
+        )
+        return
     await state.set_state(DocOrder.waiting_topic)
-    await state.update_data(kind=kind)
+    await state.update_data(kind=kind, pages=None)
     await message.answer(
-        f"✍️ {TOPIC_HINTS[kind]} (3-{MAX_TOPIC_LENGTH} belgi).\n"
-        "Masalan: <i>Sun'iy intellektning ta'limdagi o'rni</i>",
+        topic_prompt_text(kind),
         parse_mode="HTML",
         reply_markup=cancel_keyboard(),
     )
 
 
-async def run_document(message: types.Message, kind: str, topic: str) -> None:
+@dp.callback_query(F.data.startswith("pg:"))
+async def pages_choice(callback: types.CallbackQuery, state: FSMContext):
+    parts = (callback.data or "").split(":")
+    try:
+        kind, lo, hi = parts[1], int(parts[2]), int(parts[3])
+    except (IndexError, ValueError):
+        await callback.answer("Noto'g'ri tanlov", show_alert=True)
+        return
+    if kind not in PAGE_TIERS or (lo, hi) not in PAGE_TIERS[kind]:
+        await callback.answer("Noto'g'ri tanlov", show_alert=True)
+        return
+
+    await state.set_state(DocOrder.waiting_topic)
+    await state.update_data(kind=kind, pages=[lo, hi])
+    await callback.answer(f"Hajm: {lo}–{hi} bet")
+    if callback.message:
+        try:
+            await callback.message.edit_text(
+                f"✅ {DOC_KINDS[kind]['label']} hajmi: <b>{lo}–{hi} bet</b>",
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
+    await bot.send_message(
+        callback.from_user.id,
+        topic_prompt_text(kind),
+        parse_mode="HTML",
+        reply_markup=cancel_keyboard(),
+    )
+
+
+def eta_text(kind: str, pages) -> str:
+    if not pages:
+        return "2-4 daqiqa" if kind == "kurs" else "30-90 soniya"
+    hi = pages[1]
+    if hi <= 15:
+        return "2-4 daqiqa"
+    if hi <= 30:
+        return "4-7 daqiqa"
+    return "6-10 daqiqa"
+
+
+async def run_document(message: types.Message, kind: str, topic: str, pages=None) -> None:
     """Hujjatni yaratib, foydalanuvchiga yuboradi. Muvaffaqiyatsiz bo'lsa limit qaytariladi."""
     user_id = message.from_user.id
     meta = DOC_KINDS[kind]
@@ -1786,26 +2041,26 @@ async def run_document(message: types.Message, kind: str, topic: str) -> None:
     _active_users.add(user_id)
     started = time.monotonic()
     alphabet = await get_user_alphabet(user_id)
-    wait_text = (
-        "⏳ Kurs ishi yozilmoqda, bu 2-4 daqiqa olishi mumkin..."
-        if kind == "kurs"
-        else "⏳ Matn yozilmoqda, bu 30-90 soniya olishi mumkin..."
-    )
+    size_label = f" ({pages[0]}–{pages[1]} bet)" if pages else ""
+    wait_text = f"⏳ {meta['label']} yozilmoqda{size_label}, bu {eta_text(kind, pages)} olishi mumkin..."
     status = await message.answer(wait_text, reply_markup=main_keyboard())
     file_path = os.path.join(tempfile.gettempdir(), f"{meta['file']}_{uuid.uuid4().hex}.docx")
     success = False
+    use_progress = kind == "kurs" or bool(pages)
 
     async def progress(done: int, total: int) -> None:
-        await safe_edit(status, f"⏳ Kurs ishi yozilmoqda: {done}/{total} qism tayyor...")
+        await safe_edit(status, f"⏳ {meta['label']} yozilmoqda{size_label}: {done}/{total} qism tayyor...")
 
     try:
         await bot.send_chat_action(message.chat.id, "upload_document")
         data = await generate_document_content(
-            kind, topic, alphabet, progress=progress if kind == "kurs" else None
+            kind, topic, alphabet, progress=progress if use_progress else None, pages=pages
         )
         await safe_edit(status, "📄 Word fayl tayyorlanmoqda...")
         await asyncio.to_thread(build_docx, kind, topic, data, file_path, alphabet)
         caption = f"🎉 {meta['label']} tayyor!\n📌 Mavzu: {topic}\n🔤 Alifbo: {ALPHABET_NAMES[alphabet]}"
+        if pages:
+            caption += f"\n📏 Hajm: {pages[0]}–{pages[1]} bet"
         if meta.get("note"):
             caption += f"\n\n{meta['note']}"
         await message.answer_document(
@@ -1869,18 +2124,28 @@ async def stats_cmd(message: types.Message):
 async def receive_topic(message: types.Message, state: FSMContext):
     data = await state.get_data()
     kind = data.get("kind")
+    pages = tuple(data["pages"]) if data.get("pages") else None
     topic = (message.text or "").strip()
 
     if kind not in DOC_KINDS:
         await state.clear()
         await message.answer("Iltimos, xizmatni qaytadan tanlang 👇", reply_markup=main_keyboard())
         return
+    if kind in PAGE_TIERS and pages not in PAGE_TIERS[kind]:
+        # Hajm tanlanmagan bo'lsa (masalan eski holat), qaytadan so'raymiz.
+        await state.clear()
+        await message.answer(
+            f"📏 <b>{DOC_KINDS[kind]['label']}</b> hajmini tanlang:",
+            parse_mode="HTML",
+            reply_markup=pages_keyboard(kind),
+        )
+        return
     if len(topic) < 3 or len(topic) > MAX_TOPIC_LENGTH:
-        await message.answer(f"Mavzu 3 dan {MAX_TOPIC_LENGTH} tagacha belgidan iborat bo'lsin. Qayta yozing:")
+        await message.answer("Mavzu juda qisqa yoki juda uzun. Iltimos, aniqroq va qisqaroq yozing:")
         return
 
     await state.clear()
-    await run_document(message, kind, topic)
+    await run_document(message, kind, topic, pages)
 
 
 @dp.message(F.text)
@@ -1995,6 +2260,7 @@ async def api_me(req: MeRequest):
         "remaining": remaining,
         "limit": RATE_LIMIT_REQUESTS,
         "window_minutes": max(1, RATE_LIMIT_WINDOW_SECONDS // 60),
+        "slides": {"default": SLIDE_COUNT, "min": MIN_SLIDES, "max": MAX_SLIDES},
     }
 
 
@@ -2022,7 +2288,7 @@ async def api_generate_slide(req: SlideRequest):
     success = False
 
     try:
-        slide_data = await generate_slide_content(req.topic, alphabet)
+        slide_data = await generate_slide_content(req.topic, alphabet, req.slides)
 
         await asyncio.to_thread(
             generate_pptx,
@@ -2041,7 +2307,8 @@ async def api_generate_slide(req: SlideRequest):
                 caption=(
                     f"🎉 Slaydingiz tayyor!\n"
                     f"📌 Mavzu: {req.topic}\n"
-                    f"🎨 Uslub: {req.template.capitalize()}"
+                    f"🎨 Uslub: {req.template.capitalize()}\n"
+                    f"📊 Slaydlar: {req.slides + 1} ta (titul bilan)"
                 ),
             )
         except TelegramForbiddenError as exc:
