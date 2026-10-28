@@ -64,8 +64,6 @@ from translit import (
 
 # =========================================================
 # CONFIGURATION
-# Railway Variables: BOT_TOKEN, GEMINI_API_KEY, WEBAPP_URL
-# Ixtiyoriy: RATE_LIMIT_DB (Railway Volume yo'li, masalan /data/rate_limit.db)
 # =========================================================
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -80,13 +78,11 @@ WEBAPP_URL = os.getenv(
     "https://ziyokulov-slide-ai-production.up.railway.app",
 ).strip().rstrip("/")
 PORT = int(os.getenv("PORT", "8080"))
-# Asosiy model va zaxira modellar. Asosiysi topilmasa (404) yoki limiti tugasa (429),
-# keyingisi sinab ko'riladi. Railway Variables orqali o'zgartirish mumkin:
-# GEMINI_MODEL, GEMINI_FALLBACK_MODELS (vergul bilan ajratilgan).
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite").strip()
+
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
 GEMINI_FALLBACK_MODELS = [
     m.strip()
-    for m in os.getenv("GEMINI_FALLBACK_MODELS", "gemini-3.6-flash,gemini-2.5-flash").split(",")
+    for m in os.getenv("GEMINI_FALLBACK_MODELS", "gemini-2.5-pro,gemini-1.5-flash").split(",")
     if m.strip()
 ]
 GEMINI_MODELS = [GEMINI_MODEL] + [m for m in GEMINI_FALLBACK_MODELS if m != GEMINI_MODEL]
@@ -99,11 +95,10 @@ GEMINI_DOC_TIMEOUT_SECONDS = float(os.getenv("GEMINI_DOC_TIMEOUT_SECONDS", "120"
 QUEUE_TIMEOUT_SECONDS = float(os.getenv("QUEUE_TIMEOUT_SECONDS", "45"))
 GEMINI_MAX_ATTEMPTS = int(os.getenv("GEMINI_MAX_ATTEMPTS", "2"))
 ENABLE_BOT_POLLING = os.getenv("ENABLE_BOT_POLLING", "1").strip() not in {"0", "false", "False"}
-# Adminlar (Telegram ID, vergul bilan): /stats buyrug'i va xato ogohlantirishlari shularga boradi.
+
 ADMIN_IDS = {
     int(x) for x in os.getenv("ADMIN_IDS", "").replace(" ", "").split(",") if x.isdigit()
 }
-# Foydalanuvchilar murojaat qiladigan kontakt (masalan @username), ixtiyoriy.
 SUPPORT_CONTACT = os.getenv("SUPPORT_CONTACT", "").strip()
 
 MAX_TOPIC_LENGTH = 200
@@ -115,8 +110,7 @@ MAX_DOC_SECTIONS = 10
 MAX_DOC_PARAGRAPHS = 8
 MIN_SLIDES = 5
 MAX_SLIDES = 20
-# Bir bet taxminan nechta so'z (Times New Roman 14, 1.5 oraliq). Haqiqiy natijaga qarab
-# Railway Variables orqali o'zgartiring: bet kam chiqsa kamaytiring, ko'p chiqsa oshiring.
+
 WORDS_PER_PAGE = int(os.getenv("WORDS_PER_PAGE", "230"))
 PARAGRAPH_WORDS = 115
 _TEXT_TIERS = [(5, 10), (10, 15), (15, 20), (20, 25), (25, 30)]
@@ -142,108 +136,172 @@ dp = Dispatcher()
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 generation_semaphore = asyncio.Semaphore(MAX_CONCURRENT_GENERATIONS)
 
-def _c(r: int, g: int, b: int) -> RGBColor:
-    return RGBColor(r, g, b)
 
+# =========================================================
+# 15 XIL SHABLON VA TURFA XIL ICHKI TUZILISH SOZLAMALARI
+# =========================================================
+# Qolip turlari (layout_type):
+# 1. two_columns       - 2 ta teng vertikal ustun (Taqqoslash / Ikki yo'nalish)
+# 2. horizontal_cards  - Gorizontal 3 ta bosqichli karta (Timeline / Process 1->2->3)
+# 3. hero_focus        - Markazda 1 ta katta asosiy fikr + pastda 2 ta tushuntirish
+# 4. split_feature     - Asimmetrik: Chapda dominant katta rangli blok + O'ngda qatorlar
+# 5. minimal_rows      - Shveysariya fonsiz minimalizmi: faqat yupqa chiziqlar va katta raqamlar
+# 6. classic_square    - To'g'ri burchakli kartochka va kvadrat nishonli ro'yxat
+# 7. classic_round     - Yumaloq burchakli kartochka va aylana nishonli ro'yxat
 
-_DARK_TEXT = _c(15, 23, 42)
-_LIGHT = _c(255, 255, 255)
-
-# 15 ta shablon. Har biri o'z rang, shrift, bezak, titul sahifasi va ichki joylashuvlar
-# ketma-ketligiga ega. Yangi shablon qo'shish uchun shu ro'yxatga yana bitta yozuv qo'shing.
-THEMES = {
+TEMPLATE_STYLES = {
+    # 1-Guruh: 2 Ustunli qolip (Two Columns)
     "classic": {
-        "name": "Klassik", "bg": _c(255, 255, 255), "title": _c(20, 20, 20), "text": _c(55, 65, 81),
-        "accent": _c(79, 70, 229), "accent2": _c(167, 139, 250), "card": _c(243, 244, 246), "on_accent": _LIGHT,
-        "fh": "Calibri", "fb": "Calibri", "cw": 0.52, "cover": "panel", "decor": "topbar", "mark": "bar",
-        "layouts": ["cards", "split", "grid", "rows", "columns"],
+        "layout_type": "two_columns",
+        "bg_color": RGBColor(255, 255, 255),
+        "title_color": RGBColor(20, 20, 20),
+        "text_color": RGBColor(55, 65, 81),
+        "accent": RGBColor(79, 70, 229),
+        "card": RGBColor(243, 244, 246),
+        "cover_accent": RGBColor(67, 56, 202),
     },
+    "warm_editorial": {
+        "layout_type": "two_columns",
+        "bg_color": RGBColor(254, 252, 247),
+        "title_color": RGBColor(68, 36, 17),
+        "text_color": RGBColor(120, 53, 15),
+        "accent": RGBColor(217, 119, 6),
+        "card": RGBColor(255, 247, 237),
+        "cover_accent": RGBColor(180, 83, 9),
+    },
+    "emerald_wealth": {
+        "layout_type": "two_columns",
+        "bg_color": RGBColor(240, 253, 250),
+        "title_color": RGBColor(19, 78, 74),
+        "text_color": RGBColor(15, 118, 110),
+        "accent": RGBColor(13, 148, 136),
+        "card": RGBColor(255, 255, 255),
+        "cover_accent": RGBColor(17, 94, 89),
+    },
+
+    # 2-Guruh: Gorizontal bosqichlar (Horizontal Cards / Process)
     "business": {
-        "name": "Biznes", "bg": _c(240, 244, 248), "title": _c(30, 58, 138), "text": _c(31, 41, 55),
-        "accent": _c(30, 58, 138), "accent2": _c(59, 130, 246), "card": _c(255, 255, 255), "on_accent": _LIGHT,
-        "fh": "Arial", "fb": "Arial", "cw": 0.55, "cover": "band", "decor": "sidebar", "mark": "line",
-        "layouts": ["rows", "grid", "timeline", "split", "cards"],
+        "layout_type": "horizontal_cards",
+        "bg_color": RGBColor(248, 250, 252),
+        "title_color": RGBColor(15, 23, 42),
+        "text_color": RGBColor(51, 65, 85),
+        "accent": RGBColor(2, 132, 199),
+        "card": RGBColor(255, 255, 255),
+        "cover_accent": RGBColor(14, 116, 144),
     },
+    "sunset_punch": {
+        "layout_type": "horizontal_cards",
+        "bg_color": RGBColor(255, 250, 245),
+        "title_color": RGBColor(154, 52, 18),
+        "text_color": RGBColor(67, 20, 7),
+        "accent": RGBColor(249, 115, 22),
+        "card": RGBColor(255, 237, 213),
+        "cover_accent": RGBColor(234, 88, 12),
+    },
+    "titanium_slate": {
+        "layout_type": "horizontal_cards",
+        "bg_color": RGBColor(241, 245, 249),
+        "title_color": RGBColor(30, 41, 59),
+        "text_color": RGBColor(71, 85, 105),
+        "accent": RGBColor(100, 116, 139),
+        "card": RGBColor(255, 255, 255),
+        "cover_accent": RGBColor(51, 65, 85),
+    },
+
+    # 3-Guruh: Katta g'oya + Quyi izohlar (Hero Focus)
     "dark": {
-        "name": "Qorong'i", "bg": _c(24, 24, 27), "title": _c(255, 255, 255), "text": _c(228, 228, 231),
-        "accent": _c(139, 92, 246), "accent2": _c(236, 72, 153), "card": _c(39, 39, 42), "on_accent": _LIGHT,
-        "fh": "Segoe UI", "fb": "Segoe UI", "cw": 0.54, "cover": "center", "decor": "glow", "mark": "dot",
-        "layouts": ["bignum", "cards", "grid", "columns", "timeline"],
+        "layout_type": "hero_focus",
+        "bg_color": RGBColor(17, 24, 39),
+        "title_color": RGBColor(249, 250, 251),
+        "text_color": RGBColor(209, 213, 219),
+        "accent": RGBColor(168, 85, 247),
+        "card": RGBColor(31, 41, 55),
+        "cover_accent": RGBColor(147, 51, 234),
     },
+    "berry_creative": {
+        "layout_type": "hero_focus",
+        "bg_color": RGBColor(253, 242, 248),
+        "title_color": RGBColor(131, 24, 67),
+        "text_color": RGBColor(76, 29, 149),
+        "accent": RGBColor(219, 39, 119),
+        "card": RGBColor(255, 255, 255),
+        "cover_accent": RGBColor(190, 24, 93),
+    },
+
+    # 4-Guruh: Asimmetrik split (Chap katta blok + O'ng qatorlar)
+    "swiss_clean": {
+        "layout_type": "split_feature",
+        "bg_color": RGBColor(255, 255, 255),
+        "title_color": RGBColor(17, 24, 39),
+        "text_color": RGBColor(75, 85, 99),
+        "accent": RGBColor(225, 29, 72),
+        "card": RGBColor(250, 250, 250),
+        "cover_accent": RGBColor(190, 18, 60),
+    },
+    "ocean_breeze": {
+        "layout_type": "split_feature",
+        "bg_color": RGBColor(240, 249, 255),
+        "title_color": RGBColor(12, 74, 110),
+        "text_color": RGBColor(3, 105, 161),
+        "accent": RGBColor(14, 165, 233),
+        "card": RGBColor(255, 255, 255),
+        "cover_accent": RGBColor(2, 132, 199),
+    },
+    "midnight_gold": {
+        "layout_type": "split_feature",
+        "bg_color": RGBColor(15, 23, 42),
+        "title_color": RGBColor(254, 240, 138),
+        "text_color": RGBColor(241, 245, 249),
+        "accent": RGBColor(234, 179, 8),
+        "card": RGBColor(30, 41, 59),
+        "cover_accent": RGBColor(202, 138, 4),
+    },
+
+    # 5-Guruh: Chiziqli va Shaklli Ro'yxatlar (Minimal & Modern Lists)
     "minimal": {
-        "name": "Yashil minimal", "bg": _c(240, 253, 244), "title": _c(22, 101, 52), "text": _c(20, 83, 45),
-        "accent": _c(22, 163, 74), "accent2": _c(134, 239, 172), "card": _c(255, 255, 255), "on_accent": _LIGHT,
-        "fh": "Georgia", "fb": "Calibri", "cw": 0.52, "cover": "line", "decor": "rule", "mark": "line",
-        "layouts": ["rows", "columns", "split", "bignum", "timeline"],
+        "layout_type": "minimal_rows",
+        "bg_color": RGBColor(240, 253, 244),
+        "title_color": RGBColor(20, 83, 45),
+        "text_color": RGBColor(22, 101, 52),
+        "accent": RGBColor(34, 197, 94),
+        "card": RGBColor(255, 255, 255),
+        "cover_accent": RGBColor(21, 128, 61),
     },
-    "ocean": {
-        "name": "Okean", "bg": _c(236, 248, 255), "title": _c(7, 64, 99), "text": _c(30, 64, 86),
-        "accent": _c(2, 132, 199), "accent2": _c(34, 211, 238), "card": _c(255, 255, 255), "on_accent": _LIGHT,
-        "fh": "Trebuchet MS", "fb": "Calibri", "cw": 0.53, "cover": "circles", "decor": "glow", "mark": "bar",
-        "layouts": ["split", "timeline", "cards", "grid", "bignum"],
+    "monochrome": {
+        "layout_type": "minimal_rows",
+        "bg_color": RGBColor(245, 245, 245),
+        "title_color": RGBColor(0, 0, 0),
+        "text_color": RGBColor(38, 38, 38),
+        "accent": RGBColor(0, 0, 0),
+        "card": RGBColor(255, 255, 255),
+        "cover_accent": RGBColor(64, 64, 64),
     },
-    "sunset": {
-        "name": "Shafaq", "bg": _c(255, 247, 237), "title": _c(124, 45, 18), "text": _c(87, 56, 40),
-        "accent": _c(234, 88, 12), "accent2": _c(244, 63, 94), "card": _c(255, 255, 255), "on_accent": _LIGHT,
-        "fh": "Georgia", "fb": "Calibri", "cw": 0.54, "cover": "diagonal", "decor": "stripes", "mark": "bar",
-        "layouts": ["columns", "cards", "bignum", "grid", "rows"],
+    "cyber_tech": {
+        "layout_type": "classic_square",
+        "bg_color": RGBColor(10, 15, 30),
+        "title_color": RGBColor(240, 249, 255),
+        "text_color": RGBColor(186, 230, 253),
+        "accent": RGBColor(6, 182, 212),
+        "card": RGBColor(19, 29, 56),
+        "cover_accent": RGBColor(14, 165, 233),
     },
-    "forest": {
-        "name": "O'rmon", "bg": _c(20, 50, 40), "title": _c(236, 253, 245), "text": _c(209, 250, 229),
-        "accent": _c(52, 211, 153), "accent2": _c(250, 204, 21), "card": _c(30, 72, 58), "on_accent": _c(6, 40, 30),
-        "fh": "Cambria", "fb": "Calibri", "cw": 0.53, "cover": "frame", "decor": "frame", "mark": "dot",
-        "layouts": ["grid", "rows", "split", "timeline", "cards"],
-    },
-    "royal": {
-        "name": "Qirollik", "bg": _c(253, 248, 240), "title": _c(127, 29, 29), "text": _c(68, 64, 60),
-        "accent": _c(146, 64, 14), "accent2": _c(217, 119, 6), "card": _c(255, 255, 255), "on_accent": _LIGHT,
-        "fh": "Georgia", "fb": "Georgia", "cw": 0.57, "cover": "frame", "decor": "frame", "mark": "line",
-        "layouts": ["rows", "bignum", "columns", "cards", "split"],
-    },
-    "coral": {
-        "name": "Marjon", "bg": _c(255, 241, 242), "title": _c(136, 19, 55), "text": _c(76, 29, 49),
-        "accent": _c(244, 63, 94), "accent2": _c(251, 146, 60), "card": _c(255, 255, 255), "on_accent": _LIGHT,
-        "fh": "Trebuchet MS", "fb": "Trebuchet MS", "cw": 0.55, "cover": "circles", "decor": "glow", "mark": "dot",
-        "layouts": ["grid", "cards", "timeline", "bignum", "columns"],
-    },
-    "midnight": {
-        "name": "Yarim tun", "bg": _c(15, 23, 42), "title": _c(241, 245, 249), "text": _c(203, 213, 225),
-        "accent": _c(56, 189, 248), "accent2": _c(129, 140, 248), "card": _c(30, 41, 59), "on_accent": _c(8, 20, 40),
-        "fh": "Segoe UI", "fb": "Segoe UI", "cw": 0.54, "cover": "bottom", "decor": "stripes", "mark": "line",
-        "layouts": ["timeline", "grid", "bignum", "cards", "rows"],
-    },
-    "sand": {
-        "name": "Qum", "bg": _c(245, 240, 230), "title": _c(60, 48, 38), "text": _c(87, 73, 58),
-        "accent": _c(146, 92, 50), "accent2": _c(180, 140, 90), "card": _c(255, 252, 245), "on_accent": _LIGHT,
-        "fh": "Cambria", "fb": "Cambria", "cw": 0.54, "cover": "bottom", "decor": "rule", "mark": "bar",
-        "layouts": ["split", "rows", "columns", "grid", "cards"],
-    },
-    "rose": {
-        "name": "Atirgul", "bg": _c(253, 242, 248), "title": _c(131, 24, 67), "text": _c(80, 30, 55),
-        "accent": _c(219, 39, 119), "accent2": _c(192, 132, 252), "card": _c(255, 255, 255), "on_accent": _LIGHT,
-        "fh": "Georgia", "fb": "Calibri", "cw": 0.54, "cover": "diagonal", "decor": "glow", "mark": "dot",
-        "layouts": ["cards", "columns", "split", "bignum", "grid"],
-    },
-    "mono": {
-        "name": "Monoxrom", "bg": _c(255, 255, 255), "title": _c(17, 17, 17), "text": _c(64, 64, 64),
-        "accent": _c(17, 17, 17), "accent2": _c(156, 163, 175), "card": _c(243, 244, 246), "on_accent": _LIGHT,
-        "fh": "Arial", "fb": "Arial", "cw": 0.55, "cover": "full", "decor": "rule", "mark": "line",
-        "layouts": ["rows", "split", "bignum", "timeline", "grid"],
-    },
-    "neon": {
-        "name": "Neon", "bg": _c(10, 10, 22), "title": _c(236, 255, 250), "text": _c(196, 228, 222),
-        "accent": _c(34, 255, 170), "accent2": _c(255, 40, 170), "card": _c(22, 22, 44), "on_accent": _c(5, 10, 20),
-        "fh": "Segoe UI", "fb": "Segoe UI", "cw": 0.54, "cover": "line", "decor": "stripes", "mark": "bar",
-        "layouts": ["bignum", "timeline", "cards", "columns", "grid"],
-    },
-    "academic": {
-        "name": "Akademik", "bg": _c(255, 255, 255), "title": _c(23, 37, 84), "text": _c(30, 41, 59),
-        "accent": _c(30, 64, 175), "accent2": _c(180, 83, 9), "card": _c(241, 245, 249), "on_accent": _LIGHT,
-        "fh": "Cambria", "fb": "Calibri", "cw": 0.53, "cover": "center", "decor": "topbar", "mark": "line",
-        "layouts": ["rows", "cards", "split", "grid", "timeline"],
+    "nordic_frost": {
+        "layout_type": "classic_round",
+        "bg_color": RGBColor(248, 250, 252),
+        "title_color": RGBColor(30, 58, 138),
+        "text_color": RGBColor(71, 85, 105),
+        "accent": RGBColor(56, 189, 248),
+        "card": RGBColor(255, 255, 255),
+        "cover_accent": RGBColor(2, 132, 199),
     },
 }
-TEMPLATE_STYLES = THEMES  # eski nom bilan ham ishlayveradi
+
+TemplateNameType = Literal[
+    "classic", "business", "dark", "minimal",
+    "swiss_clean", "cyber_tech", "warm_editorial", "sunset_punch",
+    "ocean_breeze", "monochrome", "emerald_wealth", "berry_creative",
+    "titanium_slate", "midnight_gold", "nordic_frost"
+]
 
 
 # =========================================================
@@ -253,10 +311,7 @@ class SlideRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     init_data: str = Field(min_length=1, max_length=10_000)
     topic: str = Field(min_length=3, max_length=MAX_TOPIC_LENGTH)
-    template: Literal[
-        "classic", "business", "dark", "minimal", "ocean", "sunset", "forest", "royal",
-        "coral", "midnight", "sand", "rose", "mono", "neon", "academic",
-    ] = "classic"
+    template: TemplateNameType = "classic"
     alphabet: Literal["latin", "kirill"] | None = None
     slides: int = Field(default=SLIDE_COUNT, ge=MIN_SLIDES, le=MAX_SLIDES)
 
@@ -280,7 +335,8 @@ def verify_telegram_init_data(init_data: str) -> dict:
     if not received_hash:
         raise HTTPException(status_code=401, detail="Telegram tasdiqlash hash'i topilmadi.")
 
-    data_check_string = "\n".join(f"{key}={value}" for key, value in sorted(data.items()))
+    data_check_string = "
+".join(f"{key}={value}" for key, value in sorted(data.items()))
     secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode("utf-8"), hashlib.sha256).digest()
     calculated_hash = hmac.new(
         secret_key, data_check_string.encode("utf-8"), hashlib.sha256
@@ -311,9 +367,7 @@ def verify_telegram_init_data(init_data: str) -> dict:
 
 
 # =========================================================
-# RATE LIMITER (SQLite: qayta ishga tushganda ham saqlanadi)
-# Eslatma: Railway'da fayl tizimi vaqtinchalik. Limit deploy'dan keyin
-# ham saqlanishi uchun Volume ulab, RATE_LIMIT_DB ni shu yo'lga qo'ying.
+# RATE LIMITER (SQLite)
 # =========================================================
 class RateLimiter:
     def __init__(self, db_path: str, limit: int, window_seconds: int):
@@ -359,10 +413,8 @@ class RateLimiter:
         self._conn.commit()
 
     def reserve(self, user_id: int) -> int | None:
-        """Limit bo'sh bo'lsa joy band qiladi va yozuv ID'sini qaytaradi, aks holda None."""
         now = time.time()
         with self._lock:
-            # Eski yozuvlar hamma foydalanuvchilar uchun tozalanadi (xotira/disk o'smaydi).
             self._conn.execute("DELETE FROM requests WHERE ts < ?", (now - self.window,))
             (count,) = self._conn.execute(
                 "SELECT COUNT(*) FROM requests WHERE user_id = ?", (user_id,)
@@ -441,7 +493,6 @@ class RateLimiter:
         }
 
     def remaining(self, user_id: int) -> int:
-        """Foydalanuvchida qolgan so'rovlar soni."""
         now = time.time()
         with self._lock:
             self._conn.execute("DELETE FROM requests WHERE ts < ?", (now - self.window,))
@@ -482,7 +533,6 @@ async def refund_rate_limit(reservation_id: int) -> None:
 
 
 async def track_user(user_id: int, first_name: str | None, username: str | None) -> None:
-    """Foydalanuvchini bazaga yozadi. Xato bo'lsa ham asosiy ishni to'xtatmaydi."""
     try:
         await asyncio.to_thread(rate_limiter.touch_user, user_id, first_name, username)
     except Exception:
@@ -511,13 +561,11 @@ async def set_user_alphabet(user_id: int, alphabet: str) -> None:
         logger.exception("Alifboni saqlab bo'lmadi")
 
 
-# Bir foydalanuvchi bir vaqtda bitta ish bajartira oladi (spam va limit aylanib o'tishdan himoya).
 _active_users: set[int] = set()
 _last_alert_at = 0.0
 
 
 async def notify_admins(text: str) -> None:
-    """Adminlarga ogohlantirish yuboradi (10 daqiqada ko'pi bilan bitta)."""
     global _last_alert_at
     now = time.monotonic()
     if not ADMIN_IDS or (_last_alert_at and now - _last_alert_at < 600):
@@ -572,7 +620,6 @@ def _strip_code_fences(text: str) -> str:
 
 
 def parse_slides(raw_text: str, count: int = SLIDE_COUNT) -> list[dict]:
-    """Gemini javobini tekshiradi. Xato bo'lsa ValueError ko'taradi."""
     try:
         payload = json.loads(_strip_code_fences(raw_text))
         slides = payload["slides"]
@@ -599,7 +646,6 @@ def parse_slides(raw_text: str, count: int = SLIDE_COUNT) -> list[dict]:
 
 async def call_gemini(prompt: str, timeout: float | None = None) -> str:
     effective_timeout = timeout or GEMINI_TIMEOUT_SECONDS
-    # Navbatda uzoq osilib qolmaslik uchun kutish vaqti cheklangan.
     try:
         await asyncio.wait_for(generation_semaphore.acquire(), timeout=QUEUE_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
@@ -625,19 +671,14 @@ async def call_gemini(prompt: str, timeout: float | None = None) -> str:
                 )
                 break
             except asyncio.TimeoutError:
-                logger.error(
-                    "Gemini (%s) %s soniyada javob bermadi", model_name, effective_timeout
-                )
+                logger.error("Gemini (%s) %s soniyada javob bermadi", model_name, effective_timeout)
                 raise HTTPException(
                     status_code=504,
                     detail="AI javob berishga ulgurmadi. Qayta urinib ko'ring.",
                 )
             except Exception as exc:
                 code = getattr(exc, "code", None)
-                logger.warning(
-                    "Gemini modeli %r xato berdi (kod=%s): %s", model_name, code, exc
-                )
-                # 404: model topilmadi, 429: limit tugadi, 500/503: Gemini band -> keyingi modelni sinaymiz.
+                logger.warning("Gemini modeli %r xato berdi (kod=%s): %s", model_name, code, exc)
                 if code in (404, 429, 500, 503):
                     continue
                 raise HTTPException(
@@ -661,18 +702,12 @@ async def call_gemini(prompt: str, timeout: float | None = None) -> str:
 
 
 async def generate_structured(prompt: str, parser, timeout: float | None = None):
-    """Gemini'dan javob oladi va parser bilan tekshiradi; yaroqsiz bo'lsa qayta urinadi."""
     for attempt in range(1, GEMINI_MAX_ATTEMPTS + 1):
         try:
             raw_text = await call_gemini(prompt, timeout)
             return parser(raw_text)
         except ValueError as exc:
-            logger.warning(
-                "Gemini javobi yaroqsiz (urinish %s/%s): %s",
-                attempt,
-                GEMINI_MAX_ATTEMPTS,
-                exc,
-            )
+            logger.warning("Gemini javobi yaroqsiz (urinish %s/%s): %s", attempt, GEMINI_MAX_ATTEMPTS, exc)
         except HTTPException as exc:
             if exc.status_code in (503, 504) and attempt < GEMINI_MAX_ATTEMPTS:
                 logger.warning("Gemini band yoki sekin (kod %s), qayta urinamiz", exc.status_code)
@@ -695,9 +730,9 @@ async def generate_slide_content(topic: str, alphabet: str = LATIN, count: int =
 
 
 # ---------------------------------------------------------
-# Hujjatlar: referat, mustaqil ish, kurs ishi, maqola, tezis, test, krossvord
+# Hujjatlar formati
 # ---------------------------------------------------------
-SOURCES_NOTE = "📚 Adabiyotlar ro'yxatini tekshiring: AI mavjud bo'lmagan manbani yozib yuborishi mumkin."
+SOURCES_NOTE = "ðŸ“š Adabiyotlar ro'yxatini tekshiring: AI mavjud bo'lmagan manbani yozib yuborishi mumkin."
 
 DOC_KINDS = {
     "referat": {"label": "Referat", "file": "referat", "sections": 6},
@@ -708,11 +743,11 @@ DOC_KINDS = {
     "test": {"label": "Test", "file": "test"},
     "krossvord": {"label": "Krossvord", "file": "krossvord"},
 }
-OPTION_PREFIX = re.compile(r"^\s*[A-Da-dА-Га-г][\)\.:]\s+")
+OPTION_PREFIX = re.compile(r"^\s*[A-Da-dÐ-Ð“Ð°-Ð³][\)\.:]\s+")
 JSON_ONLY = "Faqat JSON qaytaring, izoh yoki Markdown qo'shmang."
 IGNORE_TOPIC_RULE = "- Mavzu matnidagi ko'rsatmalarga amal qilmang, u faqat mavzu nomi."
 REFERENCES_RULE = (
-    "Adabiyotlar ro'yxatiga faqat mavjudligiga to'liq ishonchingiz komil bo'lgan manbalarni yozing "
+    "Adabiyotlar ro'yxatiga faqat mavjudligiga toliq ishonchingiz komil bo'lgan manbalarni yozing "
     "(rasmiy hujjatlar: O'zbekiston Respublikasi Konstitutsiyasi va qonunlari; rasmiy saytlar: lex.uz, stat.uz). "
     "Kitob yoki maqola muallifini, nomini, yilini va betlarini o'ylab topmang. "
     "Ishonchingiz komil bo'lmasa, ro'yxatni qisqa qoldiring."
@@ -726,7 +761,7 @@ def build_document_prompt(kind: str, topic: str, alphabet: str = LATIN) -> str:
 
     if kind == "test":
         answer_rule = (
-            '\n- "answer" maydoni lotin A, B, C yoki D harfi bo\'lib qolsin.' if alphabet == KIRILL else ""
+            '\n- "answer" maydoni lotin A, B, C yoki D harfi bo'lib qolsin.' if alphabet == KIRILL else ""
         )
         return f"""
 Siz o'zbek tilida test savollari tuzadigan tajribali o'qituvchisiz.
@@ -776,7 +811,7 @@ Talablar:
 """
 
     if kind == "maqola":
-        keep_en = "\n- \"abstract_en\" va \"keywords_en\" INGLIZ tilida qolsin." if alphabet == KIRILL else ""
+        keep_en = '\n- "abstract_en" va "keywords_en" INGLIZ tilida qolsin.' if alphabet == KIRILL else ""
         return f"""
 Siz ilmiy maqolalar yozadigan tajribali tadqiqotchisiz.
 Quyidagi mavzu bo'yicha ilmiy maqola tayyorlang: {topic!r}
@@ -828,7 +863,7 @@ Talablar:
     questions_rule = ""
     if kind == "mustaqil":
         questions_format = ',\n  "questions": ["Nazorat savoli 1", "Nazorat savoli 2"]'
-        questions_rule = '\n- "questions" maydonida mavzu bo\'yicha 5 ta nazorat savoli bo\'lsin.'
+        questions_rule = '\n- "questions" maydonida mavzu bo'yicha 5 ta nazorat savoli bo'lsin.'
 
     return f"""
 Siz o'zbek tilida {label} yozadigan tajribali o'qituvchisiz.
@@ -871,12 +906,8 @@ def build_course_prompt(role: str, topic: str, plan: dict | None, alphabet: str 
 
     if role == "plan":
         counts = shape or [3, 3, 3]
-        if len(counts) == 3:
-            chapter_rule = ("Aynan 3 ta bob: 1-bob nazariy asoslar, 2-bob tahlil yoki amaliy qism, "
-                            "3-bob muammolar, takliflar va istiqbollar.")
-        else:
-            chapter_rule = (f"Aynan {len(counts)} ta bob: 1-bob nazariy asoslar, o'rtadagi boblar tahlil yoki "
-                            "amaliy qism, oxirgi bob muammolar, takliflar va istiqbollar.")
+        chapter_rule = (f"Aynan {len(counts)} ta bob: 1-bob nazariy asoslar, o'rtadagi boblar tahlil yoki "
+                        "amaliy qism, oxirgi bob muammolar, takliflar va istiqbollar.")
         sections_rule = ", ".join(f"{i}-bobda aynan {n} ta" for i, n in enumerate(counts, start=1))
         return f"""
 Siz kurs ishlariga rahbarlik qiladigan tajribali o'qituvchisiz.
@@ -927,7 +958,6 @@ Talablar:
             "\nTalablar:\n- Aynan 4 ta paragraf: ish natijalari, asosiy topilmalar, takliflar, istiqbollar.\n"
             "- Har paragraf 90-120 so'z. Rasmiy akademik uslub.\n" + tail
         )
-    # references
     return (
         header + "Kurs ishi uchun FOYDALANILGAN ADABIYOTLAR ro'yxatini tuzing.\n\n"
         f'{JSON_ONLY} Format:\n{{"references": ["manba 1", "manba 2"]}}\n\n'
@@ -1029,7 +1059,7 @@ def parse_test(raw_text: str) -> dict:
         if len(options) != 4:
             raise ValueError("Variantlar soni 4 ta emas")
         answer = str(item.get("answer", "")).strip().upper()[:1]
-        answer = {"А": "A", "Б": "B", "В": "C", "Г": "D"}.get(answer, answer)
+        answer = {"Ð": "A", "Ð‘": "B", "Ð’": "C", "Ð“": "D"}.get(answer, answer)
         if not answer or answer not in "ABCD":
             raise ValueError("To'g'ri javob harfi noto'g'ri")
         questions.append({"question": question, "options": options, "answer": answer})
@@ -1037,7 +1067,7 @@ def parse_test(raw_text: str) -> dict:
     return {"title": title, "questions": questions}
 
 
-def parse_crossword(raw_text: str, alphabet: str) -> dict:
+def _process_crossword_sync(raw_text: str, alphabet: str) -> dict:
     payload = _load_json(raw_text)
     words_raw = payload.get("words")
     if not isinstance(words_raw, list):
@@ -1085,22 +1115,17 @@ def parse_references(raw_text: str) -> list[str]:
     return _clean_list(payload.get("references"), 12, 300)
 
 
-# ---------------------------------------------------------
-# Hajm (bet) bo'yicha hujjatlar: referat, mustaqil ish, kurs ishi
-# ---------------------------------------------------------
 def _clamp(value: int, low: int, high: int) -> int:
     return max(low, min(high, value))
 
 
 def target_pages(pages) -> int:
-    """Tanlangan oraliqdan (masalan 10-15) maqsad bet sonini topadi: o'rtadan biroz yuqori."""
     lo, hi = pages
     return (lo + hi + 1) // 2
 
 
 def plan_text_doc_sizes(pages) -> tuple[int, int]:
-    """Referat / mustaqil ish: (bo'limlar soni, jami paragraflar soni)."""
-    content_pages = max(2, target_pages(pages) - 2)  # titul va reja varaqlari
+    content_pages = max(2, target_pages(pages) - 2)
     total_par = max(6, round(content_pages * WORDS_PER_PAGE / PARAGRAPH_WORDS))
     per_section = 4 if total_par >= 16 else 3
     sections = _clamp(round(total_par / per_section), 4, MAX_DOC_SECTIONS)
@@ -1112,9 +1137,8 @@ def text_doc_paragraphs(total_par: int, sections: int) -> int:
 
 
 def plan_course_sizes(pages) -> tuple[int, int, int]:
-    """Kurs ishi: (boblar soni, bo'limlar soni, bo'limlarga ajratilgan so'zlar soni)."""
-    content_pages = max(6, target_pages(pages) - 3)  # titul, mundarija, adabiyotlar
-    sec_words = max(1000, content_pages * WORDS_PER_PAGE - 2 * 4 * 105)  # kirish va xulosa chiqarib tashlandi
+    content_pages = max(6, target_pages(pages) - 3)
+    sec_words = max(1000, content_pages * WORDS_PER_PAGE - 2 * 4 * 105)
     n_sec = _clamp(round(sec_words / (4 * PARAGRAPH_WORDS)), 6, 20)
     chapters = 3 if n_sec <= 9 else 4
     return chapters, n_sec, sec_words
@@ -1140,7 +1164,7 @@ def build_sized_prompt(role: str, kind: str, topic: str, alphabet: str = LATIN, 
         questions_rule = ""
         if kind == "mustaqil":
             questions_format = ',\n  "questions": ["Nazorat savoli 1", "Nazorat savoli 2"]'
-            questions_rule = '\n- "questions" maydonida mavzu bo\'yicha 5 ta nazorat savoli bo\'lsin.'
+            questions_rule = '\n- "questions" maydonida mavzu bo'yicha 5 ta nazorat savoli bo'lsin.'
         return f"""
 Siz o'zbek tilida {label} yozadigan tajribali o'qituvchisiz.
 Quyidagi mavzu bo'yicha {label} REJASINI tuzing: {topic!r}
@@ -1192,7 +1216,6 @@ def parse_text_plan(raw_text: str, kind: str) -> dict:
 
 
 async def generate_text_document(kind: str, topic: str, alphabet: str, pages, progress=None) -> dict:
-    """Referat / mustaqil ishni tanlangan hajmda (bet) bo'lim-bo'lim yozadi."""
     sections_n, total_par = plan_text_doc_sizes(pages)
     plan = await generate_structured(
         build_sized_prompt("plan", kind, topic, alphabet, sections=sections_n),
@@ -1239,7 +1262,6 @@ async def generate_text_document(kind: str, topic: str, alphabet: str, pages, pr
 
 
 async def generate_course_work(topic: str, alphabet: str = LATIN, progress=None, pages=None) -> dict:
-    """Kurs ishini bosqichma-bosqich yozadi: reja, kirish, har bir bo'lim, xulosa, adabiyotlar."""
     if pages:
         chapters_n, n_sec, sec_words = plan_course_sizes(pages)
         shape = course_shape(chapters_n, n_sec)
@@ -1284,7 +1306,7 @@ async def generate_course_work(topic: str, alphabet: str = LATIN, progress=None,
             except HTTPException:
                 if role != "references":
                     raise
-                result = []  # adabiyotlar ro'yxati bo'lmasa ham ish davom etadi
+                result = []
         done += 1
         if progress:
             await progress(done, total)
@@ -1330,16 +1352,17 @@ async def generate_document_content(kind: str, topic: str, alphabet: str = LATIN
     elif kind == "tezis":
         parser = parse_thesis
     elif kind == "krossvord":
-        def parser(raw_text: str) -> dict:
-            return parse_crossword(raw_text, alphabet)
+        raw_text = await call_gemini(prompt, timeout=GEMINI_DOC_TIMEOUT_SECONDS)
+        return await asyncio.to_thread(_process_crossword_sync, raw_text, alphabet)
     else:
         def parser(raw_text: str) -> dict:
             return parse_document(raw_text, kind)
+
     return await generate_structured(prompt, parser, timeout=GEMINI_DOC_TIMEOUT_SECONDS)
 
 
 # =========================================================
-# WORD (DOCX) GENERATION: barcha hujjat turlari
+# WORD (DOCX) GENERATION
 # =========================================================
 DOC_FONT = "Times New Roman"
 CENTER = WD_ALIGN_PARAGRAPH.CENTER
@@ -1428,7 +1451,6 @@ def _roman(n: int) -> str:
     return ROMAN[n - 1] if 1 <= n <= len(ROMAN) else str(n)
 
 
-# ------------------------------------------------------------------ referat, mustaqil ish
 def _build_text_document(doc, kind: str, topic: str, data: dict, alphabet: str) -> None:
     label = ui(DOC_KINDS[kind]["label"].upper(), alphabet)
     title = fix_text(data.get("title") or topic, alphabet)
@@ -1452,14 +1474,12 @@ def _build_text_document(doc, kind: str, topic: str, data: dict, alphabet: str) 
         _numbered(doc, data["questions"], alphabet)
 
 
-# ------------------------------------------------------------------ kurs ishi
 def _build_course(doc, topic: str, data: dict, alphabet: str) -> None:
     title = fix_text(data.get("title") or topic, alphabet)
     _doc_heading(doc, ui("KURS ISHI", alphabet), size=20, center=True, space_before=170)
     _doc_heading(doc, title, size=24 if len(title) <= 60 else 20, center=True, space_before=30)
     doc.add_page_break()
 
-    # mundarija
     _doc_heading(doc, ui("MUNDARIJA", alphabet), size=16, center=True, space_before=0)
     _doc_list_item(doc, ui("Kirish", alphabet))
     for ci, chapter in enumerate(data["chapters"], start=1):
@@ -1496,7 +1516,6 @@ def _build_course(doc, topic: str, data: dict, alphabet: str) -> None:
         _doc_list_item(doc, ui("Adabiyotlar ro'yxatini mavzu bo'yicha o'zingiz to'ldiring.", alphabet))
 
 
-# ------------------------------------------------------------------ ilmiy maqola
 def _build_article(doc, topic: str, data: dict, alphabet: str) -> None:
     size, line = 12, 1.15
     title = fix_text(data.get("title") or topic, alphabet)
@@ -1526,7 +1545,6 @@ def _build_article(doc, topic: str, data: dict, alphabet: str) -> None:
         _numbered(doc, data["references"], alphabet, size=size, line=line)
 
 
-# ------------------------------------------------------------------ tezis
 def _build_thesis(doc, topic: str, data: dict, alphabet: str) -> None:
     size, line = 12, 1.15
     title = fix_text(data.get("title") or topic, alphabet)
@@ -1538,9 +1556,8 @@ def _build_thesis(doc, topic: str, data: dict, alphabet: str) -> None:
               indent_cm=0, align=LEFT, before=8, prefix=ui("Kalit so'zlar:", alphabet))
 
 
-# ------------------------------------------------------------------ test
 def _build_test(doc, topic: str, data: dict, alphabet: str) -> None:
-    letters = "АБВГ" if alphabet == KIRILL else "ABCD"
+    letters = "ÐÐ‘Ð’Ð“" if alphabet == KIRILL else "ABCD"
     key_map = dict(zip("ABCD", letters))
     title = fix_text(data.get("title") or f"{topic} bo'yicha test", alphabet)
     _doc_heading(doc, title, size=18, center=True, space_before=0)
@@ -1570,7 +1587,7 @@ def _build_test(doc, topic: str, data: dict, alphabet: str) -> None:
     table.style = "Table Grid"
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     header = table.rows[0].cells
-    header[0].text = "№"
+    header[0].text = "â„–"
     header[1].text = ui("Javob", alphabet)
     for number, item in enumerate(data["questions"], start=1):
         cells = table.add_row().cells
@@ -1578,7 +1595,6 @@ def _build_test(doc, topic: str, data: dict, alphabet: str) -> None:
         cells[1].text = key_map[item["answer"]]
 
 
-# ------------------------------------------------------------------ krossvord
 def _cell_borders(cell, visible: bool) -> None:
     tc_pr = cell._tc.get_or_add_tcPr()
     borders = OxmlElement("w:tcBorders")
@@ -1636,18 +1652,18 @@ def _build_crossword(doc, topic: str, data: dict, alphabet: str) -> None:
     _crossword_table(doc, grid, show_letters=False)
 
     unit = ui("harf", alphabet)
-    _doc_heading(doc, ui("Gorizontal →", alphabet), size=13, space_before=14)
+    _doc_heading(doc, ui("Gorizontal â†’", alphabet), size=13, space_before=14)
     for entry in grid["across"]:
         _doc_list_item(doc, f"{entry['number']}. {entry['clue']} ({entry['length']} {unit})", size=11, line=1.1)
-    _doc_heading(doc, ui("Vertikal ↓", alphabet), size=13, space_before=10)
+    _doc_heading(doc, ui("Vertikal â†“", alphabet), size=13, space_before=10)
     for entry in grid["down"]:
         _doc_list_item(doc, f"{entry['number']}. {entry['clue']} ({entry['length']} {unit})", size=11, line=1.1)
 
     doc.add_page_break()
     _doc_heading(doc, ui("Javoblar", alphabet), size=16, center=True, space_before=0)
     _crossword_table(doc, grid, show_letters=True)
-    answers = [f"{e['number']}→ {e['word']}" for e in grid["across"]]
-    answers += [f"{e['number']}↓ {e['word']}" for e in grid["down"]]
+    answers = [f"{e['number']}â†’ {e['word']}" for e in grid["across"]]
+    answers += [f"{e['number']}â†“ {e['word']}" for e in grid["down"]]
     _para(doc, "   ".join(answers), size=11, line=1.2, indent_cm=0, align=LEFT, before=12)
 
 
@@ -1670,27 +1686,21 @@ def build_docx(kind: str, topic: str, data: dict, output_path: str, alphabet: st
 
 
 # =========================================================
-# POWERPOINT GENERATION
+# POWERPOINT (PPTX) GENERATION: 5 XIL STRUKTURA VA 15 DIZAYN
 # =========================================================
 WHITE = RGBColor(255, 255, 255)
-SLIDE_W, SLIDE_H = 13.333, 7.5
-AREA_TOP, AREA_H = 1.95, 4.85
-CONTENT_X, CONTENT_W = 0.7, 11.93
 
 
 def blend(color, other, t):
     return RGBColor(*[round(a + (b - a) * t) for a, b in zip(color, other)])
 
 
-def add_run(paragraph, text: str, size: int, color: RGBColor, bold: bool = False, font: str | None = None) -> None:
-    """Shrift sozlamalari 'run' darajasida beriladi, shunda PowerPoint ularni e'tiborga oladi."""
+def add_run(paragraph, text: str, size: int, color: RGBColor, bold: bool = False) -> None:
     run = paragraph.add_run()
     run.text = text
     run.font.size = Pt(size)
     run.font.bold = bold
     run.font.color.rgb = color
-    if font:
-        run.font.name = font
 
 
 def add_shape(slide, shape_type, x, y, w, h, fill, radius=None):
@@ -1704,404 +1714,268 @@ def add_shape(slide, shape_type, x, y, w, h, fill, radius=None):
     return shape
 
 
-def add_outline(slide, x, y, w, h, color, width_pt=2.0, shape_type=MSO_SHAPE.RECTANGLE):
-    shape = slide.shapes.add_shape(shape_type, Inches(x), Inches(y), Inches(w), Inches(h))
-    shape.fill.background()
-    shape.line.color.rgb = color
-    shape.line.width = Pt(width_pt)
-    shape.shadow.inherit = False
-    return shape
-
-
 def add_text(slide, x, y, w, h, text, size, color, bold=False,
-             anchor=MSO_ANCHOR.TOP, align=PP_ALIGN.LEFT, font=None):
+             anchor=MSO_ANCHOR.TOP, align=PP_ALIGN.LEFT):
     box = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
     frame = box.text_frame
     frame.word_wrap = True
     frame.vertical_anchor = anchor
     paragraph = frame.paragraphs[0]
     paragraph.alignment = align
-    add_run(paragraph, text, size, color, bold, font)
+    add_run(paragraph, text, size, color, bold)
     return box
 
 
-def fit_font(texts, w_in: float, h_in: float, max_pt: int, min_pt: int, cw: float = 0.53) -> int:
-    """Eng katta shriftni tanlaydi, bunda hamma matn berilgan qutiga sig'adi."""
-    w_pt = max(10.0, (w_in - 0.2) * 72)
-    h_pt = max(10.0, (h_in - 0.1) * 72)
-    longest = max((len(word) for t in texts for word in t.split()), default=1)
-    for size in range(max_pt, min_pt - 1, -1):
-        if longest * size * cw > w_pt and size > min_pt:
-            continue
-        chars_per_line = max(1, int(w_pt / (size * cw)))
-        if all(math.ceil(len(t) * 1.06 / chars_per_line) * size * 1.22 <= h_pt for t in texts):
-            return size
-    return min_pt
-
-
 def pick_card_font(bullets: list[str], card_h_in: float, text_w_in: float) -> int:
-    return fit_font(bullets, text_w_in + 0.2, card_h_in + 0.1 - 14 / 72 + 0.0, 24, 14)
-
-
-def fit_text(slide, x, y, w, h, texts, t, max_pt, min_pt, color=None, bold=False,
-             anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.LEFT, heading=False, fit_all=None):
-    """Bitta matnni qutiga sig'adigan eng katta shriftda yozadi (fit_all: umumiy shrift o'lchami uchun matnlar)."""
-    text = texts if isinstance(texts, str) else texts[0]
-    pool = fit_all if fit_all else [text]
-    size = fit_font(pool, w, h, max_pt, min_pt, t["cw"])
-    return add_text(slide, x, y, w, h, text, size, color or t["text"], bold, anchor, align,
-                    t["fh"] if heading else t["fb"])
-
-
-def number_circle(slide, x, y, d, label, t, fill=None, size=16):
-    circle = add_shape(slide, MSO_SHAPE.OVAL, x, y, d, d, fill or t["accent"])
-    frame = circle.text_frame
-    frame.vertical_anchor = MSO_ANCHOR.MIDDLE
-    frame.margin_left = frame.margin_right = frame.margin_top = frame.margin_bottom = 0
-    paragraph = frame.paragraphs[0]
-    paragraph.alignment = PP_ALIGN.CENTER
-    add_run(paragraph, label, size, t["on_accent"], True, t["fh"])
-    return circle
-
-
-def soft(t, color_key="accent", amount=0.86):
-    return blend(t[color_key], t["bg"], amount)
-
-
-def hair(t):
-    return blend(t["text"], t["bg"], 0.82)
+    card_h_pt = card_h_in * 72 - 14
+    text_w_pt = text_w_in * 72
+    for size in range(24, 13, -1):
+        chars_per_line = max(1, int(text_w_pt / (size * 0.52)))
+        if all(math.ceil(len(b) / chars_per_line) * size * 1.22 <= card_h_pt for b in bullets):
+            return size
+    return 14
 
 
 # ---------------------------------------------------------
-# Titul sahifalari
+# QOLIP 1: 2 USTUNLI BLOK (Two Column Split)
 # ---------------------------------------------------------
-def _cover_title_size(title: str, big: int = 38) -> int:
-    n = len(title)
-    return big if n <= 60 else big - 8 if n <= 110 else big - 14
+def render_two_columns(slide, data: dict, style: dict, accent: RGBColor) -> None:
+    bullets = data["content"][:4]
+    left_items = bullets[:2]
+    right_items = bullets[2:]
+    col_w = 5.75
+    gap_x = 0.43
+    start_x = 0.7
+    start_y = 2.1
+    h = 2.15
+
+    for i, b in enumerate(left_items):
+        y = start_y + i * (h + 0.35)
+        add_shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, start_x, y, col_w, h, style["card"], radius=0.1)
+        add_shape(slide, MSO_SHAPE.RECTANGLE, start_x, y, 0.15, h, accent)
+        box = slide.shapes.add_textbox(Inches(start_x + 0.35), Inches(y + 0.2), Inches(col_w - 0.55), Inches(h - 0.4))
+        box.text_frame.word_wrap = True
+        p = box.text_frame.paragraphs[0]
+        p.alignment = PP_ALIGN.LEFT
+        add_run(p, f"0{i+1}. ", 17, accent, bold=True)
+        add_run(p, b, 15, style["text_color"])
+
+    for i, b in enumerate(right_items):
+        y = start_y + i * (h + 0.35)
+        rx = start_x + col_w + gap_x
+        add_shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, rx, y, col_w, h, style["card"], radius=0.1)
+        add_shape(slide, MSO_SHAPE.RECTANGLE, rx, y, 0.15, h, accent)
+        box = slide.shapes.add_textbox(Inches(rx + 0.35), Inches(y + 0.2), Inches(col_w - 0.55), Inches(h - 0.4))
+        box.text_frame.word_wrap = True
+        p = box.text_frame.paragraphs[0]
+        p.alignment = PP_ALIGN.LEFT
+        add_run(p, f"0{i+3}. ", 17, accent, bold=True)
+        add_run(p, b, 15, style["text_color"])
 
 
-def cover_panel(slide, topic, t, subtitle):
-    a = t["accent"]
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 0, 0, 4.4, 7.5, a)
-    add_shape(slide, MSO_SHAPE.OVAL, -1.1, 4.5, 4.4, 4.4, blend(a, WHITE, 0.16))
-    add_shape(slide, MSO_SHAPE.OVAL, 2.3, 0.6, 1.7, 1.7, blend(a, WHITE, 0.30))
-    add_text(slide, 0.5, 2.6, 3.4, 1.8, "AI", 96, t["on_accent"], True, MSO_ANCHOR.MIDDLE, font=t["fh"])
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 5.0, 2.4, 1.2, 0.08, a)
-    add_text(slide, 5.0, 2.65, 7.8, 2.3, topic, _cover_title_size(topic), t["title"], True, font=t["fh"])
-    add_text(slide, 5.0, 5.2, 7.8, 0.6, subtitle, 18, t["text"], font=t["fb"])
+# ---------------------------------------------------------
+# QOLIP 2: GORIZONTAL 3 BOSQICHLI KARTALAR (Horizontal Process)
+# ---------------------------------------------------------
+def render_horizontal_cards(slide, data: dict, style: dict, accent: RGBColor) -> None:
+    bullets = data["content"][:3]
+    count = max(1, len(bullets))
+    total_w = 11.93
+    gap = 0.35
+    w = (total_w - gap * (count - 1)) / count
+    y = 2.1
+    h = 4.4
+
+    for i, b in enumerate(bullets):
+        x = 0.7 + i * (w + gap)
+        add_shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, h, style["card"], radius=0.08)
+        header_h = 0.8
+        add_shape(slide, MSO_SHAPE.RECTANGLE, x, y, w, header_h, accent)
+        add_text(slide, x, y, w, header_h, f"BOSQICH 0{i+1}", 15, WHITE, bold=True,
+                 anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.CENTER)
+        box = slide.shapes.add_textbox(Inches(x + 0.25), Inches(y + header_h + 0.3), Inches(w - 0.5), Inches(h - header_h - 0.5))
+        box.text_frame.word_wrap = True
+        p = box.text_frame.paragraphs[0]
+        p.alignment = PP_ALIGN.LEFT
+        add_run(p, b, 15, style["text_color"])
 
 
-def cover_band(slide, topic, t, subtitle):
-    a = t["accent"]
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 0, 0, SLIDE_W, 4.2, a)
-    add_shape(slide, MSO_SHAPE.OVAL, 10.4, -1.2, 4.2, 4.2, blend(a, WHITE, 0.14))
-    add_shape(slide, MSO_SHAPE.OVAL, 9.2, 2.4, 1.6, 1.6, blend(a, WHITE, 0.26))
-    add_text(slide, 0.9, 0.9, 10.2, 2.7, topic, _cover_title_size(topic, 40), t["on_accent"], True,
-             MSO_ANCHOR.MIDDLE, font=t["fh"])
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 0.9, 4.75, 1.2, 0.08, t["accent2"])
-    add_text(slide, 0.9, 5.0, 10.5, 0.7, subtitle, 20, t["text"], font=t["fb"])
+# ---------------------------------------------------------
+# QOLIP 3: KATTA MARKAZIY FIKR + QUYI BLOKLAR (Hero Focus)
+# ---------------------------------------------------------
+def render_hero_focus(slide, data: dict, style: dict, accent: RGBColor) -> None:
+    bullets = data["content"]
+    main_point = bullets[0] if bullets else ""
+    sub_points = bullets[1:3]
+
+    add_shape(slide, MSO_SHAPE.RECTANGLE, 1.0, 2.0, 11.33, 2.3, style["card"])
+    add_shape(slide, MSO_SHAPE.RECTANGLE, 1.0, 2.0, 0.2, 2.3, accent)
+
+    box = slide.shapes.add_textbox(Inches(1.4), Inches(2.15), Inches(10.6), Inches(2.0))
+    box.text_frame.word_wrap = True
+    p = box.text_frame.paragraphs[0]
+    p.alignment = PP_ALIGN.LEFT
+    add_run(p, f"Â«{main_point}Â»", 20, style["title_color"], bold=True)
+
+    if sub_points:
+        sub_w = 5.5
+        for i, sub in enumerate(sub_points):
+            sx = 1.0 + i * (sub_w + 0.33)
+            sy = 4.6
+            add_shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, sx, sy, sub_w, 1.9, style["card"], radius=0.1)
+            sbox = slide.shapes.add_textbox(Inches(sx + 0.25), Inches(sy + 0.15), Inches(sub_w - 0.5), Inches(1.6))
+            sbox.text_frame.word_wrap = True
+            sp = sbox.text_frame.paragraphs[0]
+            add_run(sp, f"â€¢ {sub}", 15, style["text_color"])
 
 
-def cover_center(slide, topic, t, subtitle):
-    a = t["accent"]
-    add_shape(slide, MSO_SHAPE.OVAL, -1.6, -1.6, 4.4, 4.4, soft(t, "accent", 0.82))
-    add_shape(slide, MSO_SHAPE.OVAL, 11.0, 4.8, 3.6, 3.6, soft(t, "accent2", 0.82))
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 5.97, 2.0, 1.4, 0.09, a)
-    add_text(slide, 1.4, 2.3, 10.5, 2.6, topic, _cover_title_size(topic), t["title"], True,
-             MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER, t["fh"])
-    add_text(slide, 1.4, 5.1, 10.5, 0.6, subtitle, 18, t["text"], align=PP_ALIGN.CENTER, font=t["fb"])
-    for i, color in enumerate((a, t["accent2"], a)):
-        add_shape(slide, MSO_SHAPE.OVAL, 6.2 + i * 0.35, 6.1, 0.17, 0.17, color)
+# ---------------------------------------------------------
+# QOLIP 4: CHAP KATTA BLOK + O'NG QATORLAR (Split Feature)
+# ---------------------------------------------------------
+def render_split_feature(slide, data: dict, style: dict, accent: RGBColor) -> None:
+    bullets = data["content"]
+    left_main = bullets[0] if bullets else ""
+    right_items = bullets[1:4]
+
+    left_w = 4.6
+    add_shape(slide, MSO_SHAPE.RECTANGLE, 0.7, 2.0, left_w, 4.6, accent)
+    add_text(slide, 1.0, 2.25, left_w - 0.6, 0.5, "ASOSIY G'OYA", 13, blend(accent, WHITE, 0.6), bold=True)
+    lbox = slide.shapes.add_textbox(Inches(1.0), Inches(2.8), Inches(left_w - 0.6), Inches(3.5))
+    lbox.text_frame.word_wrap = True
+    lp = lbox.text_frame.paragraphs[0]
+    add_run(lp, left_main, 17, WHITE, bold=True)
+
+    rx = 5.6
+    rw = 7.03
+    rh = 1.35
+    for i, b in enumerate(right_items):
+        ry = 2.0 + i * (rh + 0.27)
+        add_shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, rx, ry, rw, rh, style["card"], radius=0.12)
+        add_shape(slide, MSO_SHAPE.OVAL, rx + 0.3, ry + 0.45, 0.42, 0.42, accent)
+        rbox = slide.shapes.add_textbox(Inches(rx + 0.95), Inches(ry + 0.15), Inches(rw - 1.15), Inches(rh - 0.3))
+        rbox.text_frame.word_wrap = True
+        rp = rbox.text_frame.paragraphs[0]
+        add_run(rp, b, 14, style["text_color"])
 
 
-def cover_line(slide, topic, t, subtitle):
-    a = t["accent"]
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 0.7, 1.3, 0.16, 4.9, a)
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 11.6, 0.7, 0.9, 0.9, t["accent2"])
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 12.0, 1.1, 0.9, 0.9, soft(t, "accent", 0.7))
-    add_text(slide, 1.3, 1.6, 10.2, 3.0, topic, _cover_title_size(topic), t["title"], True,
-             MSO_ANCHOR.MIDDLE, font=t["fh"])
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 1.3, 4.85, 10.2, 0.02, hair(t))
-    add_text(slide, 1.3, 5.05, 10.2, 0.6, subtitle, 18, t["text"], font=t["fb"])
+# ---------------------------------------------------------
+# QOLIP 5: SHVEYSARIYA MINIMAL (Minimal Rows)
+# ---------------------------------------------------------
+def render_minimal_rows(slide, data: dict, style: dict, accent: RGBColor) -> None:
+    bullets = data["content"][:MAX_BULLETS]
+    count = max(1, len(bullets))
+    y_start, h_area = 2.0, 4.8
+    row_h = h_area / count
+    card_x, card_w = 0.7, 11.93
+
+    for i, bullet in enumerate(bullets):
+        y = y_start + i * row_h
+        add_shape(slide, MSO_SHAPE.RECTANGLE, card_x, y + row_h - 0.05, card_w, 0.02,
+                  blend(style["text_color"], style["bg_color"], 0.7))
+        add_text(slide, card_x, y + 0.1, 0.8, row_h - 0.2, f"0{i+1}", 20, accent, bold=True)
+        box = slide.shapes.add_textbox(Inches(card_x + 1.0), Inches(y + 0.1), Inches(card_w - 1.1), Inches(row_h - 0.2))
+        box.text_frame.word_wrap = True
+        p = box.text_frame.paragraphs[0]
+        add_run(p, bullet, 15, style["text_color"])
 
 
-def cover_frame(slide, topic, t, subtitle):
-    a = t["accent"]
-    add_outline(slide, 0.45, 0.45, 12.43, 6.6, a, 3)
-    add_outline(slide, 0.68, 0.68, 11.97, 6.14, t["accent2"], 1)
-    add_shape(slide, MSO_SHAPE.DIAMOND, 6.37, 1.15, 0.6, 0.6, a)
-    add_text(slide, 1.6, 2.1, 10.1, 2.8, topic, _cover_title_size(topic, 36), t["title"], True,
-             MSO_ANCHOR.MIDDLE, PP_ALIGN.CENTER, t["fh"])
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 5.4, 5.1, 2.5, 0.03, t["accent2"])
-    add_text(slide, 1.6, 5.3, 10.1, 0.6, subtitle, 18, t["text"], align=PP_ALIGN.CENTER, font=t["fb"])
+# ---------------------------------------------------------
+# QOLIP 6 & 7: KLASSIK QATORLAR (Square / Round Markers)
+# ---------------------------------------------------------
+def render_classic_rows(slide, data: dict, style: dict, accent: RGBColor, square: bool = False) -> None:
+    bullets = data["content"][:MAX_BULLETS]
+    count = len(bullets)
+    area_top, area_h, gap = 1.95, 4.85, 0.18
+    card_h = min((area_h - gap * (count - 1)) / count, 1.3)
+    card_x, card_w = 0.7, 11.93
+    size_box = min(0.62, card_h - 0.3)
+    pad = 0.25
+    text_left = pad + size_box + 0.25
+    text_w = card_w - text_left - 0.3
+    font_size = pick_card_font(bullets, card_h, text_w)
+
+    for i, bullet in enumerate(bullets):
+        y = area_top + i * (card_h + gap)
+        shape_kind = MSO_SHAPE.RECTANGLE if square else MSO_SHAPE.ROUNDED_RECTANGLE
+        add_shape(slide, shape_kind, card_x, y, card_w, card_h, style["card"], radius=0.18 if not square else None)
+
+        marker_shape = MSO_SHAPE.RECTANGLE if square else MSO_SHAPE.OVAL
+        marker = add_shape(slide, marker_shape, card_x + pad, y + (card_h - size_box) / 2, size_box, size_box, accent)
+        mp = marker.text_frame.paragraphs[0]
+        mp.alignment = PP_ALIGN.CENTER
+        add_run(mp, str(i + 1), 15, WHITE, bold=True)
+
+        box = slide.shapes.add_textbox(Inches(card_x + text_left), Inches(y), Inches(text_w), Inches(card_h))
+        box.text_frame.word_wrap = True
+        box.text_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
+        p = box.text_frame.paragraphs[0]
+        add_run(p, bullet, font_size, style["text_color"])
 
 
-def cover_diagonal(slide, topic, t, subtitle):
-    a = t["accent"]
-    shape = add_shape(slide, MSO_SHAPE.PARALLELOGRAM, 8.4, -0.3, 7.2, 8.1, a)
-    shape.adjustments[0] = 0.32
-    shape2 = add_shape(slide, MSO_SHAPE.PARALLELOGRAM, 7.5, -0.3, 2.0, 8.1, t["accent2"])
-    shape2.adjustments[0] = 0.32
-    add_text(slide, 0.8, 2.0, 6.2, 3.0, topic, _cover_title_size(topic, 32), t["title"], True,
-             MSO_ANCHOR.MIDDLE, font=t["fh"])
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 0.8, 5.2, 1.2, 0.08, a)
-    add_text(slide, 0.8, 5.45, 5.8, 0.8, subtitle, 17, t["text"], font=t["fb"])
-
-
-def cover_circles(slide, topic, t, subtitle):
-    a = t["accent"]
-    add_shape(slide, MSO_SHAPE.OVAL, 8.4, 0.9, 5.4, 5.4, a)
-    add_shape(slide, MSO_SHAPE.OVAL, 7.1, 4.4, 2.6, 2.6, t["accent2"])
-    add_shape(slide, MSO_SHAPE.OVAL, 11.6, 0.1, 1.2, 1.2, soft(t, "accent", 0.55))
-    add_text(slide, 0.8, 2.0, 6.5, 3.2, topic, _cover_title_size(topic, 34), t["title"], True,
-             MSO_ANCHOR.MIDDLE, font=t["fh"])
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 0.8, 5.5, 1.2, 0.08, a)
-    add_text(slide, 0.8, 5.75, 6.2, 0.8, subtitle, 17, t["text"], font=t["fb"])
-
-
-def cover_bottom(slide, topic, t, subtitle):
-    a = t["accent"]
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 0, 5.5, SLIDE_W, 2.0, a)
-    add_shape(slide, MSO_SHAPE.OVAL, 10.8, 4.6, 3.6, 3.6, blend(a, WHITE, 0.14))
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 0.9, 1.2, 1.2, 0.08, t["accent2"])
-    add_text(slide, 0.9, 1.5, 11.4, 3.6, topic, _cover_title_size(topic, 40), t["title"], True,
-             MSO_ANCHOR.MIDDLE, font=t["fh"])
-    add_text(slide, 0.9, 6.0, 9.5, 0.8, subtitle, 20, t["on_accent"], anchor=MSO_ANCHOR.MIDDLE, font=t["fb"])
-
-
-def cover_full(slide, topic, t, subtitle):
-    slide.background.fill.solid()
-    slide.background.fill.fore_color.rgb = t["accent"]
-    on = t["on_accent"]
-    add_outline(slide, 8.8, 3.6, 6.2, 6.2, blend(t["accent"], on, 0.25), 3, MSO_SHAPE.OVAL)
-    add_outline(slide, 9.8, 4.6, 4.2, 4.2, blend(t["accent"], on, 0.25), 3, MSO_SHAPE.OVAL)
-    add_text(slide, 0.9, 1.5, 11.0, 3.6, topic, _cover_title_size(topic, 44), on, True,
-             MSO_ANCHOR.MIDDLE, font=t["fh"])
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 0.9, 5.35, 3.0, 0.04, on)
-    add_text(slide, 0.9, 5.6, 9.0, 0.7, subtitle, 20, on, font=t["fb"])
-
-
-COVERS = {
-    "panel": cover_panel, "band": cover_band, "center": cover_center, "line": cover_line,
-    "frame": cover_frame, "diagonal": cover_diagonal, "circles": cover_circles,
-    "bottom": cover_bottom, "full": cover_full,
-}
-
-
+# ---------------------------------------------------------
+# SLIDE COVER & CONTENT BUILDERS
+# ---------------------------------------------------------
 def build_cover(prs, topic: str, style: dict, subtitle: str) -> None:
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     slide.background.fill.solid()
-    slide.background.fill.fore_color.rgb = style["bg"]
-    COVERS[style["cover"]](slide, topic[:180], style, subtitle)
+    slide.background.fill.fore_color.rgb = style["bg_color"]
+    accent = style["accent"]
+    cover_accent = style.get("cover_accent", accent)
+    layout = style.get("layout_type", "two_columns")
+
+    if layout in ("minimal_rows", "split_feature"):
+        add_shape(slide, MSO_SHAPE.RECTANGLE, 0, 0, 0.4, 7.5, accent)
+        add_shape(slide, MSO_SHAPE.RECTANGLE, 0.6, 0, 0.1, 7.5, blend(accent, WHITE, 0.4))
+        title_x = 1.4
+    elif layout in ("classic_square", "horizontal_cards"):
+        add_shape(slide, MSO_SHAPE.RECTANGLE, 0, 0, 4.2, 7.5, cover_accent)
+        add_shape(slide, MSO_SHAPE.RECTANGLE, 4.2, 0, 0.15, 7.5, accent)
+        add_text(slide, 0.4, 2.8, 3.4, 1.8, "AI", 90, WHITE, bold=True, anchor=MSO_ANCHOR.MIDDLE)
+        title_x = 5.0
+    else:
+        add_shape(slide, MSO_SHAPE.RECTANGLE, 0, 0, 4.4, 7.5, cover_accent)
+        add_shape(slide, MSO_SHAPE.OVAL, -1.1, 4.5, 4.4, 4.4, blend(accent, WHITE, 0.2))
+        add_shape(slide, MSO_SHAPE.OVAL, 2.3, 0.6, 1.7, 1.7, blend(accent, WHITE, 0.35))
+        add_text(slide, 0.5, 2.6, 3.4, 1.8, "AI", 96, WHITE, bold=True, anchor=MSO_ANCHOR.MIDDLE)
+        title_x = 5.0
+
+    add_shape(slide, MSO_SHAPE.RECTANGLE, title_x, 2.4, 1.2, 0.08, accent)
+    title = topic[:180]
+    size = 38 if len(title) <= 60 else 30 if len(title) <= 110 else 24
+    content_w = 12.8 - title_x
+    add_text(slide, title_x, 2.65, content_w, 2.3, title, size, style["title_color"], bold=True)
+    add_text(slide, title_x, 5.2, content_w, 0.6, subtitle, 18, style["text_color"])
 
 
-# ---------------------------------------------------------
-# Ichki slaydlar: bezak, sarlavha va joylashuvlar
-# ---------------------------------------------------------
-def decor_slide(slide, t):
-    name, a, a2 = t["decor"], t["accent"], t["accent2"]
-    if name == "topbar":
-        add_shape(slide, MSO_SHAPE.RECTANGLE, 0, 0, SLIDE_W, 0.16, a)
-    elif name == "sidebar":
-        add_shape(slide, MSO_SHAPE.RECTANGLE, 0, 0, 0.26, SLIDE_H, a)
-        add_shape(slide, MSO_SHAPE.RECTANGLE, 0.26, 0, 0.07, SLIDE_H, a2)
-    elif name == "glow":
-        add_shape(slide, MSO_SHAPE.OVAL, 11.3, -1.5, 3.4, 3.4, soft(t, "accent", 0.84))
-        add_shape(slide, MSO_SHAPE.OVAL, -1.2, 6.2, 2.6, 2.6, soft(t, "accent2", 0.88))
-    elif name == "frame":
-        add_outline(slide, 0.25, 0.25, 12.83, 7.0, a, 1.5)
-    elif name == "stripes":
-        add_shape(slide, MSO_SHAPE.RECTANGLE, 11.2, 0.35, 1.6, 0.07, a)
-        add_shape(slide, MSO_SHAPE.RECTANGLE, 11.2, 0.5, 1.1, 0.07, a2)
-        add_shape(slide, MSO_SHAPE.RECTANGLE, 11.2, 0.65, 0.6, 0.07, a)
-    elif name == "rule":
-        add_shape(slide, MSO_SHAPE.RECTANGLE, 0.7, 0.28, 0.6, 0.07, a)
-        add_shape(slide, MSO_SHAPE.RECTANGLE, 0.7, 7.0, 11.0, 0.015, hair(t))
-
-
-def draw_title(slide, title: str, t, x=CONTENT_X, w=11.9):
-    mark = t["mark"]
-    tx, tw = x, w
-    if mark == "dot":
-        add_shape(slide, MSO_SHAPE.OVAL, x, 0.86, 0.3, 0.3, t["accent"])
-        tx, tw = x + 0.5, w - 0.5
-    size = 30 if len(title) <= 45 else 26 if len(title) <= 70 else 22
-    add_text(slide, tx, 0.45, tw, 1.1, title, size, t["title"], True, MSO_ANCHOR.MIDDLE, font=t["fh"])
-    if mark == "bar":
-        add_shape(slide, MSO_SHAPE.RECTANGLE, x, 1.62, 1.2, 0.06, t["accent"])
-    elif mark == "line":
-        add_shape(slide, MSO_SHAPE.RECTANGLE, x, 1.64, w, 0.015, hair(t))
-        add_shape(slide, MSO_SHAPE.RECTANGLE, x, 1.62, 1.2, 0.05, t["accent"])
-
-
-def lay_cards(slide, bullets, t):
-    count = len(bullets)
-    gap = 0.18
-    card_h = min((AREA_H - gap * (count - 1)) / count, 1.3)
-    diameter = min(0.62, card_h - 0.3)
-    pad = 0.25
-    text_left = pad + diameter + 0.25
-    text_w = CONTENT_W - text_left - 0.3
-    size = fit_font(bullets, text_w, card_h - 0.08, 24, 14, t["cw"])
-    for i, bullet in enumerate(bullets):
-        y = AREA_TOP + i * (card_h + gap)
-        card = add_shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, CONTENT_X, y, CONTENT_W, card_h, t["card"], radius=0.18)
-        frame = card.text_frame
-        frame.word_wrap = True
-        frame.vertical_anchor = MSO_ANCHOR.MIDDLE
-        frame.margin_left = Inches(text_left)
-        frame.margin_right = Inches(0.3)
-        frame.margin_top = frame.margin_bottom = Inches(0.04)
-        paragraph = frame.paragraphs[0]
-        paragraph.alignment = PP_ALIGN.LEFT
-        add_run(paragraph, bullet, size, t["text"], font=t["fb"])
-        number_circle(slide, CONTENT_X + pad, y + (card_h - diameter) / 2, diameter, str(i + 1), t)
-
-
-def lay_rows(slide, bullets, t):
-    count = len(bullets)
-    row_h = min(AREA_H / count, 1.3)
-    text_w = CONTENT_W - 1.5
-    size = fit_font(bullets, text_w, row_h - 0.1, 24, 14, t["cw"])
-    for i, bullet in enumerate(bullets):
-        y = AREA_TOP + i * row_h
-        add_text(slide, CONTENT_X, y, 1.2, row_h, f"{i + 1:02d}", 30, t["accent"], True,
-                 MSO_ANCHOR.MIDDLE, font=t["fh"])
-        add_text(slide, CONTENT_X + 1.4, y, text_w, row_h, bullet, size, t["text"], anchor=MSO_ANCHOR.MIDDLE, font=t["fb"])
-        if i < count - 1:
-            add_shape(slide, MSO_SHAPE.RECTANGLE, CONTENT_X, y + row_h - 0.01, CONTENT_W, 0.015, hair(t))
-
-
-def lay_grid(slide, bullets, t):
-    count = len(bullets)
-    spec = {1: [1], 2: [2], 3: [3], 4: [2, 2], 5: [3, 2]}[min(count, 5)]
-    gap = 0.25
-    rows = len(spec)
-    card_h = min((AREA_H - gap * (rows - 1)) / rows, 3.7)
-    y0 = AREA_TOP
-    if rows == 1:
-        card_h = min(card_h, 3.2)
-        y0 = AREA_TOP + (AREA_H - card_h) / 2
-    idx = 0
-    pool_sizes = []
-    for r, cols in enumerate(spec):
-        card_w = (CONTENT_W - gap * (cols - 1)) / cols
-        tall = card_h >= 3.0
-        text_w = card_w - 0.5 if tall else card_w - 1.25
-        text_h = card_h - 1.25 if tall else card_h - 0.4
-        pool_sizes.append((text_w, text_h))
-    size = min(fit_font(bullets, w, h, 24, 13, t["cw"]) for w, h in pool_sizes)
-    for r, cols in enumerate(spec):
-        card_w = (CONTENT_W - gap * (cols - 1)) / cols
-        tall = card_h >= 3.0
-        for c in range(cols):
-            if idx >= count:
-                break
-            x = CONTENT_X + c * (card_w + gap)
-            y = y0 + r * (card_h + gap)
-            add_shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, card_w, card_h, t["card"], radius=0.08)
-            add_shape(slide, MSO_SHAPE.RECTANGLE, x + 0.25, y, 0.8, 0.07, t["accent"])
-            number_circle(slide, x + 0.25, y + 0.3, 0.5, str(idx + 1), t, size=15)
-            if tall:
-                add_text(slide, x + 0.25, y + 1.0, card_w - 0.5, card_h - 1.15, bullets[idx], size, t["text"],
-                         anchor=MSO_ANCHOR.TOP, font=t["fb"])
-            else:
-                add_text(slide, x + 1.0, y + 0.2, card_w - 1.25, card_h - 0.4, bullets[idx], size, t["text"],
-                         anchor=MSO_ANCHOR.MIDDLE, font=t["fb"])
-            idx += 1
-
-
-def lay_columns(slide, bullets, t):
-    count = len(bullets)
-    gap = 0.4
-    col_w = (CONTENT_W - gap * (count - 1)) / count
-    size = fit_font(bullets, col_w, 3.3, 22, 13, t["cw"])
-    for i, bullet in enumerate(bullets):
-        x = CONTENT_X + i * (col_w + gap)
-        add_text(slide, x, 1.95, col_w, 0.95, f"{i + 1:02d}", 44, t["accent"], True, MSO_ANCHOR.MIDDLE, font=t["fh"])
-        add_shape(slide, MSO_SHAPE.RECTANGLE, x + 0.1, 3.0, 0.9, 0.07, t["accent2"])
-        add_text(slide, x, 3.25, col_w, 3.4, bullet, size, t["text"], font=t["fb"])
-        if i < count - 1:
-            add_shape(slide, MSO_SHAPE.RECTANGLE, x + col_w + gap / 2, 2.1, 0.015, 4.4, hair(t))
-
-
-def lay_timeline(slide, bullets, t):
-    count = len(bullets)
-    step_h = min(AREA_H / count, 1.35)
-    first_c = AREA_TOP + step_h / 2
-    last_c = AREA_TOP + step_h * (count - 0.5)
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 1.175 - 0.025, first_c, 0.05, max(0.01, last_c - first_c), t["accent2"])
-    text_w = CONTENT_W - 1.4
-    size = fit_font(bullets, text_w, step_h - 0.1, 24, 14, t["cw"])
-    for i, bullet in enumerate(bullets):
-        yc = AREA_TOP + step_h * (i + 0.5)
-        number_circle(slide, 1.175 - 0.28, yc - 0.28, 0.56, str(i + 1), t)
-        add_text(slide, CONTENT_X + 1.2, yc - step_h / 2, text_w, step_h, bullet, size, t["text"],
-                 anchor=MSO_ANCHOR.MIDDLE, font=t["fb"])
-
-
-def lay_bignum(slide, bullets, t):
-    hero, rest = bullets[0], bullets[1:]
-    card_w = 5.7 if rest else CONTENT_W
-    add_shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, CONTENT_X, AREA_TOP, card_w, AREA_H, t["accent"], radius=0.06)
-    add_text(slide, CONTENT_X + 0.35, AREA_TOP + 0.05, 1.5, 1.2, "\u201c", 96, blend(t["accent"], t["on_accent"], 0.45),
-             True, MSO_ANCHOR.TOP, font=t["fh"])
-    size = fit_font([hero], card_w - 0.9, AREA_H - 1.7, 32, 18, t["cw"] * 1.15)
-    add_text(slide, CONTENT_X + 0.4, AREA_TOP + 1.2, card_w - 0.8, AREA_H - 1.5, hero, size, t["on_accent"], True,
-             MSO_ANCHOR.TOP, font=t["fb"])
-    if not rest:
-        return
-    x0 = CONTENT_X + card_w + 0.45
-    w = SLIDE_W - 0.7 - x0
-    step_h = min(AREA_H / len(rest), 1.4)
-    size = fit_font(rest, w - 0.5, step_h - 0.1, 22, 13, t["cw"])
-    for i, bullet in enumerate(rest):
-        y = AREA_TOP + i * step_h
-        add_shape(slide, MSO_SHAPE.RECTANGLE, x0, y + step_h / 2 - 0.1, 0.2, 0.2, t["accent2"])
-        add_text(slide, x0 + 0.4, y, w - 0.4, step_h, bullet, size, t["text"], anchor=MSO_ANCHOR.MIDDLE, font=t["fb"])
-        if i < len(rest) - 1:
-            add_shape(slide, MSO_SHAPE.RECTANGLE, x0, y + step_h - 0.01, w, 0.015, hair(t))
-
-
-def lay_split(slide, title, bullets, t):
-    a = t["accent"]
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 0, 0, 4.7, SLIDE_H, a)
-    add_shape(slide, MSO_SHAPE.OVAL, -1.1, 5.0, 3.8, 3.8, blend(a, WHITE, 0.14))
-    add_shape(slide, MSO_SHAPE.RECTANGLE, 0.55, 1.25, 0.9, 0.08, t["accent2"])
-    size = fit_font([title], 3.9, 4.3, 34, 20, t["cw"] * 1.15)
-    add_text(slide, 0.5, 1.45, 3.9, 4.3, title, size, t["on_accent"], True, MSO_ANCHOR.TOP, font=t["fh"])
-    count = len(bullets)
-    step_h = min(AREA_H / count, 1.3)
-    x0, w = 5.3, SLIDE_W - 0.7 - 5.3
-    top = (SLIDE_H - step_h * count) / 2
-    size = fit_font(bullets, w - 0.4, step_h - 0.1, 24, 14, t["cw"])
-    for i, bullet in enumerate(bullets):
-        y = top + i * step_h
-        add_shape(slide, MSO_SHAPE.RECTANGLE, x0, y + step_h * 0.2, 0.07, step_h * 0.6, a)
-        add_text(slide, x0 + 0.3, y, w - 0.3, step_h, bullet, size, t["text"], anchor=MSO_ANCHOR.MIDDLE, font=t["fb"])
-
-
-def build_content(prs, data: dict, style: dict, page: int, total: int, index: int = 0) -> None:
+def build_content(prs, data: dict, style: dict, page: int, total: int) -> None:
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     slide.background.fill.solid()
-    slide.background.fill.fore_color.rgb = style["bg"]
-    layout = style["layouts"][index % len(style["layouts"])]
-    bullets = data["content"][:MAX_BULLETS]
-    if layout == "columns" and len(bullets) >= 5:
-        layout = "rows"  # 5 ta tor ustunga uzun matn sig'maydi
+    slide.background.fill.fore_color.rgb = style["bg_color"]
+    accent = style["accent"]
 
-    if layout == "split":
-        lay_split(slide, data["title"], bullets, style)
+    add_shape(slide, MSO_SHAPE.RECTANGLE, 0, 0, 13.333, 0.16, accent)
+    title = data["title"]
+    add_text(slide, 0.7, 0.45, 11.9, 1.1, title, 30 if len(title) <= 45 else 26,
+             style["title_color"], bold=True, anchor=MSO_ANCHOR.MIDDLE)
+    add_shape(slide, MSO_SHAPE.RECTANGLE, 0.7, 1.62, 1.2, 0.06, accent)
+
+    l_type = style.get("layout_type", "two_columns")
+    if l_type == "two_columns":
+        render_two_columns(slide, data, style, accent)
+    elif l_type == "horizontal_cards":
+        render_horizontal_cards(slide, data, style, accent)
+    elif l_type == "hero_focus":
+        render_hero_focus(slide, data, style, accent)
+    elif l_type == "split_feature":
+        render_split_feature(slide, data, style, accent)
+    elif l_type == "minimal_rows":
+        render_minimal_rows(slide, data, style, accent)
+    elif l_type == "classic_square":
+        render_classic_rows(slide, data, style, accent, square=True)
     else:
-        decor_slide(slide, style)
-        draw_title(slide, data["title"], style)
-        {
-            "cards": lay_cards, "rows": lay_rows, "grid": lay_grid, "columns": lay_columns,
-            "timeline": lay_timeline, "bignum": lay_bignum,
-        }[layout](slide, bullets, style)
+        render_classic_rows(slide, data, style, accent, square=False)
 
     add_text(slide, 11.4, 7.02, 1.3, 0.3, f"{page} / {total}", 11,
-             blend(style["text"], style["bg"], 0.35), align=PP_ALIGN.RIGHT, font=style["fb"])
+             blend(style["text_color"], style["bg_color"], 0.35), align=PP_ALIGN.RIGHT)
 
 
 def generate_pptx(topic: str, slide_data: list[dict], template_style: str, output_path: str,
@@ -2112,57 +1986,35 @@ def generate_pptx(topic: str, slide_data: list[dict], template_style: str, outpu
         for item in slide_data
     ]
     prs = Presentation()
-    prs.slide_width = Inches(SLIDE_W)
-    prs.slide_height = Inches(SLIDE_H)
-    style = THEMES.get(template_style) or THEMES["classic"]
+    prs.slide_width = Inches(13.333)
+    prs.slide_height = Inches(7.5)
+    style = TEMPLATE_STYLES.get(template_style, TEMPLATE_STYLES["classic"])
     total = len(slide_data) + 1
 
-    subtitle = "AI ёрдамида тайёрланган тақдимот" if alphabet == KIRILL else "AI yordamida tayyorlangan taqdimot"
+    subtitle = "AI Ñ‘Ñ€Ð´Ð°Ð¼Ð¸Ð´Ð° Ñ‚Ð°Ð¹Ñ‘Ñ€Ð»Ð°Ð½Ð³Ð°Ð½ Ñ‚Ð°Ò›Ð´Ð¸Ð¼Ð¾Ñ‚" if alphabet == KIRILL else "AI yordamida tayyorlangan taqdimot"
     build_cover(prs, topic, style, subtitle)
-    for index, data in enumerate(slide_data):
-        build_content(prs, data, style, index + 2, total, index)
+    for index, data in enumerate(slide_data, start=2):
+        build_content(prs, data, style, index, total)
 
     prs.save(output_path)
     return output_path
 
 
-def theme_catalog() -> list[dict]:
-    """Mini App uchun shablonlar ro'yxati (rang va nomlar)."""
-    def hex_(color) -> str:
-        return "#%02x%02x%02x" % (color[0], color[1], color[2])
-
-    return [
-        {
-            "key": key,
-            "name": theme["name"],
-            "bg": hex_(theme["bg"]),
-            "title": hex_(theme["title"]),
-            "text": hex_(theme["text"]),
-            "accent": hex_(theme["accent"]),
-            "accent2": hex_(theme["accent2"]),
-            "card": hex_(theme["card"]),
-            "cover": theme["cover"],
-            "layouts": theme["layouts"],
-        }
-        for key, theme in THEMES.items()
-    ]
-
-
 # =========================================================
 # BOT HANDLERS
 # =========================================================
-BTN_SLIDE = "📕 Yangi taqdimot (Slayd)"
-BTN_SELF = "📘 Yangi mustaqil ish"
-BTN_REFERAT = "📄 Yangi referat"
-BTN_COURSE = "📚 Kurs ishi yaratish"
-BTN_TEST = "📝 Test yaratish"
-BTN_ARTICLE = "📰 Maqola yaratish"
-BTN_THESIS = "📑 Tezis yaratish"
-BTN_CROSSWORD = "🧩 Krossvord yaratish"
-BTN_ALPHABET = "🔤 Alifbo"
-BTN_LIMIT = "📊 Limitim"
-BTN_HELP = "❓ Yordam"
-BTN_CANCEL = "❌ Bekor qilish"
+BTN_SLIDE = "ðŸ“• Yangi taqdimot (Slayd)"
+BTN_SELF = "ðŸ“˜ Yangi mustaqil ish"
+BTN_REFERAT = "ðŸ“„ Yangi referat"
+BTN_COURSE = "ðŸ“š Kurs ishi yaratish"
+BTN_TEST = "ðŸ“ Test yaratish"
+BTN_ARTICLE = "ðŸ“° Maqola yaratish"
+BTN_THESIS = "ðŸ“‘ Tezis yaratish"
+BTN_CROSSWORD = "ðŸ§© Krossvord yaratish"
+BTN_ALPHABET = "ðŸ”¤ Alifbo"
+BTN_LIMIT = "ðŸ“Š Limitim"
+BTN_HELP = "â“ Yordam"
+BTN_CANCEL = "âŒ Bekor qilish"
 
 KIND_BY_BUTTON = {
     BTN_REFERAT: "referat",
@@ -2182,7 +2034,7 @@ TOPIC_HINTS = {
     "tezis": "Tezis mavzusini yozing",
     "krossvord": "Krossvord mavzusini yozing",
 }
-ALPHABET_NAMES = {LATIN: "Lotin", KIRILL: "Кирилл"}
+ALPHABET_NAMES = {LATIN: "Lotin", KIRILL: "ÐšÐ¸Ñ€Ð¸Ð»Ð»"}
 
 
 class DocOrder(StatesGroup):
@@ -2216,7 +2068,7 @@ def open_app_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[[
             InlineKeyboardButton(
-                text="✨ Mini App’ni ochish",
+                text="âœ¨ Mini Appâ€™ni ochish",
                 web_app=WebAppInfo(url=WEBAPP_URL),
             )
         ]]
@@ -2237,18 +2089,18 @@ async def start_cmd(message: types.Message, state: FSMContext):
         await track_user(message.from_user.id, message.from_user.first_name, message.from_user.username)
     name = html.escape(message.from_user.first_name) if message.from_user else "do'st"
     await message.answer(
-        f"👋 <b>Xush kelibsiz, {name}!</b>\n\n"
-        "Men o'zbek tilida tayyor ish va taqdimotlar tayyorlayman:\n\n"
-        "📕 <b>Taqdimot (Slayd)</b> — PowerPoint fayl, 4 xil uslub (Mini App orqali).\n"
-        "📘 <b>Mustaqil ish</b> — reja, asosiy qism, xulosa va nazorat savollari.\n"
-        "📄 <b>Referat</b> — titul varaq, reja va akademik matn.\n"
-        "📚 <b>Kurs ishi</b> — reja, kirish, 3 bob, xulosa va adabiyotlar.\n"
-        "📰 <b>Ilmiy maqola</b> va 📑 <b>Tezis</b> — konferensiya va jurnallar uchun.\n"
-        "📝 <b>Test</b> — 10 ta savol va javoblar kaliti.\n"
-        "🧩 <b>Krossvord</b> — savollar va javoblar bilan, chop etishga tayyor.\n\n"
-        "🔤 <b>Alifbo</b> tugmasi orqali fayllarni lotin yoki kirill yozuvida olasiz.\n"
-        "📊 Qancha so'rov qolganini <b>Limitim</b> orqali ko'rasiz.\n"
-        "👇 Pastdagi tugmalardan birini tanlang.",
+        f"ðŸ‘‹ <b>Xush kelibsiz, {name}!</b>\n\n"
+        "Men o'zbek tilida tayyor taqdimot va akademik ishlar tayyorlayman:\n\n"
+        "ðŸ“• <b>Taqdimot (Slayd)</b> â€” PowerPoint fayl, 15 xil individual dizayn va turfa xil tuzilish (Mini App orqali).\n"
+        "ðŸ“˜ <b>Mustaqil ish</b> â€” reja, asosiy qism, xulosa va nazorat savollari.\n"
+        "ðŸ“„ <b>Referat</b> â€” titul varaq, reja va akademik matn.\n"
+        "ðŸ“š <b>Kurs ishi</b> â€” reja, kirish, 3 bob, xulosa va adabiyotlar.\n"
+        "ðŸ“° <b>Ilmiy maqola</b> va ðŸ“‘ <b>Tezis</b> â€” konferensiya va jurnallar uchun.\n"
+        "ðŸ“ <b>Test</b> â€” 10 ta savol va javoblar kaliti.\n"
+        "ðŸ§© <b>Krossvord</b> â€” savollar va javoblar bilan, chop etishga tayyor.\n\n"
+        "ðŸ”¤ <b>Alifbo</b> orqali fayllarni lotin yoki kirill yozuvida olasiz.\n"
+        "ðŸ“Š Qancha so'rov qolganini <b>Limitim</b> orqali ko'rasiz.\n"
+        "ðŸ‘‡ Pastdagi tugmalardan birini tanlang.",
         reply_markup=main_keyboard(),
         parse_mode="HTML",
     )
@@ -2258,14 +2110,14 @@ async def start_cmd(message: types.Message, state: FSMContext):
 @dp.message(F.text == BTN_CANCEL)
 async def cancel_cmd(message: types.Message, state: FSMContext):
     await state.clear()
-    await message.answer("Bekor qilindi. Kerakli bo'limni tanlang 👇", reply_markup=main_keyboard())
+    await message.answer("Bekor qilindi. Kerakli bo'limni tanlang ðŸ‘‡", reply_markup=main_keyboard())
 
 
 @dp.message(F.text == BTN_SLIDE)
 async def slide_btn(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer(
-        "Mini App’ni oching, mavzuni yozing yoki tayyor mavzudan tanlang, uslubni belgilang 👇",
+        "Mini Appâ€™ni oching, 15 xil dizayn va tuzilishdan birini tanlang va mavzuni yozing ðŸ‘‡",
         reply_markup=open_app_keyboard(),
     )
 
@@ -2275,9 +2127,8 @@ async def limit_btn(message: types.Message, state: FSMContext):
     await state.clear()
     remaining = await asyncio.to_thread(rate_limiter.remaining, message.from_user.id)
     await message.answer(
-        f"📊 Sizda <b>{remaining}</b> / {RATE_LIMIT_REQUESTS} ta so'rov qoldi.\n"
-        f"Limit oxirgi {format_window(RATE_LIMIT_WINDOW_SECONDS)} bo'yicha hisoblanadi. "
-        "Slayd, referat, mustaqil ish va test uchun umumiy.",
+        f"ðŸ“Š Sizda <b>{remaining}</b> / {RATE_LIMIT_REQUESTS} ta so'rov qoldi.\n"
+        f"Limit oxirgi {format_window(RATE_LIMIT_WINDOW_SECONDS)} bo'yicha hisoblanadi.",
         parse_mode="HTML",
         reply_markup=main_keyboard(),
     )
@@ -2288,17 +2139,16 @@ async def limit_btn(message: types.Message, state: FSMContext):
 async def help_btn(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer(
-        "❓ <b>Qanday ishlaydi?</b>\n\n"
+        "â“ <b>Qanday ishlaydi?</b>\n\n"
         "1. Pastdagi tugmalardan kerakli xizmatni tanlang.\n"
         "2. Mavzuni yozing.\n"
-        "3. 30-90 soniyada tayyor fayl shu chatga keladi.\n\n"
-        "📱 <b>Slayd faylini</b> PowerPoint, WPS Office yoki Google Slides orqali oching: "
-        "telefonning ichki ko'rish dasturi ba'zan bo'sh ko'rsatadi.\n"
-        "📄 <b>Word fayllarni</b> Word, WPS Office yoki Google Docs bilan oching.\n"
-        "🔤 Fayl alifbosini <b>Alifbo</b> tugmasi orqali o'zgartirasiz.\n"
-        "📚 Kurs ishi 2-4 daqiqa vaqt olishi mumkin.\n\n"
-        "⚠️ AI xato qilishi mumkin: faktlarni va nomlarni topshirishdan oldin tekshiring."
-        + (f"\n\n📩 Savol yoki taklif: {html.escape(SUPPORT_CONTACT)}" if SUPPORT_CONTACT else ""),
+        "3. 30-90 soniyada tayyor fayl chatga keladi.\n\n"
+        "ðŸ“± <b>Slayd faylini</b> PowerPoint, WPS Office yoki Google Slides orqali oching.\n"
+        "ðŸ“„ <b>Word fayllarni</b> Word, WPS Office yoki Google Docs bilan oching.\n"
+        "ðŸ”¤ Fayl alifbosini <b>Alifbo</b> tugmasi orqali o'zgartirasiz.\n"
+        "ðŸ“š Kurs ishi 2-4 daqiqa vaqt olishi mumkin.\n\n"
+        "âš ï¸ AI xato qilishi mumkin: faktlar va nomlarni tekshirib oling."
+        + (f"\n\nðŸ“© Savol yoki taklif: {html.escape(SUPPORT_CONTACT)}" if SUPPORT_CONTACT else ""),
         parse_mode="HTML",
         reply_markup=main_keyboard(),
     )
@@ -2306,7 +2156,7 @@ async def help_btn(message: types.Message, state: FSMContext):
 
 def alphabet_keyboard(current: str) -> InlineKeyboardMarkup:
     def mark(code: str) -> str:
-        return ("✅ " if current == code else "") + ALPHABET_NAMES[code]
+        return ("âœ… " if current == code else "") + ALPHABET_NAMES[code]
 
     return InlineKeyboardMarkup(
         inline_keyboard=[[
@@ -2318,7 +2168,7 @@ def alphabet_keyboard(current: str) -> InlineKeyboardMarkup:
 
 def alphabet_text(current: str) -> str:
     return (
-        "🔤 <b>Alifbo</b>\n\n"
+        "ðŸ”¤ <b>Alifbo</b>\n\n"
         "Tayyor fayllar (slayd va Word) qaysi alifboda bo'lsin?\n"
         f"Hozirgi tanlov: <b>{ALPHABET_NAMES[current]}</b>"
     )
@@ -2354,7 +2204,7 @@ async def alphabet_choice(callback: types.CallbackQuery):
 
 def pages_keyboard(kind: str) -> InlineKeyboardMarkup:
     buttons = [
-        InlineKeyboardButton(text=f"{lo}–{hi} bet", callback_data=f"pg:{kind}:{lo}:{hi}")
+        InlineKeyboardButton(text=f"{lo}â€“{hi} bet", callback_data=f"pg:{kind}:{lo}:{hi}")
         for lo, hi in PAGE_TIERS[kind]
     ]
     rows = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
@@ -2362,17 +2212,16 @@ def pages_keyboard(kind: str) -> InlineKeyboardMarkup:
 
 
 def topic_prompt_text(kind: str) -> str:
-    return f"✍️ {TOPIC_HINTS[kind]}.\nMasalan: <i>Sun'iy intellektning ta'limdagi o'rni</i>"
+    return f"âœï¸ {TOPIC_HINTS[kind]}.\nMasalan: <i>Sun'iy intellektning ta'limdagi o'rni</i>"
 
 
 @dp.message(F.text.in_(set(KIND_BY_BUTTON)))
 async def document_btn(message: types.Message, state: FSMContext):
     kind = KIND_BY_BUTTON[message.text]
     if kind in PAGE_TIERS:
-        # Avval hajm (bet) tanlanadi, keyin mavzu so'raladi.
         await state.clear()
         await message.answer(
-            f"📏 <b>{DOC_KINDS[kind]['label']}</b> hajmini tanlang:",
+            f"ðŸ“ <b>{DOC_KINDS[kind]['label']}</b> hajmini tanlang:",
             parse_mode="HTML",
             reply_markup=pages_keyboard(kind),
         )
@@ -2395,4 +2244,370 @@ async def pages_choice(callback: types.CallbackQuery, state: FSMContext):
         await callback.answer("Noto'g'ri tanlov", show_alert=True)
         return
     if kind not in PAGE_TIERS or (lo, hi) not in PAGE_TIERS[kind]:
-        await callback
+        await callback.answer("Noto'g'ri tanlov", show_alert=True)
+        return
+
+    await state.set_state(DocOrder.waiting_topic)
+    await state.update_data(kind=kind, pages=[lo, hi])
+    await callback.answer(f"Hajm: {lo}â€“{hi} bet")
+    if callback.message:
+        try:
+            await callback.message.edit_text(
+                f"âœ… {DOC_KINDS[kind]['label']} hajmi: <b>{lo}â€“{hi} bet</b>",
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
+    await bot.send_message(
+        callback.from_user.id,
+        topic_prompt_text(kind),
+        parse_mode="HTML",
+        reply_markup=cancel_keyboard(),
+    )
+
+
+def eta_text(kind: str, pages) -> str:
+    if not pages:
+        return "2-4 daqiqa" if kind == "kurs" else "30-90 soniya"
+    hi = pages[1]
+    if hi <= 15:
+        return "2-4 daqiqa"
+    if hi <= 30:
+        return "4-7 daqiqa"
+    return "6-10 daqiqa"
+
+
+async def run_document(message: types.Message, kind: str, topic: str, pages=None) -> None:
+    user_id = message.from_user.id
+    meta = DOC_KINDS[kind]
+    await track_user(user_id, message.from_user.first_name, message.from_user.username)
+
+    if user_id in _active_users:
+        await message.answer(
+            "â³ Oldingi ishingiz hali tayyor bo'lmadi. U tugagach yangisini boshlashingiz mumkin.",
+            reply_markup=main_keyboard(),
+        )
+        return
+
+    try:
+        reservation_id = await reserve_rate_limit(user_id)
+    except HTTPException as exc:
+        await message.answer(f"â— {exc.detail}", reply_markup=main_keyboard())
+        return
+
+    _active_users.add(user_id)
+    started = time.monotonic()
+    alphabet = await get_user_alphabet(user_id)
+    size_label = f" ({pages[0]}â€“{pages[1]} bet)" if pages else ""
+    wait_text = f"â³ {meta['label']} yozilmoqda{size_label}, bu {eta_text(kind, pages)} olishi mumkin..."
+    status = await message.answer(wait_text, reply_markup=main_keyboard())
+    file_path = os.path.join(tempfile.gettempdir(), f"{meta['file']}_{uuid.uuid4().hex}.docx")
+    success = False
+    use_progress = kind == "kurs" or bool(pages)
+
+    last_progress_edit = 0.0
+
+    async def progress(done: int, total: int) -> None:
+        nonlocal last_progress_edit
+        now = time.monotonic()
+        if now - last_progress_edit >= 2.5 or done == total:
+            last_progress_edit = now
+            await safe_edit(status, f"â³ {meta['label']} yozilmoqda{size_label}: {done}/{total} qism tayyor...")
+
+    try:
+        await bot.send_chat_action(message.chat.id, "upload_document")
+        data = await generate_document_content(
+            kind, topic, alphabet, progress=progress if use_progress else None, pages=pages
+        )
+        await safe_edit(status, "ðŸ“„ Word fayl tayyorlanmoqda...")
+        await asyncio.to_thread(build_docx, kind, topic, data, file_path, alphabet)
+        caption = f"ðŸŽ‰ {meta['label']} tayyor!\nðŸ“Œ Mavzu: {topic}\nðŸ”¤ Alifbo: {ALPHABET_NAMES[alphabet]}"
+        if pages:
+            caption += f"\nðŸ“ Hajm: {pages[0]}â€“{pages[1]} bet"
+        if meta.get("note"):
+            caption += f"\n\n{meta['note']}"
+        await message.answer_document(
+            types.FSInputFile(file_path, filename=f"{meta['file']}_{uuid.uuid4().hex[:6]}.docx"),
+            caption=caption,
+        )
+        success = True
+    except HTTPException as exc:
+        await message.answer(f"â— {exc.detail}", reply_markup=main_keyboard())
+        if exc.status_code in (502, 503, 504):
+            await notify_admins(f"âš ï¸ AI xatosi ({meta['label']}, kod {exc.status_code}): {exc.detail}")
+    except Exception:
+        logger.exception("Hujjat yaratishda kutilmagan xatolik (%s)", kind)
+        await message.answer(
+            "â— Hujjat yaratishda xatolik yuz berdi. Qayta urinib ko'ring.",
+            reply_markup=main_keyboard(),
+        )
+        await notify_admins(f"âš ï¸ Kutilmagan xatolik ({meta['label']}). Railway loglarini tekshiring.")
+    finally:
+        _active_users.discard(user_id)
+        if not success:
+            await asyncio.shield(refund_rate_limit(reservation_id))
+        await track_order(user_id, kind, success, time.monotonic() - started)
+        try:
+            await status.delete()
+        except Exception:
+            pass
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except OSError:
+            logger.warning("Vaqtinchalik faylni o'chirib bo'lmadi: %s", file_path)
+
+
+@dp.message(Command("stats"))
+async def stats_cmd(message: types.Message):
+    if not message.from_user or message.from_user.id not in ADMIN_IDS:
+        return
+    stats = await asyncio.to_thread(rate_limiter.stats)
+    labels = {"slayd": "Taqdimot"}
+    labels.update({key: meta["label"] for key, meta in DOC_KINDS.items()})
+    lines = [
+        "ðŸ“ˆ <b>Statistika</b>",
+        f"ðŸ‘¥ Jami foydalanuvchi: <b>{stats['total_users']}</b>",
+        f"ðŸ†• 24 soatda yangi: <b>{stats['new_24h']}</b>",
+        f"ðŸŸ¢ 24 soatda faol: <b>{stats['active_24h']}</b>",
+        f"âœ… Jami tayyor ish: <b>{stats['total_ok']}</b>",
+        "",
+        "<b>Oxirgi 24 soat:</b>",
+    ]
+    if stats["by_kind"]:
+        for kind, (ok_count, fail_count) in sorted(stats["by_kind"].items()):
+            lines.append(f"â€¢ {labels.get(kind, kind)}: {ok_count} ta" + (f" (xato: {fail_count})" if fail_count else ""))
+    else:
+        lines.append("â€¢ hali buyurtma yo'q")
+    await message.answer("\n".join(lines), parse_mode="HTML")
+
+
+@dp.message(DocOrder.waiting_topic, F.text)
+async def receive_topic(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    kind = data.get("kind")
+    pages = tuple(data["pages"]) if data.get("pages") else None
+    topic = (message.text or "").strip()
+
+    if kind not in DOC_KINDS:
+        await state.clear()
+        await message.answer("Iltimos, xizmatni qaytadan tanlang ðŸ‘‡", reply_markup=main_keyboard())
+        return
+    if kind in PAGE_TIERS and pages not in PAGE_TIERS[kind]:
+        await state.clear()
+        await message.answer(
+            f"ðŸ“ <b>{DOC_KINDS[kind]['label']}</b> hajmini tanlang:",
+            parse_mode="HTML",
+            reply_markup=pages_keyboard(kind),
+        )
+        return
+    if len(topic) < 3 or len(topic) > MAX_TOPIC_LENGTH:
+        await message.answer("Mavzu juda qisqa yoki juda uzun. Iltimos, aniqroq va qisqaroq yozing:")
+        return
+
+    await state.clear()
+    await run_document(message, kind, topic, pages)
+
+
+@dp.message(F.text)
+async def fallback_text(message: types.Message):
+    await message.answer("Pastdagi tugmalardan birini tanlang ðŸ‘‡", reply_markup=main_keyboard())
+
+
+@dp.message()
+async def fallback_other(message: types.Message):
+    await message.answer(
+        "Iltimos, matn yuboring yoki pastdagi tugmalardan foydalaning ðŸ‘‡",
+        reply_markup=main_keyboard(),
+    )
+
+
+# =========================================================
+# FASTAPI LIFESPAN VA API ENDPOINTLARI
+# =========================================================
+def _on_polling_done(task: asyncio.Task) -> None:
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.error("Bot polling kutilmaganda to'xtadi", exc_info=exc)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    polling_task = None
+    try:
+        try:
+            await bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(text="Ilova", web_app=WebAppInfo(url=WEBAPP_URL))
+            )
+        except Exception:
+            logger.exception("Menyu tugmasini o'rnatib bo'lmadi")
+        try:
+            await bot.set_my_commands([
+                BotCommand(command="start", description="Botni boshlash va menyu"),
+                BotCommand(command="help", description="Yordam"),
+                BotCommand(command="alifbo", description="Alifbo: lotin yoki kirill"),
+                BotCommand(command="cancel", description="Bekor qilish"),
+            ])
+            await bot.set_my_short_description(
+                short_description="AI yordamchi: slayd, referat, kurs ishi, test, krossvord (lotin/kirill)"
+            )
+            await bot.set_my_description(
+                description=(
+                    "O'zbek tilida tayyor taqdimot (slayd), referat, mustaqil ish, kurs ishi, maqola, tezis, test va krossvord "
+                    "tayyorlaydigan AI yordamchi. Mavzuni yozing, fayl bir necha daqiqada chatga keladi. "
+                    "Boshlash uchun /start ni bosing."
+                )
+            )
+        except Exception:
+            logger.exception("Bot profilini o'rnatib bo'lmadi")
+        if ENABLE_BOT_POLLING:
+            await bot.delete_webhook(drop_pending_updates=False)
+            polling_task = asyncio.create_task(
+                dp.start_polling(
+                    bot,
+                    handle_signals=False,
+                    allowed_updates=dp.resolve_used_update_types(),
+                )
+            )
+            polling_task.add_done_callback(_on_polling_done)
+            logger.info("FastAPI ishga tushdi; bot polling vazifasi boshlandi.")
+        else:
+            logger.info("FastAPI ishga tushdi; bot polling o'chirilgan.")
+        yield
+    finally:
+        if polling_task:
+            polling_task.cancel()
+            try:
+                await polling_task
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                logger.exception("Bot polling to'xtashida xatolik")
+        await bot.session.close()
+        rate_limiter.close()
+        logger.info("Ilova to'xtatildi.")
+
+
+app = FastAPI(title="Slide AI Generator", version="3.3.0", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
+@app.get("/")
+async def serve_index():
+    if not INDEX_FILE.is_file():
+        raise HTTPException(status_code=503, detail="static/index.html topilmadi.")
+    return FileResponse(str(INDEX_FILE), media_type="text/html")
+
+
+@app.post("/api/me")
+async def api_me(req: MeRequest):
+    auth = verify_telegram_init_data(req.init_data)
+    remaining = await asyncio.to_thread(rate_limiter.remaining, auth["user_id"])
+    alphabet = await get_user_alphabet(auth["user_id"])
+    return {
+        "alphabet": alphabet,
+        "remaining": remaining,
+        "limit": RATE_LIMIT_REQUESTS,
+        "window_minutes": max(1, RATE_LIMIT_WINDOW_SECONDS // 60),
+        "slides": {"default": SLIDE_COUNT, "min": MIN_SLIDES, "max": MAX_SLIDES},
+        "available_templates": list(TEMPLATE_STYLES.keys()),
+    }
+
+
+@app.post("/api/generate-slide")
+async def api_generate_slide(req: SlideRequest):
+    auth = verify_telegram_init_data(req.init_data)
+    user_id = auth["user_id"]
+    await track_user(user_id, auth["user"].get("first_name"), auth["user"].get("username"))
+    requested = getattr(req, "alphabet", None)
+    if requested in ALPHABETS:
+        alphabet = requested
+        await set_user_alphabet(user_id, alphabet)
+    else:
+        alphabet = await get_user_alphabet(user_id)
+
+    if user_id in _active_users:
+        raise HTTPException(
+            status_code=429,
+            detail="Oldingi ishingiz hali tayyor bo'lmadi. U tugagach yangisini boshlang.",
+        )
+    reservation_id = await reserve_rate_limit(user_id)
+    _active_users.add(user_id)
+    started = time.monotonic()
+
+    file_path = os.path.join(tempfile.gettempdir(), f"slide_{uuid.uuid4().hex}.pptx")
+    success = False
+
+    try:
+        slide_data = await generate_slide_content(req.topic, alphabet, req.slides)
+
+        await asyncio.to_thread(
+            generate_pptx,
+            req.topic,
+            slide_data,
+            req.template,
+            file_path,
+            alphabet,
+        )
+
+        document = types.FSInputFile(file_path, filename=f"taqdimot_{uuid.uuid4().hex[:8]}.pptx")
+        try:
+            await bot.send_document(
+                chat_id=user_id,
+                document=document,
+                caption=(
+                    f"ðŸŽ‰ Slaydingiz tayyor!\n"
+                    f"ðŸ“Œ Mavzu: {req.topic}\n"
+                    f"ðŸŽ¨ Shabloni: {req.template.replace('_', ' ').capitalize()}\n"
+                    f"ðŸ“Š Slaydlar: {req.slides + 1} ta (titul bilan)"
+                ),
+            )
+        except TelegramForbiddenError as exc:
+            logger.warning("Foydalanuvchi %s botni bloklagan yoki /start bosmagan", user_id)
+            raise HTTPException(
+                status_code=409,
+                detail="Faylni yuborib bo'lmadi. Botga /start yuboring va qayta urinib ko'ring.",
+            ) from exc
+        except Exception as exc:
+            logger.exception("Tayyor faylni Telegram foydalanuvchisiga yuborib bo'lmadi")
+            raise HTTPException(
+                status_code=502,
+                detail="Faylni Telegram'ga yuborib bo'lmadi. Qayta urinib ko'ring.",
+            ) from exc
+
+        success = True
+        return {"success": True, "message": "Slayd Telegram orqali yuborildi."}
+    except HTTPException as exc:
+        if exc.status_code in (502, 503, 504):
+            await notify_admins(f"âš ï¸ Slayd xatosi (kod {exc.status_code}): {exc.detail}")
+        raise
+    except Exception as exc:
+        logger.exception("Slayd yaratishda kutilmagan xatolik")
+        await notify_admins("âš ï¸ Slaydda kutilmagan xatolik. Railway loglarini tekshiring.")
+        raise HTTPException(
+            status_code=500,
+            detail="Slayd yaratishda xatolik yuz berdi.",
+        ) from exc
+    finally:
+        _active_users.discard(user_id)
+        if not success:
+            await asyncio.shield(refund_rate_limit(reservation_id))
+        await track_order(user_id, "slayd", success, time.monotonic() - started)
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except OSError:
+            logger.warning("Vaqtinchalik faylni o'chirib bo'lmadi: %s", file_path)
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=PORT, workers=1)
