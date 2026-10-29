@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import hmac
 import html
+import io
 import json
 import logging
 import math
@@ -35,7 +36,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     WebAppInfo,
 )
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from google import genai
@@ -47,6 +48,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm
 from docx.shared import Pt as DocPt
+from PIL import Image
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
@@ -2613,7 +2615,7 @@ async def document_btn_handler(message: types.Message, state: FSMContext):
 
     min_price = 4000 if kind in ("referat", "mustaqil") else (PRICING.get(kind, 3000) if isinstance(PRICING.get(kind), int) else 3000)
 
-    # Agar bepuli tugagan, obunasi yo'q va puli yetmasa -> Darhol to'lov oynasi (2-rasmdagi kabi)
+    # Agar bepuli tugagan, obunasi yo'q va puli yetmasa -> Darhol to'lov oynasi
     if not is_free and not is_sub_valid and account["balance"] < min_price:
         await message.answer(
             "❗️ <b>Balansingizda yetarli mablag' mavjud emas!</b>",
@@ -3085,7 +3087,7 @@ async def lifespan(app: FastAPI):
         logger.info("Ilova to'xtatildi.")
 
 
-app = FastAPI(title="Slide AI Generator", version="3.5.0", lifespan=lifespan)
+app = FastAPI(title="Slide AI Generator", version="3.6.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
@@ -3231,6 +3233,74 @@ async def api_generate_slide(req: SlideRequest):
                 os.remove(file_path)
         except OSError:
             logger.warning("Vaqtinchalik faylni o'chirib bo'lmadi: %s", file_path)
+
+
+# =========================================================
+# RASMLARDAN PDF YARATISH ENDPOINTI (MINI APP UCHUN)
+# =========================================================
+@app.post("/api/images-to-pdf")
+async def api_images_to_pdf(
+    init_data: str = Form(...),
+    page_size: str = Form("a4"),
+    files: list[UploadFile] = File(...)
+):
+    auth = verify_telegram_init_data(init_data)
+    user_id = auth["user_id"]
+    await track_user(user_id, auth["user"].get("first_name"), auth["user"].get("username"))
+
+    if not files:
+        raise HTTPException(status_code=400, detail="Hech qanday rasm yuklanmadi.")
+
+    pdf_images = []
+    A4_SIZE = (2480, 3508)
+
+    for file in files:
+        try:
+            content = await file.read()
+            img = Image.open(io.BytesIO(content))
+            
+            # Rang rejimini RGB ga o'girish (PNG/RGBA shaffoflik xatosini oldini olish uchun)
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+
+            if page_size == "a4":
+                a4_canvas = Image.new("RGB", A4_SIZE, (255, 255, 255))
+                img.thumbnail(A4_SIZE, Image.Resampling.LANCZOS)
+                offset = (
+                    (A4_SIZE[0] - img.size[0]) // 2,
+                    (A4_SIZE[1] - img.size[1]) // 2
+                )
+                a4_canvas.paste(img, offset)
+                pdf_images.append(a4_canvas)
+            else:
+                pdf_images.append(img)
+        except Exception as e:
+            logger.warning("Rasm ochishda xatolik: %s", e)
+            continue
+
+    if not pdf_images:
+        raise HTTPException(status_code=400, detail="Yuklangan rasmlarni qayta ishlab bo'lmadi.")
+
+    file_path = os.path.join(tempfile.gettempdir(), f"doc_{uuid.uuid4().hex[:8]}.pdf")
+    try:
+        first_img = pdf_images[0]
+        other_imgs = pdf_images[1:] if len(pdf_images) > 1 else []
+        first_img.save(file_path, "PDF", save_all=True, append_images=other_imgs, resolution=100.0)
+
+        doc = types.FSInputFile(file_path, filename=f"hujjat_{uuid.uuid4().hex[:6]}.pdf")
+        await bot.send_document(
+            chat_id=user_id,
+            document=doc,
+            caption=f"📄 <b>PDF faylingiz tayyorlandi!</b>\n🖼 Sahifalar soni: {len(pdf_images)} ta",
+            parse_mode="HTML"
+        )
+        return {"success": True, "pages": len(pdf_images)}
+    except Exception:
+        logger.exception("PDF yaratishda xato yuz berdi")
+        raise HTTPException(status_code=500, detail="PDF tayyorlashda xatolik yuz berdi.")
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
 
 if __name__ == "__main__":
