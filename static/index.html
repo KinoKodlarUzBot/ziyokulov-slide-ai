@@ -40,29 +40,33 @@
     }
 
     /* ---------- Yuqori qator: tablar + balans ---------- */
-    .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
     .tabs {
       display: flex;
       gap: 2px;
-      padding: 5px;
+      padding: 4px;
       border-radius: 999px;
       background: rgba(255, 255, 255, .05);
       border: 1px solid var(--line);
+      overflow-x: auto;
+      scrollbar-width: none;
     }
+    .tabs::-webkit-scrollbar { display: none; }
     .tab {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       border: none;
       background: transparent;
       color: var(--hint);
-      padding: 9px 13px;
+      padding: 8px 12px;
       border-radius: 999px;
       font: inherit;
       font-weight: 700;
-      font-size: 15px;
+      font-size: 14px;
       cursor: pointer;
+      white-space: nowrap;
       transition: background .15s, color .15s;
     }
     .tab .lb { display: none; }
@@ -72,18 +76,19 @@
     .limit {
       display: flex;
       align-items: center;
-      gap: 7px;
-      padding: 11px 15px;
+      gap: 6px;
+      padding: 10px 14px;
       border-radius: 999px;
       background: linear-gradient(135deg, var(--gold-soft), var(--gold));
       color: var(--gold-ink);
       font-weight: 800;
-      font-size: 14px;
+      font-size: 13px;
       box-shadow: 0 6px 20px rgba(245, 183, 61, .28);
       white-space: nowrap;
       cursor: pointer;
       border: none;
       transition: transform .1s;
+      flex-shrink: 0;
     }
     .limit:active { transform: scale(.96); }
 
@@ -319,9 +324,9 @@
     .sname { margin: 9px 3px 0; font-size: 14px; font-weight: 800; }
     .sdesc { margin: 1px 3px 0; font-size: 12px; color: var(--hint); }
 
-    /* ---------- Alifbo tanlash ---------- */
+    /* ---------- Alifbo va Segmentlar ---------- */
     .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 5px; border-radius: 16px; background: rgba(255, 255, 255, .05); border: 1px solid var(--line); }
-    .seg button { border: none; background: transparent; color: var(--hint); padding: 13px; border-radius: 12px; font: inherit; font-weight: 800; font-size: 15px; cursor: pointer; }
+    .seg button { border: none; background: transparent; color: var(--hint); padding: 11px; border-radius: 12px; font: inherit; font-weight: 800; font-size: 14px; cursor: pointer; }
     .seg button.on { background: var(--gold); color: var(--gold-ink); }
 
     /* ---------- Asosiy tugma ---------- */
@@ -396,6 +401,185 @@
     }
     .chip.active { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
     .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px 13px; }
+
+    /* ---------- Hujjatlar va Asboblar Tabi Stili ---------- */
+    .tool-banner {
+      background: linear-gradient(135deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .02));
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 22px 16px;
+      text-align: center;
+      margin-top: 10px;
+    }
+    .tool-banner-icon { font-size: 42px; margin-bottom: 6px; }
+    .tool-banner h3 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
+    .tool-banner p { margin: 0 0 16px; font-size: 13px; color: var(--hint); }
+    .btn-upload {
+      background: #ffffff;
+      color: #111;
+      border: none;
+      font-weight: 800;
+      padding: 11px 26px;
+      border-radius: 999px;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(255,255,255,.2);
+    }
+    .btn-upload:active { transform: scale(.96); }
+
+    .tool-action-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255, 255, 255, .05);
+      border: 1px solid var(--line);
+      padding: 14px 16px;
+      border-radius: 20px;
+      margin-top: 14px;
+      cursor: pointer;
+      transition: border-color .15s;
+    }
+    .tool-action-card:active { border-color: var(--gold); }
+    .tool-ac-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 17px;
+    }
+    .tool-ac-icon.orange { background: #f59e0b; color: #fff; }
+    .tool-ac-info { flex: 1; display: flex; flex-direction: column; }
+    .tool-ac-info b { font-size: 15px; margin-bottom: 2px; }
+    .tool-ac-info span { font-size: 12px; color: var(--hint); }
+    .tag { font-size: 11px; font-weight: 800; color: #f59e0b; background: rgba(245, 158, 11, .15); padding: 4px 8px; border-radius: 8px; }
+
+    .tools-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .tool-card {
+      background: rgba(255, 255, 255, .04);
+      border: 1px solid var(--line);
+      padding: 14px 12px;
+      border-radius: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      cursor: pointer;
+      transition: border-color .15s;
+    }
+    .tool-card:active { border-color: var(--gold); }
+    .t-badge {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 900;
+      color: #fff;
+    }
+    .t-badge.blue { background: #2563eb; }
+    .t-badge.purple { background: #9333ea; }
+    .t-badge.red { background: #dc2626; }
+    .t-badge.gray { background: #475569; }
+    .t-badge.green { background: #16a34a; }
+    .tool-card b { font-size: 13px; line-height: 1.25; display: block; }
+    .tool-card span { font-size: 11px; color: var(--hint); line-height: 1.2; display: block; }
+
+    /* ---------- Rasmlardan PDF Qilish Bo'limi ---------- */
+    .img2pdf-box {
+      margin-top: 10px;
+      background: rgba(255, 255, 255, .03);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 18px 16px;
+    }
+    .img2pdf-head h2 { font-size: 20px; font-weight: 800; margin: 0 0 4px; }
+    .img2pdf-head p { font-size: 13px; color: var(--hint); margin: 0 0 16px; }
+
+    .img-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .img-thumb-box {
+      position: relative;
+      height: 115px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: rgba(0, 0, 0, .3);
+    }
+    .img-thumb-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .img-thumb-num {
+      position: absolute;
+      bottom: 6px;
+      left: 6px;
+      background: rgba(0, 0, 0, .75);
+      color: #fff;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      font-size: 11px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .img-thumb-del {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: rgba(255, 59, 48, .9);
+      color: #fff;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      border: none;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .add-img-box {
+      height: 115px;
+      border-radius: 16px;
+      border: 2px dashed rgba(255, 255, 255, .2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--hint);
+      cursor: pointer;
+      gap: 4px;
+      transition: border-color .15s;
+    }
+    .add-img-box:active { border-color: var(--gold); color: var(--gold); }
+    .add-img-box .plus-icon { font-size: 26px; font-weight: 300; line-height: 1; }
+    .add-img-box span { font-size: 12px; font-weight: 700; }
+
+    .size-selector {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      font-size: 14px;
+      color: var(--text);
+    }
 
     /* ---------- Yordam tabi ---------- */
     .help-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
@@ -515,7 +699,8 @@
   <main class="app">
     <header class="top">
       <nav class="tabs" id="tabs" aria-label="Bo'limlar">
-        <button class="tab active" type="button" data-tab="create"><span class="ic">✨</span><span class="lb">Yaratish</span></button>
+        <button class="tab active" type="button" data-tab="create"><span class="ic">✨</span><span class="lb">Slayd</span></button>
+        <button class="tab" type="button" data-tab="docs"><span class="ic">📄</span><span class="lb">Hujjatlar</span></button>
         <button class="tab" type="button" data-tab="topics"><span class="ic">🔥</span><span class="lb">Mavzular</span></button>
         <button class="tab" type="button" data-tab="help"><span class="ic">❓</span><span class="lb">Yordam</span></button>
       </nav>
@@ -527,7 +712,7 @@
 
     <p class="count" id="count"></p>
 
-    <!-- ===== Yaratish ===== -->
+    <!-- ===== 1. Slayd Yaratish ===== -->
     <section class="panel active" id="panel-create">
       <div class="search">
         <input id="topic" type="text" maxlength="200" enterkeyhint="go" autocomplete="off"
@@ -563,22 +748,104 @@
       <p class="note">Taqdimot 6 ta slayddan iborat: muqova va 5 ta mazmunli slayd.</p>
     </section>
 
-    <!-- ===== Mavzular ===== -->
+    <!-- ===== 2. Hujjatlar & Rasmlardan PDF ===== -->
+    <section class="panel" id="panel-docs">
+      <!-- Rasmlardan PDF bo'limi -->
+      <div class="img2pdf-box">
+        <div class="img2pdf-head">
+          <h2>1 ta rasm — bitta PDF</h2>
+          <p>Rasmlarni tanlang, bitta sifatli PDF qilib beraman</p>
+        </div>
+
+        <div class="img-preview-grid" id="preview-grid">
+          <div class="add-img-box" id="btn-add-img">
+            <span class="plus-icon">+</span>
+            <span>Qo'shish</span>
+          </div>
+        </div>
+
+        <input type="file" id="img-file-input" multiple accept="image/*" style="display:none">
+
+        <div class="size-selector">
+          <span>Sahifa o'lchami:</span>
+          <div class="seg" style="max-width: 240px;">
+            <button type="button" id="size-a4" class="on">A4</button>
+            <button type="button" id="size-fit">Asl o'lcham</button>
+          </div>
+        </div>
+
+        <button class="submit" id="btn-make-pdf" type="button" disabled style="margin-top: 10px;">
+          <span class="spinner" id="pdf-spinner"></span>
+          <span id="pdf-btn-text">PDF yaratish</span>
+        </button>
+        <div class="message" id="pdf-message"></div>
+      </div>
+
+      <!-- Tarjima / Kirill-Lotin kartasi -->
+      <div class="tool-action-card" onclick="alert('Ushbu xizmat bot chatida ishlaydi. Botga matn yuboring!')">
+        <div class="tool-ac-icon orange">Aa</div>
+        <div class="tool-ac-info">
+          <b>Tarjima va Kirill ↔ Lotin</b>
+          <span>Jadval, shrift va qoliplar joyida qoladi</span>
+        </div>
+        <span class="tag">UZ·RU·EN</span>
+      </div>
+
+      <div class="sec-head" style="margin-top: 24px;">
+        <h2>Barcha amallar</h2>
+      </div>
+
+      <div class="tools-grid">
+        <div class="tool-card" onclick="alert('Word yoki PowerPoint faylingizni bot chatiga yuboring!')">
+          <div class="t-badge blue">W</div>
+          <div>
+            <b>Hujjatni PDF qilish</b>
+            <span>Word, PowerPoint, Excel</span>
+          </div>
+        </div>
+
+        <div class="tool-card" onclick="document.getElementById('img-file-input').click()">
+          <div class="t-badge purple">JPG</div>
+          <div>
+            <b>Rasmlardan PDF</b>
+            <span>Bitta yoki ko'p rasm ➔ 1 fayl</span>
+          </div>
+        </div>
+
+        <div class="tool-card" onclick="alert('PDF faylingizni bot chatiga yuboring!')">
+          <div class="t-badge red">PDF</div>
+          <div>
+            <b>PDF ➔ rasm</b>
+            <span>Har sahifa alohida JPG</span>
+          </div>
+        </div>
+
+        <div class="tool-card" onclick="alert('Rasmni bot chatiga yuboring, matnini ajratib beraman!')">
+          <div class="t-badge green">OCR</div>
+          <div>
+            <b>Rasmdan matn</b>
+            <span>Suratdagi yozuvni o'qish</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 3. Mavzular ===== -->
     <section class="panel" id="panel-topics">
       <div class="chips" id="cats"></div>
       <div class="grid" id="grid"></div>
     </section>
 
-    <!-- ===== Yordam ===== -->
+    <!-- ===== 4. Yordam ===== -->
     <section class="panel" id="panel-help">
       <div class="sec-head"><h2>Nimalar qila olaman</h2></div>
       <ul class="help-list">
         <li><span class="hi">✨</span><div><b>Slayd yaratish</b><span>Mavzuni yozasiz, PowerPoint taqdimot fayli to'g'ridan-to'g'ri Telegram chatingizga keladi.</span></div></li>
+        <li><span class="hi">📄</span><div><b>Rasmlardan PDF</b><span>Bir nechta fotosuratlarni A4 formatdagi sifatli bitta PDF hujjatga aylantiring.</span></div></li>
         <li><span class="hi">🎨</span><div><b>15 xil uslub va tuzilish</b><span>2 ustun, gorizontal bosqichlar, iqtibos, asimmetrik va minimal ro'yxatlar.</span></div></li>
         <li><span class="hi">🎁</span><div><b>1-martalik Bepul sinov</b><span>Har bir yangi foydalanuvchi birinchi buyurtmasini mutlaqo bepul oladi!</span></div></li>
         <li><span class="hi">💳</span><div><b>Click orqali to'lov</b><span>Balansingizni yuqoridagi tugma orqali osongina to'ldirishingiz mumkin.</span></div></li>
         <li><span class="hi">💎</span><div><b>Obuna paketlari</b><span>Lite, Pro va Ultra obunalari orqali xizmatlardan yanada arzonroq foydalaning.</span></div></li>
-        <li><span class="hi">📱</span><div><b>Faylni qanday ochaman?</b><span>PowerPoint, WPS Office yoki Google Slides ilovasi orqali oching.</span></div></li>
       </ul>
     </section>
   </main>
@@ -783,7 +1050,6 @@
         if (e.target === payModal) closeModal();
       });
 
-      // Mini App orqali to'lov yuborish (Telegram chatiga buyruq yuborish)
       document.querySelectorAll(".btn-topup").forEach(function (btn) {
         btn.addEventListener("click", function () {
           var amt = btn.getAttribute("data-amount");
@@ -816,7 +1082,7 @@
         for (var j = 0; j < panels.length; j++) {
           panels[j].classList.toggle("active", panels[j].id === "panel-" + name);
         }
-        countEl.style.display = name === "help" ? "none" : "";
+        countEl.style.display = (name === "help" || name === "docs") ? "none" : "";
         window.scrollTo(0, 0);
         haptic("select");
       }
@@ -1020,7 +1286,6 @@
           try { data = await response.json(); } catch (e) { }
 
           if (!response.ok) {
-            // Agar balans yetarli bo'lmasa (Status 402), to'lov oynasini ochamiz
             if (response.status === 402) {
               openModal();
               showMessage("error", extractError(data, response.status));
@@ -1048,7 +1313,153 @@
         }
       }
 
-      // ---------- Hodisalar ----------
+      // =========================================================
+      // RASMLARDAN PDF YARATISH MANTIQI (HUJJATLAR TABI)
+      // =========================================================
+      var selectedPdfFiles = [];
+      var selectedPdfSize = "a4";
+
+      var btnAddImg = document.getElementById("btn-add-img");
+      var imgFileInput = document.getElementById("img-file-input");
+      var previewGrid = document.getElementById("preview-grid");
+      var sizeA4Btn = document.getElementById("size-a4");
+      var sizeFitBtn = document.getElementById("size-fit");
+      var btnMakePdf = document.getElementById("btn-make-pdf");
+      var pdfSpinner = document.getElementById("pdf-spinner");
+      var pdfBtnText = document.getElementById("pdf-btn-text");
+      var pdfMessage = document.getElementById("pdf-message");
+
+      function showPdfMessage(kind, text) {
+        pdfMessage.className = "message show " + kind;
+        pdfMessage.textContent = text;
+      }
+      function hidePdfMessage() {
+        pdfMessage.className = "message";
+        pdfMessage.textContent = "";
+      }
+
+      btnAddImg.addEventListener("click", function () {
+        imgFileInput.click();
+      });
+
+      imgFileInput.addEventListener("change", function (e) {
+        var files = Array.from(e.target.files);
+        if (files.length) {
+          selectedPdfFiles = selectedPdfFiles.concat(files);
+          renderPdfThumbs();
+        }
+        imgFileInput.value = "";
+      });
+
+      sizeA4Btn.addEventListener("click", function () {
+        selectedPdfSize = "a4";
+        sizeA4Btn.classList.add("on");
+        sizeFitBtn.classList.remove("on");
+        haptic("select");
+      });
+
+      sizeFitBtn.addEventListener("click", function () {
+        selectedPdfSize = "fit";
+        sizeFitBtn.classList.add("on");
+        sizeA4Btn.classList.remove("on");
+        haptic("select");
+      });
+
+      function renderPdfThumbs() {
+        hidePdfMessage();
+        previewGrid.innerHTML = "";
+
+        selectedPdfFiles.forEach(function (file, index) {
+          var box = el("div", "img-thumb-box");
+          var img = el("img");
+          img.src = URL.createObjectURL(file);
+
+          var num = el("span", "img-thumb-num", (index + 1).toString());
+          var del = el("button", "img-thumb-del", "✕");
+          del.type = "button";
+          del.addEventListener("click", function (ev) {
+            ev.stopPropagation();
+            selectedPdfFiles.splice(index, 1);
+            renderPdfThumbs();
+            haptic("select");
+          });
+
+          box.appendChild(img);
+          box.appendChild(num);
+          box.appendChild(del);
+          previewGrid.appendChild(box);
+        });
+
+        // + Qo'shish katagini qayta joylash
+        var addBox = el("div", "add-img-box");
+        addBox.appendChild(el("span", "plus-icon", "+"));
+        addBox.appendChild(el("span", "", "Qo'shish"));
+        addBox.addEventListener("click", function () {
+          imgFileInput.click();
+        });
+        previewGrid.appendChild(addBox);
+
+        btnMakePdf.disabled = selectedPdfFiles.length === 0;
+        pdfBtnText.textContent = selectedPdfFiles.length > 0 ? "PDF yaratish (" + selectedPdfFiles.length + " ta)" : "PDF yaratish";
+      }
+
+      async function makePdf() {
+        if (!selectedPdfFiles.length) return;
+        hidePdfMessage();
+
+        if (!initData) {
+          showPdfMessage("error", "Bu sahifani Telegram bot ichida oching.");
+          haptic("error");
+          return;
+        }
+
+        btnMakePdf.disabled = true;
+        btnMakePdf.classList.add("loading");
+        pdfSpinner.style.display = "block";
+        pdfBtnText.textContent = "PDF tayyorlanmoqda...";
+        showPdfMessage("info", "Rasmlar qayta ishlanib, PDF shakllanmoqda. Biroz kuting...");
+
+        var formData = new FormData();
+        formData.append("init_data", initData);
+        formData.append("page_size", selectedPdfSize);
+
+        selectedPdfFiles.forEach(function (file) {
+          formData.append("files", file);
+        });
+
+        try {
+          var res = await fetch("/api/images-to-pdf", {
+            method: "POST",
+            body: formData
+          });
+
+          var data = null;
+          try { data = await res.json(); } catch (e) { }
+
+          if (!res.ok) {
+            showPdfMessage("error", (data && data.detail) ? data.detail : "PDF yaratishda xatolik yuz berdi.");
+            haptic("error");
+            return;
+          }
+
+          showPdfMessage("success", "✅ PDF fayl tayyorlandi va Telegram chatingizga yuborildi!");
+          haptic("success");
+          selectedPdfFiles = [];
+          renderPdfThumbs();
+        } catch (err) {
+          showPdfMessage("error", "Serverga ulanishda xatolik yuz berdi. Internetni tekshiring.");
+          haptic("error");
+        } finally {
+          btnMakePdf.disabled = selectedPdfFiles.length === 0;
+          btnMakePdf.classList.remove("loading");
+          pdfSpinner.style.display = "none";
+          pdfBtnText.textContent = "PDF yaratish";
+        }
+      }
+
+      btnMakePdf.addEventListener("click", makePdf);
+
+      // ---------- Boshqa hodisalar ----------
       topicEl.addEventListener("input", updateCounter);
       topicEl.addEventListener("keydown", function (event) {
         if (event.key === "Enter") { event.preventDefault(); topicEl.blur(); generate(); }
