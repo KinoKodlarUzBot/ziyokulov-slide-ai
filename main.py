@@ -13,6 +13,7 @@ import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 from urllib.parse import parse_qsl
@@ -24,10 +25,13 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
     BotCommand,
+    ContentType,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
+    LabeledPrice,
     MenuButtonWebApp,
+    PreCheckoutQuery,
     ReplyKeyboardMarkup,
     WebAppInfo,
 )
@@ -79,7 +83,11 @@ WEBAPP_URL = os.getenv(
 ).strip().rstrip("/")
 PORT = int(os.getenv("PORT", "8080"))
 
-# ASOSIY VA ZAXIRA MODELLAR (Oldingi to'g'ri ishlagan holati):
+PAYMENT_PROVIDER_TOKEN = os.getenv(
+    "PAYMENT_PROVIDER_TOKEN",
+    "398062629:TEST:999999999_F91D8F69C042267444B74CC0B3C747757EB0E065",
+).strip()
+
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite").strip()
 GEMINI_FALLBACK_MODELS = [
     m.strip()
@@ -122,6 +130,44 @@ PAGE_TIERS = {
     "kurs": [(10, 15), (15, 20), (20, 25), (25, 30), (30, 35), (35, 40), (40, 45)],
 }
 
+# =========================================================
+# NARXLAR VA OBUNALAR
+# =========================================================
+PRICING = {
+    "slayd": {3: 3000, 4: 3000, 5: 5000},
+    "referat": {3: 4000, 4: 5000, 5: 6000},
+    "mustaqil": {3: 4000, 4: 5000, 5: 6000},
+    "kurs": 10000,
+    "test": 2500,
+    "maqola": 3000,
+    "tezis": 3000,
+    "krossvord": 3000,
+}
+
+SUBSCRIPTIONS = {
+    "sub_lite": {
+        "title": "🔹 Lite (3 kun)",
+        "days": 3,
+        "price": 14900,
+        "daily_limit": 3,
+        "desc": "3 kun davomida kuniga 3 tagacha bepul generatsiya"
+    },
+    "sub_pro": {
+        "title": "⭐ Pro (10 kun)",
+        "days": 10,
+        "price": 29900,
+        "daily_limit": 5,
+        "desc": "10 kun davomida kuniga 5 tagacha bepul generatsiya"
+    },
+    "sub_ultra": {
+        "title": "👑 Ultra (30 kun)",
+        "days": 30,
+        "price": 59900,
+        "daily_limit": 10,
+        "desc": "30 kun davomida kuniga 10 tagacha bepul generatsiya"
+    }
+}
+
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN Railway Variables bo'limida sozlanmagan.")
 if not GEMINI_API_KEY:
@@ -143,7 +189,6 @@ generation_semaphore = asyncio.Semaphore(MAX_CONCURRENT_GENERATIONS)
 # 15 XIL SHABLON VA TURFA XIL ICHKI TUZILISH SOZLAMALARI
 # =========================================================
 TEMPLATE_STYLES = {
-    # 1. 2 Ustunli qolip
     "classic": {
         "layout_type": "two_columns",
         "bg_color": RGBColor(255, 255, 255),
@@ -171,8 +216,6 @@ TEMPLATE_STYLES = {
         "card": RGBColor(255, 255, 255),
         "cover_accent": RGBColor(17, 94, 89),
     },
-
-    # 2. Gorizontal bosqichlar (3 ta karta)
     "business": {
         "layout_type": "horizontal_cards",
         "bg_color": RGBColor(248, 250, 252),
@@ -200,8 +243,6 @@ TEMPLATE_STYLES = {
         "card": RGBColor(255, 255, 255),
         "cover_accent": RGBColor(51, 65, 85),
     },
-
-    # 3. Katta g'oya (Hero)
     "dark": {
         "layout_type": "hero_focus",
         "bg_color": RGBColor(17, 24, 39),
@@ -220,8 +261,6 @@ TEMPLATE_STYLES = {
         "card": RGBColor(255, 255, 255),
         "cover_accent": RGBColor(190, 24, 93),
     },
-
-    # 4. Asimmetrik split (Chap dominant)
     "swiss_clean": {
         "layout_type": "split_feature",
         "bg_color": RGBColor(255, 255, 255),
@@ -249,8 +288,6 @@ TEMPLATE_STYLES = {
         "card": RGBColor(30, 41, 59),
         "cover_accent": RGBColor(202, 138, 4),
     },
-
-    # 5. Chiziqli va ro'yxat qoliplari
     "minimal": {
         "layout_type": "minimal_rows",
         "bg_color": RGBColor(240, 253, 244),
@@ -288,13 +325,6 @@ TEMPLATE_STYLES = {
         "cover_accent": RGBColor(2, 132, 199),
     },
 }
-
-TemplateNameType = Literal[
-    "classic", "business", "dark", "minimal",
-    "swiss_clean", "cyber_tech", "warm_editorial", "sunset_punch",
-    "ocean_breeze", "monochrome", "emerald_wealth", "berry_creative",
-    "titanium_slate", "midnight_gold", "nordic_frost"
-]
 
 
 # =========================================================
@@ -359,7 +389,7 @@ def verify_telegram_init_data(init_data: str) -> dict:
 
 
 # =========================================================
-# RATE LIMITER
+# RATE LIMITER & DATABASE
 # =========================================================
 class RateLimiter:
     def __init__(self, db_path: str, limit: int, window_seconds: int):
@@ -385,7 +415,12 @@ class RateLimiter:
             "first_seen REAL NOT NULL, "
             "last_seen REAL NOT NULL, "
             "free_used INTEGER NOT NULL DEFAULT 0, "
-            "credits INTEGER NOT NULL DEFAULT 0)"
+            "balance INTEGER NOT NULL DEFAULT 0, "
+            "subscription_until REAL NOT NULL DEFAULT 0, "
+            "sub_tier TEXT NOT NULL DEFAULT '', "
+            "daily_used INTEGER NOT NULL DEFAULT 0, "
+            "last_used_date TEXT NOT NULL DEFAULT '', "
+            "alphabet TEXT NOT NULL DEFAULT 'latin')"
         )
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS orders ("
@@ -397,12 +432,102 @@ class RateLimiter:
             "duration REAL NOT NULL DEFAULT 0)"
         )
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created)")
+        
+        # Ustunlar mavjudligini tekshirish
         columns = {row[1] for row in self._conn.execute("PRAGMA table_info(users)")}
+        if "balance" not in columns:
+            self._conn.execute("ALTER TABLE users ADD COLUMN balance INTEGER NOT NULL DEFAULT 0")
+        if "subscription_until" not in columns:
+            self._conn.execute("ALTER TABLE users ADD COLUMN subscription_until REAL NOT NULL DEFAULT 0")
+        if "sub_tier" not in columns:
+            self._conn.execute("ALTER TABLE users ADD COLUMN sub_tier TEXT NOT NULL DEFAULT ''")
+        if "daily_used" not in columns:
+            self._conn.execute("ALTER TABLE users ADD COLUMN daily_used INTEGER NOT NULL DEFAULT 0")
+        if "last_used_date" not in columns:
+            self._conn.execute("ALTER TABLE users ADD COLUMN last_used_date TEXT NOT NULL DEFAULT ''")
         if "alphabet" not in columns:
-            self._conn.execute(
-                "ALTER TABLE users ADD COLUMN alphabet TEXT NOT NULL DEFAULT 'latin'"
-            )
+            self._conn.execute("ALTER TABLE users ADD COLUMN alphabet TEXT NOT NULL DEFAULT 'latin'")
         self._conn.commit()
+
+    def get_user_account(self, user_id: int) -> dict:
+        now = time.time()
+        today = datetime.now().strftime("%Y-%m-%d")
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT user_id, free_used, balance, subscription_until, sub_tier, daily_used, last_used_date, alphabet "
+                "FROM users WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+            if not row:
+                self._conn.execute(
+                    "INSERT INTO users (user_id, first_name, username, first_seen, last_seen, free_used, balance, subscription_until, sub_tier, daily_used, last_used_date, alphabet) "
+                    "VALUES (?, '', '', ?, ?, 0, 0, 0, '', 0, ?, 'latin')",
+                    (user_id, now, now, today),
+                )
+                self._conn.commit()
+                row = self._conn.execute(
+                    "SELECT user_id, free_used, balance, subscription_until, sub_tier, daily_used, last_used_date, alphabet "
+                    "FROM users WHERE user_id = ?",
+                    (user_id,),
+                ).fetchone()
+
+            if row[6] != today:
+                self._conn.execute(
+                    "UPDATE users SET daily_used = 0, last_used_date = ? WHERE user_id = ?",
+                    (today, user_id),
+                )
+                self._conn.commit()
+                row = self._conn.execute(
+                    "SELECT user_id, free_used, balance, subscription_until, sub_tier, daily_used, last_used_date, alphabet "
+                    "FROM users WHERE user_id = ?",
+                    (user_id,),
+                ).fetchone()
+
+        return {
+            "user_id": row[0],
+            "free_used": row[1],
+            "balance": row[2],
+            "subscription_until": row[3],
+            "sub_tier": row[4],
+            "daily_used": row[5],
+            "last_used_date": row[6],
+            "alphabet": row[7],
+        }
+
+    def update_balance(self, user_id: int, delta: int) -> int:
+        with self._lock:
+            self._conn.execute(
+                "UPDATE users SET balance = balance + ? WHERE user_id = ?",
+                (delta, user_id),
+            )
+            self._conn.commit()
+            (bal,) = self._conn.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,)).fetchone()
+            return bal
+
+    def mark_free_used(self, user_id: int) -> None:
+        with self._lock:
+            self._conn.execute("UPDATE users SET free_used = 1 WHERE user_id = ?", (user_id,))
+            self._conn.commit()
+
+    def activate_subscription(self, user_id: int, sub_key: str) -> float:
+        sub = SUBSCRIPTIONS[sub_key]
+        now = time.time()
+        with self._lock:
+            row = self._conn.execute("SELECT subscription_until FROM users WHERE user_id = ?", (user_id,)).fetchone()
+            current_until = row[0] if row else 0
+            start_point = max(now, current_until)
+            new_until = start_point + (sub["days"] * 86400)
+            self._conn.execute(
+                "UPDATE users SET subscription_until = ?, sub_tier = ? WHERE user_id = ?",
+                (new_until, sub_key, user_id),
+            )
+            self._conn.commit()
+            return new_until
+
+    def inc_daily_used(self, user_id: int) -> None:
+        with self._lock:
+            self._conn.execute("UPDATE users SET daily_used = daily_used + 1 WHERE user_id = ?", (user_id,))
+            self._conn.commit()
 
     def reserve(self, user_id: int) -> int | None:
         now = time.time()
@@ -1728,9 +1853,6 @@ def pick_card_font(bullets: list[str], card_h_in: float, text_w_in: float) -> in
     return 14
 
 
-# ---------------------------------------------------------
-# QOLIP RENDERLAR
-# ---------------------------------------------------------
 def render_two_columns(slide, data: dict, style: dict, accent: RGBColor) -> None:
     bullets = data["content"][:4]
     left_items = bullets[:2]
@@ -1888,9 +2010,6 @@ def render_classic_rows(slide, data: dict, style: dict, accent: RGBColor, square
         add_run(p, bullet, font_size, style["text_color"])
 
 
-# ---------------------------------------------------------
-# SLIDE BUILDERS
-# ---------------------------------------------------------
 def build_cover(prs, topic: str, style: dict, subtitle: str) -> None:
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     slide.background.fill.solid()
@@ -1978,7 +2097,7 @@ def generate_pptx(topic: str, slide_data: list[dict], template_style: str, outpu
 
 
 # =========================================================
-# BOT HANDLERS
+# BOT HANDLERS & PAYMENT FLOW
 # =========================================================
 BTN_SLIDE = "📕 Yangi taqdimot (Slayd)"
 BTN_SELF = "📘 Yangi mustaqil ish"
@@ -1988,6 +2107,8 @@ BTN_TEST = "📝 Test yaratish"
 BTN_ARTICLE = "📰 Maqola yaratish"
 BTN_THESIS = "📑 Tezis yaratish"
 BTN_CROSSWORD = "🧩 Krossvord yaratish"
+BTN_BALANCE = "💳 Balans / To'lov"
+BTN_SUBS = "💎 Obunalar"
 BTN_ALPHABET = "🔤 Alifbo"
 BTN_LIMIT = "📊 Limitim"
 BTN_HELP = "❓ Yordam"
@@ -2003,6 +2124,7 @@ KIND_BY_BUTTON = {
     BTN_CROSSWORD: "krossvord",
 }
 TOPIC_HINTS = {
+    "slayd": "Taqdimot mavzusini yozing",
     "referat": "Referat mavzusini yozing",
     "mustaqil": "Mustaqil ish mavzusini yozing",
     "kurs": "Kurs ishi mavzusini yozing",
@@ -2016,6 +2138,7 @@ ALPHABET_NAMES = {LATIN: "Lotin", KIRILL: "Кирилл"}
 
 class DocOrder(StatesGroup):
     waiting_topic = State()
+    waiting_outline = State()
 
 
 def main_keyboard() -> ReplyKeyboardMarkup:
@@ -2026,6 +2149,7 @@ def main_keyboard() -> ReplyKeyboardMarkup:
             [KeyboardButton(text=BTN_COURSE), KeyboardButton(text=BTN_TEST)],
             [KeyboardButton(text=BTN_ARTICLE), KeyboardButton(text=BTN_THESIS)],
             [KeyboardButton(text=BTN_CROSSWORD), KeyboardButton(text=BTN_ALPHABET)],
+            [KeyboardButton(text=BTN_BALANCE), KeyboardButton(text=BTN_SUBS)],
             [KeyboardButton(text=BTN_LIMIT), KeyboardButton(text=BTN_HELP)],
         ],
         resize_keyboard=True,
@@ -2045,7 +2169,7 @@ def open_app_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[[
             InlineKeyboardButton(
-                text="✨ Mini App’ni ochish",
+                text="✨ Mini App’ni ochish (15 xil dizayn)",
                 web_app=WebAppInfo(url=WEBAPP_URL),
             )
         ]]
@@ -2059,25 +2183,77 @@ def format_window(seconds: int) -> str:
     return f"{minutes} daqiqa"
 
 
+def outline_selection_keyboard(kind: str) -> InlineKeyboardMarkup:
+    pricing_map = PRICING[kind]
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=f"🟠 3 ta reja ({pricing_map[3]:,} so'm)", callback_data="reja_3")],
+            [InlineKeyboardButton(text=f"🟠 4 ta reja ({pricing_map[4]:,} so'm)", callback_data="reja_4")],
+            [InlineKeyboardButton(text=f"🟠 5 ta reja ({pricing_map[5]:,} so'm)", callback_data="reja_5")],
+            [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel_order")]
+        ]
+    )
+
+
+def topup_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="5 000 so'm", callback_data="topup_5000"),
+                InlineKeyboardButton(text="10 000 so'm", callback_data="topup_10000"),
+            ],
+            [
+                InlineKeyboardButton(text="20 000 so'm", callback_data="topup_20000"),
+                InlineKeyboardButton(text="50 000 so'm", callback_data="topup_50000"),
+            ],
+            [InlineKeyboardButton(text="💎 Chegirmali Obuna Olish", callback_data="open_subs_menu")],
+        ]
+    )
+
+
+def subscriptions_keyboard() -> InlineKeyboardMarkup:
+    rows = []
+    for key, item in SUBSCRIPTIONS.items():
+        rows.append([
+            InlineKeyboardButton(
+                text=f"{item['title']} — {item['price']:,} so'm",
+                callback_data=f"buy_{key}"
+            )
+        ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message, state: FSMContext):
     await state.clear()
-    if message.from_user:
-        await track_user(message.from_user.id, message.from_user.first_name, message.from_user.username)
+    user_id = message.from_user.id if message.from_user else 0
     name = html.escape(message.from_user.first_name) if message.from_user else "do'st"
+    await track_user(user_id, message.from_user.first_name if message.from_user else None,
+                     message.from_user.username if message.from_user else None)
+    
+    account = await asyncio.to_thread(rate_limiter.get_user_account, user_id)
+    now = time.time()
+    
+    sub_text = ""
+    if account["subscription_until"] > now:
+        sub_info = SUBSCRIPTIONS.get(account["sub_tier"], {})
+        days_left = max(1, int((account["subscription_until"] - now) // 86400))
+        sub_text = f"\n💎 <b>Obuna holati:</b> {sub_info.get('title', '')} ({days_left} kun qoldi, bugungi limit: {account['daily_used']}/{sub_info.get('daily_limit', 0)})"
+
+    free_text = "🎁 <b>Sizda 1 dona BEPUL xizmat sinovi mavjud!</b>\n" if account["free_used"] == 0 else ""
+
     await message.answer(
         f"👋 <b>Xush kelibsiz, {name}!</b>\n\n"
         "Men o'zbek tilida tayyor taqdimot va akademik ishlar tayyorlayman:\n\n"
-        "📕 <b>Taqdimot (Slayd)</b> — PowerPoint fayl, 15 xil individual dizayn va turfa xil tuzilish (Mini App orqali).\n"
-        "📘 <b>Mustaqil ish</b> — reja, asosiy qism, xulosa va nazorat savollari.\n"
-        "📄 <b>Referat</b> — titul varaq, reja va akademik matn.\n"
+        f"💰 <b>Balansingiz:</b> {account['balance']:,} so'm\n"
+        f"{free_text}"
+        f"{sub_text}\n"
+        "📕 <b>Taqdimot (Slayd)</b> — PowerPoint fayl, 15 xil individual dizayn.\n"
+        "📘 <b>Mustaqil ish / Referat</b> — reja, mundarija, xulosa va nazorat savollari.\n"
         "📚 <b>Kurs ishi</b> — reja, kirish, 3 bob, xulosa va adabiyotlar.\n"
         "📰 <b>Ilmiy maqola</b> va 📑 <b>Tezis</b> — konferensiya va jurnallar uchun.\n"
-        "📝 <b>Test</b> — 10 ta savol va javoblar kaliti.\n"
-        "🧩 <b>Krossvord</b> — savollar va javoblar bilan, chop etishga tayyor.\n\n"
-        "🔤 <b>Alifbo</b> orqali fayllarni lotin yoki kirill yozuvida olasiz.\n"
-        "📊 Qancha so'rov qolganini <b>Limitim</b> orqali ko'rasiz.\n"
-        "👇 Pastdagi tugmalardan birini tanlang.",
+        "📝 <b>Test</b> va 🧩 <b>Krossvord</b> — chop etishga tayyor formatda.\n\n"
+        "👇 Xizmatlardan birini tanlang:",
         reply_markup=main_keyboard(),
         parse_mode="HTML",
     )
@@ -2090,13 +2266,129 @@ async def cancel_cmd(message: types.Message, state: FSMContext):
     await message.answer("Bekor qilindi. Kerakli bo'limni tanlang 👇", reply_markup=main_keyboard())
 
 
+@dp.callback_query(F.data == "cancel_order")
+async def cancel_callback(call: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    try:
+        await call.message.edit_text("❌ Jarayon bekor qilindi.")
+    except Exception:
+        pass
+    await call.message.answer("Asosiy menyu 👇", reply_markup=main_keyboard())
+
+
+@dp.message(F.text == BTN_BALANCE)
+async def balance_cmd(message: types.Message):
+    account = await asyncio.to_thread(rate_limiter.get_user_account, message.from_user.id)
+    await message.answer(
+        f"💳 <b>Sizning balansingiz:</b> {account['balance']:,} so'm\n\n"
+        "Balansni to'ldirish uchun summani tanlang:",
+        reply_markup=topup_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+@dp.message(F.text == BTN_SUBS)
+@dp.callback_query(F.data == "open_subs_menu")
+async def subscriptions_cmd(event: types.Message | types.CallbackQuery):
+    text = (
+        "💎 <b>Chegirmali Obuna Paketlari:</b>\n\n"
+        "Obuna orqali har bir generatsiyani eng arzon narxda olasiz:\n\n"
+        "🔹 <b>Lite (3 kun)</b> — 14 900 so'm (Kuniga 3 tagacha bepul ish)\n"
+        "⭐ <b>Pro (10 kun)</b> — 29 900 so'm (Kuniga 5 tagacha bepul ish)\n"
+        "👑 <b>Ultra (30 kun)</b> — 59 900 so'm (Kuniga 10 tagacha bepul ish)\n\n"
+        "Kerakli obunani tanlang:"
+    )
+    if isinstance(event, types.CallbackQuery):
+        await event.message.answer(text, reply_markup=subscriptions_keyboard(), parse_mode="HTML")
+        await event.answer()
+    else:
+        await event.answer(text, reply_markup=subscriptions_keyboard(), parse_mode="HTML")
+
+
+@dp.callback_query(F.data.startswith("topup_"))
+async def topup_payment_handler(callback: types.CallbackQuery):
+    amount = int(callback.data.split("_")[1])
+    prices = [LabeledPrice(label="Balans to'ldirish", amount=amount * 100)] # UZS tiyinda
+    
+    await bot.send_invoice(
+        chat_id=callback.from_user.id,
+        title="Balansni to'ldirish",
+        description=f"Bot hisobingizni {amount:,} so'mga to'ldirish",
+        payload=f"topup_{callback.from_user.id}_{amount}",
+        provider_token=PAYMENT_PROVIDER_TOKEN,
+        currency="UZS",
+        prices=prices,
+        start_parameter="topup",
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("buy_sub_"))
+async def buy_sub_handler(callback: types.CallbackQuery):
+    sub_key = callback.data.replace("buy_", "")
+    sub = SUBSCRIPTIONS.get(sub_key)
+    if not sub:
+        await callback.answer("Noto'g'ri obuna tanlandi", show_alert=True)
+        return
+    prices = [LabeledPrice(label=sub["title"], amount=sub["price"] * 100)]
+
+    await bot.send_invoice(
+        chat_id=callback.from_user.id,
+        title=f"Obuna: {sub['title']}",
+        description=sub["desc"],
+        payload=f"sub_{callback.from_user.id}_{sub_key}",
+        provider_token=PAYMENT_PROVIDER_TOKEN,
+        currency="UZS",
+        prices=prices,
+        start_parameter="subscription",
+    )
+    await callback.answer()
+
+
+@dp.pre_checkout_query()
+async def process_pre_checkout(pre_checkout: PreCheckoutQuery):
+    await bot.answer_pre_checkout_query(pre_checkout.id, ok=True)
+
+
+@dp.message(F.content_type == ContentType.SUCCESSFUL_PAYMENT)
+async def process_successful_payment(message: types.Message):
+    sp = message.successful_payment
+    payload = sp.invoice_payload
+
+    if payload.startswith("topup_"):
+        parts = payload.split("_")
+        amount = int(parts[2])
+        await asyncio.to_thread(rate_limiter.update_balance, message.from_user.id, amount)
+        account = await asyncio.to_thread(rate_limiter.get_user_account, message.from_user.id)
+        await message.answer(
+            f"✅ <b>To'lov qabul qilindi!</b>\n\n"
+            f"Hisobingizga <b>+{amount:,} so'm</b> qo'shildi.\n"
+            f"Joriy balans: <b>{account['balance']:,} so'm</b>",
+            reply_markup=main_keyboard(),
+            parse_mode="HTML",
+        )
+    elif payload.startswith("sub_"):
+        sub_key = payload.replace(f"sub_{message.from_user.id}_", "")
+        await asyncio.to_thread(rate_limiter.activate_subscription, message.from_user.id, sub_key)
+        sub = SUBSCRIPTIONS[sub_key]
+        await message.answer(
+            f"🎉 <b>Tabriklaymiz! {sub['title']} obunasi muvaffaqiyatli yoqildi!</b>\n\n"
+            f"Endi xizmatlardan qulay va chegirmali tartibda foydalanishingiz mumkin.",
+            reply_markup=main_keyboard(),
+            parse_mode="HTML",
+        )
+
+
 @dp.message(F.text == BTN_SLIDE)
 async def slide_btn(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer(
-        "Mini App’ni oching, 15 xil dizayn va tuzilishdan birini tanlang va mavzuni yozing 👇",
+        "Taqdimot yaratish uchun mavzuni yozing yoki pastdagi Mini App orqali 15 xil dizayndan tanlang 👇",
         reply_markup=open_app_keyboard(),
     )
+    await state.set_state(DocOrder.waiting_topic)
+    await state.update_data(kind="slayd")
+    await message.answer(topic_prompt_text("slayd"), reply_markup=cancel_keyboard())
 
 
 @dp.message(F.text == BTN_LIMIT)
@@ -2118,14 +2410,12 @@ async def help_btn(message: types.Message, state: FSMContext):
     await message.answer(
         "❓ <b>Qanday ishlaydi?</b>\n\n"
         "1. Pastdagi tugmalardan kerakli xizmatni tanlang.\n"
-        "2. Mavzuni yozing.\n"
-        "3. 30-90 soniyada tayyor fayl chatga keladi.\n\n"
-        "📱 <b>Slayd faylini</b> PowerPoint, WPS Office yoki Google Slides orqali oching.\n"
-        "📄 <b>Word fayllarni</b> Word, WPS Office yoki Google Docs bilan oching.\n"
-        "🔤 Fayl alifbosini <b>Alifbo</b> tugmasi orqali o'zgartirasiz.\n"
-        "📚 Kurs ishi 2-4 daqiqa vaqt olishi mumkin.\n\n"
-        "⚠️ AI xato qilishi mumkin: faktlar va nomlarni tekshirib oling."
-        + (f"\n\n📩 Savol yoki taklif: {html.escape(SUPPORT_CONTACT)}" if SUPPORT_CONTACT else ""),
+        "2. Mavzuni yozing va reja sonini tanlang.\n"
+        "3. Birinchi buyurtmangiz 100% BEPUL tayyorlanadi.\n"
+        "4. Keyingi buyurtmalarni hamyonbop narxlarda Click orqali xarid qilasiz.\n\n"
+        "📱 <b>Slayd:</b> PowerPoint, WPS Office yoki Google Slides bilan ochiladi.\n"
+        "📄 <b>Word fayllar:</b> Word, WPS Office yoki Google Docs bilan ochiladi."
+        + (f"\n\n📩 Aloqa: {html.escape(SUPPORT_CONTACT)}" if SUPPORT_CONTACT else ""),
         parse_mode="HTML",
         reply_markup=main_keyboard(),
     )
@@ -2179,32 +2469,17 @@ async def alphabet_choice(callback: types.CallbackQuery):
     await callback.answer(f"Tanlandi: {ALPHABET_NAMES[code]}")
 
 
-def pages_keyboard(kind: str) -> InlineKeyboardMarkup:
-    buttons = [
-        InlineKeyboardButton(text=f"{lo}–{hi} bet", callback_data=f"pg:{kind}:{lo}:{hi}")
-        for lo, hi in PAGE_TIERS[kind]
-    ]
-    rows = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
-    return InlineKeyboardMarkup(inline_keyboard=rows)
-
-
 def topic_prompt_text(kind: str) -> str:
-    return f"✍️ {TOPIC_HINTS[kind]}.\nMasalan: <i>Sun'iy intellektning ta'limdagi o'rni</i>"
+    hint = TOPIC_HINTS.get(kind, "Mavzuni yozing")
+    return f"✍️ {hint}.\nMasalan: <i>Sun'iy intellektning ta'limdagi o'rni</i>"
 
 
 @dp.message(F.text.in_(set(KIND_BY_BUTTON)))
 async def document_btn(message: types.Message, state: FSMContext):
     kind = KIND_BY_BUTTON[message.text]
-    if kind in PAGE_TIERS:
-        await state.clear()
-        await message.answer(
-            f"📏 <b>{DOC_KINDS[kind]['label']}</b> hajmini tanlang:",
-            parse_mode="HTML",
-            reply_markup=pages_keyboard(kind),
-        )
-        return
+    await state.clear()
     await state.set_state(DocOrder.waiting_topic)
-    await state.update_data(kind=kind, pages=None)
+    await state.update_data(kind=kind)
     await message.answer(
         topic_prompt_text(kind),
         parse_mode="HTML",
@@ -2212,35 +2487,149 @@ async def document_btn(message: types.Message, state: FSMContext):
     )
 
 
-@dp.callback_query(F.data.startswith("pg:"))
-async def pages_choice(callback: types.CallbackQuery, state: FSMContext):
-    parts = (callback.data or "").split(":")
-    try:
-        kind, lo, hi = parts[1], int(parts[2]), int(parts[3])
-    except (IndexError, ValueError):
-        await callback.answer("Noto'g'ri tanlov", show_alert=True)
-        return
-    if kind not in PAGE_TIERS or (lo, hi) not in PAGE_TIERS[kind]:
-        await callback.answer("Noto'g'ri tanlov", show_alert=True)
+@dp.message(DocOrder.waiting_topic, F.text)
+async def receive_topic(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    kind = data.get("kind")
+    topic = (message.text or "").strip()
+
+    if len(topic) < 3 or len(topic) > MAX_TOPIC_LENGTH:
+        await message.answer("Mavzu juda qisqa yoki juda uzun. Iltimos, aniqroq yozing:")
         return
 
-    await state.set_state(DocOrder.waiting_topic)
-    await state.update_data(kind=kind, pages=[lo, hi])
-    await callback.answer(f"Hajm: {lo}–{hi} bet")
-    if callback.message:
-        try:
-            await callback.message.edit_text(
-                f"✅ {DOC_KINDS[kind]['label']} hajmi: <b>{lo}–{hi} bet</b>",
-                parse_mode="HTML",
+    await state.update_data(topic=topic)
+
+    # 3/4/5 reja tanlash (Slayd, Referat, Mustaqil ish)
+    if kind in ("slayd", "referat", "mustaqil"):
+        await state.set_state(DocOrder.waiting_outline)
+        await message.answer(
+            f"📌 <b>Mavzu:</b> {html.escape(topic)}\n\n"
+            "Reja sonini tanlang (shunga muvofiq sahifalar va narx belgilanadi):",
+            reply_markup=outline_selection_keyboard(kind),
+            parse_mode="HTML",
+        )
+        return
+
+    # Boshqa hujjat turlari (kurs, maqola, test va h.k.)
+    await state.clear()
+    price = PRICING.get(kind, 3000)
+    await check_and_run_order(message, kind, topic, reja_count=None, price=price)
+
+
+@dp.callback_query(DocOrder.waiting_outline, F.data.startswith("reja_"))
+async def receive_outline_choice(call: types.CallbackQuery, state: FSMContext):
+    reja_count = int(call.data.split("_")[1])
+    data = await state.get_data()
+    kind = data.get("kind")
+    topic = data.get("topic")
+    await state.clear()
+    
+    price = PRICING[kind][reja_count]
+    await check_and_run_order(call.message, kind, topic, reja_count=reja_count, price=price, target_user=call.from_user)
+    await call.answer()
+
+
+async def check_and_run_order(message: types.Message, kind: str, topic: str,
+                              reja_count: int | None, price: int, target_user: types.User | None = None):
+    user = target_user or message.from_user
+    user_id = user.id
+    account = await asyncio.to_thread(rate_limiter.get_user_account, user_id)
+    now = time.time()
+
+    # 1. Bepul sinov bormi?
+    is_free = (account["free_used"] == 0)
+    is_sub_valid = False
+
+    # 2. Obunani tekshirish
+    if not is_free and account["subscription_until"] > now:
+        sub = SUBSCRIPTIONS.get(account["sub_tier"])
+        if sub and account["daily_used"] < sub["daily_limit"]:
+            is_sub_valid = True
+
+    # 3. Agar bepul ham emas, obunasi ham bo'lmasa -> Balansni tekshirish
+    if not is_free and not is_sub_valid:
+        if account["balance"] < price:
+            shortage = price - account["balance"]
+            text = (
+                f"❗️ <b>Balansingizda yetarli mablag' mavjud emas!</b>\n\n"
+                f"📋 Xizmat narxi: <b>{price:,} so'm</b>\n"
+                f"💳 Balansingiz: <b>{account['balance']:,} so'm</b>\n"
+                f"❌ Yetishmayapti: <b>{shortage:,} so'm</b>\n\n"
+                f"Davom etish uchun hisobingizni to'ldiring:"
             )
+            await message.answer(text, reply_markup=topup_keyboard(), parse_mode="HTML")
+            return
+        else:
+            await asyncio.to_thread(rate_limiter.update_balance, user_id, -price)
+    elif is_free:
+        await asyncio.to_thread(rate_limiter.mark_free_used, user_id)
+    elif is_sub_valid:
+        await asyncio.to_thread(rate_limiter.inc_daily_used, user_id)
+
+    # Reja bo'yicha sahifa taqsimoti
+    pages = None
+    if reja_count == 3:
+        pages = (10, 15)
+    elif reja_count == 4:
+        pages = (15, 25)
+    elif reja_count == 5:
+        pages = (20, 30)
+
+    if kind == "slayd":
+        slides_count = 10 if reja_count == 3 else 15 if reja_count == 4 else 20
+        await run_slide_generation(message, topic, slides_count, target_user=user)
+    else:
+        await run_document(message, kind, topic, pages=pages, target_user=user)
+
+
+async def run_slide_generation(message: types.Message, topic: str, count: int, target_user: types.User = None):
+    user = target_user or message.from_user
+    user_id = user.id
+    await track_user(user_id, user.first_name, user.username)
+
+    if user_id in _active_users:
+        await message.answer(
+            "⏳ Oldingi ishingiz hali tayyor bo'lmadi. U tugagach yangisini boshlashingiz mumkin.",
+            reply_markup=main_keyboard(),
+        )
+        return
+
+    try:
+        reservation_id = await reserve_rate_limit(user_id)
+    except HTTPException as exc:
+        await message.answer(f"❗ {exc.detail}", reply_markup=main_keyboard())
+        return
+
+    _active_users.add(user_id)
+    started = time.monotonic()
+    alphabet = await get_user_alphabet(user_id)
+    status = await message.answer(f"⏳ Taqdimot tayyorlanmoqda ({count} ta slayd), biroz kuting...", reply_markup=main_keyboard())
+    file_path = os.path.join(tempfile.gettempdir(), f"slide_{uuid.uuid4().hex}.pptx")
+    success = False
+
+    try:
+        slide_data = await generate_slide_content(topic, alphabet, count)
+        await asyncio.to_thread(generate_pptx, topic, slide_data, "classic", file_path, alphabet)
+        doc = types.FSInputFile(file_path, filename=f"taqdimot_{uuid.uuid4().hex[:6]}.pptx")
+        await message.answer_document(
+            doc,
+            caption=f"🎉 Taqdimotingiz tayyor!\n📌 Mavzu: {topic}\n📊 Slaydlar: {count + 1} ta",
+        )
+        success = True
+    except Exception:
+        logger.exception("Slayd yaratishda xato")
+        await message.answer("❗ Slayd tayyorlashda xatolik yuz berdi. Qayta urinib ko'ring.", reply_markup=main_keyboard())
+    finally:
+        _active_users.discard(user_id)
+        if not success:
+            await asyncio.shield(refund_rate_limit(reservation_id))
+        await track_order(user_id, "slayd", success, time.monotonic() - started)
+        try:
+            await status.delete()
         except Exception:
             pass
-    await bot.send_message(
-        callback.from_user.id,
-        topic_prompt_text(kind),
-        parse_mode="HTML",
-        reply_markup=cancel_keyboard(),
-    )
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
 
 def eta_text(kind: str, pages) -> str:
@@ -2254,10 +2643,11 @@ def eta_text(kind: str, pages) -> str:
     return "6-10 daqiqa"
 
 
-async def run_document(message: types.Message, kind: str, topic: str, pages=None) -> None:
-    user_id = message.from_user.id
+async def run_document(message: types.Message, kind: str, topic: str, pages=None, target_user: types.User = None) -> None:
+    user = target_user or message.from_user
+    user_id = user.id
     meta = DOC_KINDS[kind]
-    await track_user(user_id, message.from_user.first_name, message.from_user.username)
+    await track_user(user_id, user.first_name, user.username)
 
     if user_id in _active_users:
         await message.answer(
@@ -2357,33 +2747,6 @@ async def stats_cmd(message: types.Message):
     else:
         lines.append("• hali buyurtma yo'q")
     await message.answer("\n".join(lines), parse_mode="HTML")
-
-
-@dp.message(DocOrder.waiting_topic, F.text)
-async def receive_topic(message: types.Message, state: FSMContext):
-    data = await state.get_data()
-    kind = data.get("kind")
-    pages = tuple(data["pages"]) if data.get("pages") else None
-    topic = (message.text or "").strip()
-
-    if kind not in DOC_KINDS:
-        await state.clear()
-        await message.answer("Iltimos, xizmatni qaytadan tanlang 👇", reply_markup=main_keyboard())
-        return
-    if kind in PAGE_TIERS and pages not in PAGE_TIERS[kind]:
-        await state.clear()
-        await message.answer(
-            f"📏 <b>{DOC_KINDS[kind]['label']}</b> hajmini tanlang:",
-            parse_mode="HTML",
-            reply_markup=pages_keyboard(kind),
-        )
-        return
-    if len(topic) < 3 or len(topic) > MAX_TOPIC_LENGTH:
-        await message.answer("Mavzu juda qisqa yoki juda uzun. Iltimos, aniqroq va qisqaroq yozing:")
-        return
-
-    await state.clear()
-    await run_document(message, kind, topic, pages)
 
 
 @dp.message(F.text)
@@ -2486,11 +2849,16 @@ async def serve_index():
 @app.post("/api/me")
 async def api_me(req: MeRequest):
     auth = verify_telegram_init_data(req.init_data)
-    remaining = await asyncio.to_thread(rate_limiter.remaining, auth["user_id"])
-    alphabet = await get_user_alphabet(auth["user_id"])
+    user_id = auth["user_id"]
+    account = await asyncio.to_thread(rate_limiter.get_user_account, user_id)
+    remaining = await asyncio.to_thread(rate_limiter.remaining, user_id)
+    alphabet = await get_user_alphabet(user_id)
     return {
         "alphabet": alphabet,
         "remaining": remaining,
+        "balance": account["balance"],
+        "free_used": account["free_used"],
+        "is_subscriber": account["subscription_until"] > time.time(),
         "limit": RATE_LIMIT_REQUESTS,
         "window_minutes": max(1, RATE_LIMIT_WINDOW_SECONDS // 60),
         "slides": {"default": SLIDE_COUNT, "min": MIN_SLIDES, "max": MAX_SLIDES},
@@ -2503,6 +2871,32 @@ async def api_generate_slide(req: SlideRequest):
     auth = verify_telegram_init_data(req.init_data)
     user_id = auth["user_id"]
     await track_user(user_id, auth["user"].get("first_name"), auth["user"].get("username"))
+    
+    account = await asyncio.to_thread(rate_limiter.get_user_account, user_id)
+    now = time.time()
+    price = 3000 if req.slides <= 10 else 5000
+    
+    # Bepul sinov yoki Obuna yoki Balans tekshiruvi
+    is_free = (account["free_used"] == 0)
+    is_sub_valid = False
+    if not is_free and account["subscription_until"] > now:
+        sub = SUBSCRIPTIONS.get(account["sub_tier"])
+        if sub and account["daily_used"] < sub["daily_limit"]:
+            is_sub_valid = True
+
+    if not is_free and not is_sub_valid:
+        if account["balance"] < price:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Balansingiz yetarli emas! Narxi: {price:,} so'm. Balans: {account['balance']:,} so'm.",
+            )
+        else:
+            await asyncio.to_thread(rate_limiter.update_balance, user_id, -price)
+    elif is_free:
+        await asyncio.to_thread(rate_limiter.mark_free_used, user_id)
+    elif is_sub_valid:
+        await asyncio.to_thread(rate_limiter.inc_daily_used, user_id)
+
     requested = getattr(req, "alphabet", None)
     if requested in ALPHABETS:
         alphabet = requested
@@ -2521,8 +2915,6 @@ async def api_generate_slide(req: SlideRequest):
 
     file_path = os.path.join(tempfile.gettempdir(), f"slide_{uuid.uuid4().hex}.pptx")
     success = False
-
-    # Agar tanlangan shablon topilmasa, standart "classic" ishlatiladi
     template_name = req.template if req.template in TEMPLATE_STYLES else "classic"
 
     try:
