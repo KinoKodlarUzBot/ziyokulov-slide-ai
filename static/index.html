@@ -39,7 +39,7 @@
       padding: 14px 14px calc(34px + env(safe-area-inset-bottom, 0px));
     }
 
-    /* ---------- Yuqori qator: tablar + limit ---------- */
+    /* ---------- Yuqori qator: tablar + balans ---------- */
     .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 
     .tabs {
@@ -78,10 +78,14 @@
       background: linear-gradient(135deg, var(--gold-soft), var(--gold));
       color: var(--gold-ink);
       font-weight: 800;
-      font-size: 15px;
+      font-size: 14px;
       box-shadow: 0 6px 20px rgba(245, 183, 61, .28);
       white-space: nowrap;
+      cursor: pointer;
+      border: none;
+      transition: transform .1s;
     }
+    .limit:active { transform: scale(.96); }
 
     .count { color: var(--hint); margin: 16px 2px 12px; font-size: 15px; }
 
@@ -221,7 +225,6 @@
     .pv .bar { position: absolute; top: 0; left: 0; right: 0; height: 7px; }
     .pv .ttl { position: absolute; top: 16px; left: 12px; height: 6px; width: 45%; border-radius: 3px; }
     
-    /* Qolip 1: 2 USTUNLI BLOK */
     .pv .pv-col-wrap {
       position: absolute; top: 32px; left: 10px; right: 10px; bottom: 10px;
       display: flex; gap: 8px;
@@ -235,7 +238,6 @@
       background: var(--acc);
     }
 
-    /* Qolip 2: GORIZONTAL 3 BOSQICH */
     .pv .pv-proc-wrap {
       position: absolute; top: 32px; left: 10px; right: 10px; bottom: 10px;
       display: flex; gap: 5px;
@@ -246,7 +248,6 @@
     }
     .pv .pv-proc-head { height: 10px; background: var(--acc); width: 100%; }
 
-    /* Qolip 3: KATTA IQTIBOS / HERO */
     .pv .pv-hero-box {
       position: absolute; top: 30px; left: 10px; right: 10px; height: 32px;
       border-radius: 6px; box-shadow: 0 0 0 1px rgba(128,128,128,.15);
@@ -259,7 +260,6 @@
     }
     .pv .pv-sub-item { flex: 1; border-radius: 4px; box-shadow: 0 0 0 1px rgba(128,128,128,.15); }
 
-    /* Qolip 4: ASIMMETRIK SPLIT */
     .pv .pv-split-wrap {
       position: absolute; top: 30px; left: 10px; right: 10px; bottom: 10px;
       display: flex; gap: 7px;
@@ -272,7 +272,6 @@
     }
     .pv .pv-split-row { height: 22px; border-radius: 5px; box-shadow: 0 0 0 1px rgba(128,128,128,.15); }
 
-    /* Qolip 5: MINIMAL CHIZIQLI */
     .pv .pv-min-wrap {
       position: absolute; top: 32px; left: 12px; right: 12px; bottom: 8px;
       display: flex; flex-direction: column; justify-content: space-around;
@@ -282,7 +281,6 @@
       background: var(--acc);
     }
 
-    /* Qolip 6: KVADRAT NISHONLI QATORLAR */
     .pv .pv-sq-row {
       position: absolute; left: 10px; right: 10px; height: 24px; border-radius: 5px;
       box-shadow: 0 0 0 1px rgba(128,128,128,.15);
@@ -292,7 +290,6 @@
       background: var(--acc); border-radius: 2px;
     }
 
-    /* Qolip 7: DOIRA NISHONLI QATORLAR */
     .pv .pv-rd-row {
       position: absolute; left: 10px; right: 10px; height: 24px; border-radius: 8px;
       box-shadow: 0 0 0 1px rgba(128,128,128,.15);
@@ -418,6 +415,100 @@
     .panel { display: none; }
     .panel.active { display: block; }
     .note { color: var(--hint); font-size: 12px; text-align: center; margin-top: 20px; }
+
+    /* ---------- To'lov Modali (Modal Dialog) ---------- */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .75);
+      backdrop-filter: blur(5px);
+      z-index: 9999;
+      align-items: flex-end;
+      justify-content: center;
+      animation: fadeIn .2s ease;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-card {
+      width: 100%;
+      max-width: 520px;
+      background: #14172a;
+      border-top-left-radius: 28px;
+      border-top-right-radius: 28px;
+      border: 1px solid var(--line);
+      border-bottom: none;
+      padding: 22px 18px calc(24px + env(safe-area-inset-bottom, 0px));
+      box-shadow: 0 -10px 30px rgba(0, 0, 0, .6);
+      animation: slideUp .25s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .modal-header h3 { margin: 0; font-size: 19px; font-weight: 800; color: var(--text); }
+    .modal-close {
+      background: rgba(255, 255, 255, .08);
+      border: none;
+      color: var(--hint);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-desc { font-size: 14px; color: var(--hint); margin-bottom: 18px; line-height: 1.4; }
+    .modal-desc b { color: var(--gold-soft); }
+
+    .topup-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .btn-topup {
+      padding: 13px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, .06);
+      color: var(--text);
+      font: inherit;
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background .15s, border-color .15s;
+    }
+    .btn-topup:active { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+
+    .btn-sub-promo {
+      width: 100%;
+      padding: 14px;
+      border-radius: 16px;
+      border: none;
+      background: linear-gradient(135deg, #7928ca, #ff0080);
+      color: #fff;
+      font: inherit;
+      font-weight: 800;
+      font-size: 15px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 18px rgba(255, 0, 128, .25);
+    }
+    .btn-sub-promo:active { opacity: .9; }
   </style>
 </head>
 <body>
@@ -428,7 +519,10 @@
         <button class="tab" type="button" data-tab="topics"><span class="ic">🔥</span><span class="lb">Mavzular</span></button>
         <button class="tab" type="button" data-tab="help"><span class="ic">❓</span><span class="lb">Yordam</span></button>
       </nav>
-      <div class="limit" id="limit" title="Qolgan so'rovlar"><span>⚡</span><span id="limit-text">—</span></div>
+      <!-- Balans / Limit tugmasi -->
+      <button class="limit" id="limit-btn" type="button" title="Balansni to'ldirish">
+        <span id="limit-icon">💳</span><span id="limit-text">Yuklanmoqda...</span>
+      </button>
     </header>
 
     <p class="count" id="count"></p>
@@ -479,16 +573,40 @@
     <section class="panel" id="panel-help">
       <div class="sec-head"><h2>Nimalar qila olaman</h2></div>
       <ul class="help-list">
-        <li><span class="hi">✨</span><div><b>Slayd yaratish</b><span>Mavzuni yozasiz, 6 slaydli PowerPoint fayl Telegram chatingizga keladi.</span></div></li>
+        <li><span class="hi">✨</span><div><b>Slayd yaratish</b><span>Mavzuni yozasiz, PowerPoint taqdimot fayli to'g'ridan-to'g'ri Telegram chatingizga keladi.</span></div></li>
         <li><span class="hi">🎨</span><div><b>15 xil uslub va tuzilish</b><span>2 ustun, gorizontal bosqichlar, iqtibos, asimmetrik va minimal ro'yxatlar.</span></div></li>
-        <li><span class="hi">🔤</span><div><b>Lotin yoki Кирилл</b><span>Alifboni tanlang, slayd va Word fayllar shu yozuvda tayyorlanadi.</span></div></li>
-        <li><span class="hi">🔥</span><div><b>Tayyor mavzular</b><span>Mavzular bo'limidan birini bosing, u avtomatik yoziladi.</span></div></li>
-        <li><span class="hi">📄</span><div><b>Referat, kurs ishi, maqola, tezis, test, krossvord</b><span>Botdagi tugmalar orqali: mavzuni chatga yozasiz, Word fayl keladi. Limit umumiy.</span></div></li>
-        <li><span class="hi">⚡</span><div><b id="help-limit-title">So'rovlar limiti</b><span id="help-limit-text">Limit tepada ko'rinib turadi.</span></div></li>
-        <li><span class="hi">📱</span><div><b>Faylni qanday ochaman?</b><span>PowerPoint, WPS Office yoki Google Slides ilovasi orqali oching. Telefonning ichki ko'rish dasturi ba'zan bo'sh ko'rsatadi.</span></div></li>
+        <li><span class="hi">🎁</span><div><b>1-martalik Bepul sinov</b><span>Har bir yangi foydalanuvchi birinchi buyurtmasini mutlaqo bepul oladi!</span></div></li>
+        <li><span class="hi">💳</span><div><b>Click orqali to'lov</b><span>Balansingizni yuqoridagi tugma orqali osongina to'ldirishingiz mumkin.</span></div></li>
+        <li><span class="hi">💎</span><div><b>Obuna paketlari</b><span>Lite, Pro va Ultra obunalari orqali xizmatlardan yanada arzonroq foydalaning.</span></div></li>
+        <li><span class="hi">📱</span><div><b>Faylni qanday ochaman?</b><span>PowerPoint, WPS Office yoki Google Slides ilovasi orqali oching.</span></div></li>
       </ul>
     </section>
   </main>
+
+  <!-- ===== To'lov Modali ===== -->
+  <div class="modal-overlay" id="pay-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>💳 Balansni to'ldirish</h3>
+        <button class="modal-close" id="modal-close" type="button">✕</button>
+      </div>
+      <p class="modal-desc" id="modal-desc">
+        Hozirgi balansingiz: <b id="modal-balance">0 so'm</b>.<br>
+        To'lov summasini tanlang (Telegram orqali 24/7 xavfsiz to'lov):
+      </p>
+
+      <div class="topup-grid">
+        <button class="btn-topup" type="button" data-amount="5000">5 000 so'm</button>
+        <button class="btn-topup" type="button" data-amount="10000">10 000 so'm</button>
+        <button class="btn-topup" type="button" data-amount="20000">20 000 so'm</button>
+        <button class="btn-topup" type="button" data-amount="50000">50 000 so'm</button>
+      </div>
+
+      <button class="btn-sub-promo" id="btn-open-subs" type="button">
+        💎 Chegirmali Obuna Paketlari
+      </button>
+    </div>
+  </div>
 
   <script>
     (function () {
@@ -496,7 +614,7 @@
       if (tg) {
         tg.ready();
         tg.expand();
-        try { tg.setHeaderColor("#0d0e1b"); tg.setBackgroundColor("#0d0e1b"); } catch (e) { /* eski versiya */ }
+        try { tg.setHeaderColor("#0d0e1b"); tg.setBackgroundColor("#0d0e1b"); } catch (e) { }
       }
       var initData = tg ? tg.initData : "";
 
@@ -504,7 +622,6 @@
       var MIN_LEN = 3;
       var REQUEST_TIMEOUT_MS = 150000;
 
-      // ---------- 15 XIL SHABLON VA ULARNING MOS TUZILISHI (layout) ----------
       var STYLES = [
         { id: "classic",        layout: "two_cols",   name: "Klassik",     desc: "2 ustun, indigo",      bg: "#ffffff", accent: "#4f46e5", card: "#f3f4f6" },
         { id: "business",       layout: "process",    name: "Biznes",      desc: "Gorizontal 3 bosqich", bg: "#f0f4f8", accent: "#0284c7", card: "#ffffff" },
@@ -550,12 +667,22 @@
       var goEl = document.getElementById("go");
       var messageEl = document.getElementById("message");
       var closeEl = document.getElementById("close");
+      var limitBtnEl = document.getElementById("limit-btn");
       var limitTextEl = document.getElementById("limit-text");
+      var limitIconEl = document.getElementById("limit-icon");
       var countEl = document.getElementById("count");
+
+      var payModal = document.getElementById("pay-modal");
+      var modalClose = document.getElementById("modal-close");
+      var modalBalance = document.getElementById("modal-balance");
+      var btnOpenSubs = document.getElementById("btn-open-subs");
 
       var busy = false;
       var selectedStyle = "classic";
       var selectedAlphabet = "latin";
+      var currentBalance = 0;
+      var freeUsed = 0;
+      var isSubscriber = false;
 
       function el(tag, className, text) {
         var node = document.createElement(tag);
@@ -603,10 +730,81 @@
         return "Xatolik yuz berdi (" + status + "). Qayta urinib ko'ring.";
       }
 
-      function formatWindow(minutes) {
-        if (minutes >= 60 && minutes % 60 === 0) return (minutes / 60) + " soat";
-        return minutes + " daqiqa";
+      // ---------- Balans va Limitni Yangilash ----------
+      function applyUserData(data) {
+        if (!data) return;
+        if (data.alphabet) setAlphabet(data.alphabet);
+        
+        currentBalance = data.balance || 0;
+        freeUsed = data.free_used || 0;
+        isSubscriber = !!data.is_subscriber;
+
+        modalBalance.textContent = currentBalance.toLocaleString() + " so'm";
+
+        if (freeUsed === 0) {
+          limitIconEl.textContent = "🎁";
+          limitTextEl.textContent = "1 bepul";
+        } else if (isSubscriber) {
+          limitIconEl.textContent = "💎";
+          limitTextEl.textContent = "VIP";
+        } else {
+          limitIconEl.textContent = "💳";
+          limitTextEl.textContent = currentBalance.toLocaleString() + " so'm";
+        }
       }
+
+      async function loadUserData() {
+        if (!initData) {
+          limitTextEl.textContent = "0 so'm";
+          return;
+        }
+        try {
+          var response = await fetch("/api/me", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ init_data: initData })
+          });
+          if (response.ok) applyUserData(await response.json());
+        } catch (e) { }
+      }
+
+      // ---------- Modal Dialog (To'lov) ----------
+      function openModal() {
+        payModal.classList.add("open");
+        haptic("select");
+      }
+      function closeModal() {
+        payModal.classList.remove("open");
+      }
+
+      limitBtnEl.addEventListener("click", openModal);
+      modalClose.addEventListener("click", closeModal);
+      payModal.addEventListener("click", function (e) {
+        if (e.target === payModal) closeModal();
+      });
+
+      // Mini App orqali to'lov yuborish (Telegram chatiga buyruq yuborish)
+      document.querySelectorAll(".btn-topup").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var amt = btn.getAttribute("data-amount");
+          haptic("select");
+          closeModal();
+          showMessage("info", "To'lov cheki Telegram chatingizga yuborilmoqda...");
+          if (tg) {
+            tg.sendData("topup_" + amt);
+            setTimeout(function () { tg.close(); }, 300);
+          }
+        });
+      });
+
+      btnOpenSubs.addEventListener("click", function () {
+        haptic("select");
+        closeModal();
+        if (tg) {
+          tg.sendData("open_subs");
+          setTimeout(function () { tg.close(); }, 300);
+        }
+      });
 
       // ---------- Tablar ----------
       function switchTab(name) {
@@ -683,7 +881,7 @@
 
       countEl.textContent = TOPICS.length + " ta tayyor mavzu · posterini bosing";
 
-      // ---------- 15 XIL ICHKI TUZILISHGA EGA USLUB KARTALARI ----------
+      // ---------- Uslublar ----------
       var stylesEl = document.getElementById("styles");
       STYLES.forEach(function (st) {
         var btn = el("button", "sty" + (st.id === selectedStyle ? " sel" : ""));
@@ -697,16 +895,13 @@
         var bar = el("div", "bar"); bar.style.background = st.accent; pv.appendChild(bar);
         var ttl = el("div", "ttl"); ttl.style.background = st.accent; pv.appendChild(ttl);
 
-        // HAR BIR QOLIPNI O'ZIGA XOS SHAKLDA CHIZISH:
         if (st.layout === "two_cols") {
-          // 2 ta vertikal ustun
           var wrap = el("div", "pv-col-wrap");
           var c1 = el("div", "pv-col"); c1.style.background = st.card;
           var c2 = el("div", "pv-col"); c2.style.background = st.card;
           wrap.appendChild(c1); wrap.appendChild(c2);
           pv.appendChild(wrap);
         } else if (st.layout === "process") {
-          // Gorizontal 3 ta bosqich
           var wrap = el("div", "pv-proc-wrap");
           for (var k = 0; k < 3; k++) {
             var col = el("div", "pv-proc-col"); col.style.background = st.card;
@@ -715,7 +910,6 @@
           }
           pv.appendChild(wrap);
         } else if (st.layout === "hero") {
-          // Katta markaziy karta + 2 ta mayda
           var hero = el("div", "pv-hero-box"); hero.style.background = st.card; pv.appendChild(hero);
           var subWrap = el("div", "pv-sub-wrap");
           var s1 = el("div", "pv-sub-item"); s1.style.background = st.card;
@@ -723,7 +917,6 @@
           subWrap.appendChild(s1); subWrap.appendChild(s2);
           pv.appendChild(subWrap);
         } else if (st.layout === "split") {
-          // Chap dominant blok + o'ng qatorlar
           var wrap = el("div", "pv-split-wrap");
           var l = el("div", "pv-split-left");
           var r = el("div", "pv-split-right");
@@ -733,14 +926,12 @@
           wrap.appendChild(l); wrap.appendChild(r);
           pv.appendChild(wrap);
         } else if (st.layout === "minimal") {
-          // Shveysariya toza gorizontal chiziqlari
           var wrap = el("div", "pv-min-wrap");
           wrap.appendChild(el("div", "pv-min-line"));
           wrap.appendChild(el("div", "pv-min-line"));
           wrap.appendChild(el("div", "pv-min-line"));
           pv.appendChild(wrap);
         } else if (st.layout === "square") {
-          // Kvadrat neon nishon
           [36, 64].forEach(function (top) {
             var row = el("div", "pv-sq-row");
             row.style.top = top + "px";
@@ -750,7 +941,6 @@
             pv.appendChild(row);
           });
         } else {
-          // Dumaloq nishonli qatorlar (round)
           [36, 64].forEach(function (top) {
             var row = el("div", "pv-rd-row");
             row.style.top = top + "px";
@@ -792,28 +982,6 @@
         haptic("select");
       });
 
-      // ---------- Limitni ko'rsatish ----------
-      function applyLimit(data) {
-        if (!data || typeof data.remaining !== "number") return;
-        if (data.alphabet) setAlphabet(data.alphabet);
-        limitTextEl.textContent = data.remaining + "/" + data.limit;
-        document.getElementById("help-limit-title").textContent = "Limit: " + data.remaining + " / " + data.limit;
-        document.getElementById("help-limit-text").textContent =
-          "Har " + formatWindow(data.window_minutes) + "da " + data.limit + " tagacha ish yaratish mumkin (slayd, referat, mustaqil ish va test uchun umumiy).";
-      }
-
-      async function loadLimit() {
-        if (!initData) return;
-        try {
-          var response = await fetch("/api/me", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ init_data: initData })
-          });
-          if (response.ok) applyLimit(await response.json());
-        } catch (e) { }
-      }
-
       // ---------- Slayd yaratish ----------
       async function generate() {
         if (busy) return;
@@ -852,7 +1020,13 @@
           try { data = await response.json(); } catch (e) { }
 
           if (!response.ok) {
-            showMessage("error", extractError(data, response.status));
+            // Agar balans yetarli bo'lmasa (Status 402), to'lov oynasini ochamiz
+            if (response.status === 402) {
+              openModal();
+              showMessage("error", extractError(data, response.status));
+            } else {
+              showMessage("error", extractError(data, response.status));
+            }
             haptic("error");
             return;
           }
@@ -870,7 +1044,7 @@
         } finally {
           clearTimeout(timer);
           setBusy(false);
-          loadLimit();
+          loadUserData();
         }
       }
 
@@ -884,7 +1058,7 @@
       closeEl.addEventListener("click", function () { if (tg) tg.close(); });
 
       updateCounter();
-      loadLimit();
+      loadUserData();
     })();
   </script>
 </body>
