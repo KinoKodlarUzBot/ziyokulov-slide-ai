@@ -4,20 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
-  <title>Slayd AI</title>
+  <title>Ziyoqulov Slide AI</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
-      --bg: #0d0e1b;
-      --card: #1a1d35;
-      --line: rgba(255, 255, 255, .09);
-      --text: #f3f4fa;
-      --hint: #8f94b3;
+      --bg: #0b111e;
+      --card: #151d30;
+      --card-inner: rgba(255, 255, 255, 0.05);
+      --line: rgba(255, 255, 255, 0.1);
+      --text: #ffffff;
+      --hint: #8e9bb0;
       --gold: #f5b73d;
       --gold-soft: #ffd27a;
       --gold-ink: #231a05;
-      --danger: #ff7b7b;
-      --ok: #4ade80;
+      --danger: #ff5b5b;
+      --ok: #34d399;
+      --cyan: #38bdf8;
     }
 
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -28,506 +30,321 @@
       background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      font-size: 16px;
+      font-size: 15px;
       line-height: 1.4;
     }
-    body { background: linear-gradient(180deg, #0d0e1b 0%, #131226 60%, #0d0e1b 100%) fixed; }
+    body {
+      background: radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 40%),
+                  radial-gradient(circle at top left, rgba(245, 183, 61, 0.08), transparent 35%),
+                  #090d16;
+      background-attachment: fixed;
+    }
 
     .app {
-      max-width: 560px;
+      max-width: 520px;
       margin: 0 auto;
-      padding: 14px 14px calc(34px + env(safe-area-inset-bottom, 0px));
+      padding: 12px 14px calc(36px + env(safe-area-inset-bottom, 0px));
     }
 
-    /* ---------- Yuqori qator: tablar + balans ---------- */
-    .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-
-    .tabs {
-      display: flex;
-      gap: 2px;
-      padding: 4px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, .05);
-      border: 1px solid var(--line);
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-    .tabs::-webkit-scrollbar { display: none; }
-    .tab {
+    /* ---------- Yuqori Tab Navigatsiya ---------- */
+    .top-bar {
       display: flex;
       align-items: center;
-      gap: 5px;
-      border: none;
-      background: transparent;
-      color: var(--hint);
-      padding: 8px 12px;
-      border-radius: 999px;
-      font: inherit;
-      font-weight: 700;
-      font-size: 14px;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: background .15s, color .15s;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 14px;
     }
-    .tab .lb { display: none; }
-    .tab.active { background: var(--gold); color: var(--gold-ink); }
-    .tab.active .lb { display: inline; }
 
-    .limit {
+    .nav-tabs {
+      display: flex;
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(12px);
+      padding: 4px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      gap: 3px;
+    }
+    .nav-btn {
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 10px 14px;
+      padding: 8px 14px;
+      border: none;
+      background: transparent;
+      color: var(--hint);
+      font-weight: 700;
+      font-size: 14px;
       border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .nav-btn.active-yellow {
+      background: #f6c344;
+      color: #1a1500;
+    }
+    .nav-btn.active-cyan {
+      background: #38d6f8;
+      color: #03212b;
+    }
+
+    .bal-btn {
       background: linear-gradient(135deg, var(--gold-soft), var(--gold));
       color: var(--gold-ink);
+      border: none;
+      padding: 9px 14px;
+      border-radius: 999px;
       font-weight: 800;
       font-size: 13px;
-      box-shadow: 0 6px 20px rgba(245, 183, 61, .28);
-      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
       cursor: pointer;
-      border: none;
-      transition: transform .1s;
+      box-shadow: 0 4px 14px rgba(245, 183, 61, 0.25);
+    }
+
+    /* ---------- Bo'limlar boshqaruvi ---------- */
+    .view-panel { display: none; }
+    .view-panel.active { display: block; animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ========================================================
+       HUJJATLAR ASOSIY MENYUSI (Zakirovs_bot dizayni)
+    ======================================================== */
+    .h-title {
+      font-size: 28px;
+      font-weight: 900;
+      line-height: 1.15;
+      margin: 10px 0 16px;
+      letter-spacing: -0.5px;
+    }
+
+    /* Katta Fayl Tanlash Kartasi */
+    .card-dropzone {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+      border: 1.5px dashed rgba(255, 255, 255, 0.2);
+      border-radius: 24px;
+      padding: 22px 18px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      cursor: pointer;
+      margin-bottom: 12px;
+      transition: border-color 0.15s;
+    }
+    .card-dropzone:active { border-color: var(--cyan); }
+    .drop-icons {
+      position: relative;
+      width: 54px;
+      height: 60px;
       flex-shrink: 0;
     }
-    .limit:active { transform: scale(.96); }
-
-    .count { color: var(--hint); margin: 16px 2px 12px; font-size: 15px; }
-
-    /* ---------- Qidiruv ko'rinishidagi kiritish ---------- */
-    .search {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 8px 8px 16px;
-      border-radius: 22px;
-      background: rgba(255, 255, 255, .05);
-      border: 1px solid var(--line);
-      transition: border-color .15s, box-shadow .15s;
-    }
-    .search:focus-within { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(245, 183, 61, .15); }
-    .search input {
-      flex: 1;
-      min-width: 0;
-      border: none;
-      outline: none;
-      background: transparent;
-      color: var(--text);
-      font: inherit;
-      font-size: 16px;
-      padding: 10px 0;
-    }
-    .search input::placeholder { color: var(--hint); }
-    .gobtn {
-      width: 50px;
+    .drop-doc {
+      position: absolute;
+      width: 38px;
       height: 50px;
-      flex: none;
-      border: none;
-      border-radius: 16px;
-      background: linear-gradient(135deg, var(--gold-soft), var(--gold));
-      color: var(--gold-ink);
-      font-size: 22px;
-      font-weight: 800;
-      cursor: pointer;
-    }
-    .gobtn:disabled { opacity: .5; }
-    .counter { text-align: right; color: var(--hint); font-size: 12px; margin: 6px 6px 0; }
-    .counter.limit-hit { color: var(--danger); }
-
-    /* ---------- Sarlavhalar ---------- */
-    .sec-head { display: flex; align-items: baseline; justify-content: space-between; margin: 0 2px 12px; }
-    .sec-head h2 { margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -.2px; }
-    .sec-head span { color: var(--hint); font-size: 13px; }
-
-    .band {
-      margin: 22px -14px 0;
-      padding: 20px 14px 10px;
-      border-top: 1px solid var(--line);
-      background: linear-gradient(180deg, rgba(150, 40, 70, .30), rgba(150, 40, 70, 0));
-    }
-    .block { margin-top: 22px; }
-
-    /* ---------- Gorizontal lenta ---------- */
-    .rail {
-      display: flex;
-      gap: 13px;
-      overflow-x: auto;
-      scroll-snap-type: x mandatory;
-      margin: 0 -14px;
-      padding: 2px 14px 8px;
-      scroll-padding: 0 14px;
-      scrollbar-width: none;
-    }
-    .rail::-webkit-scrollbar { display: none; }
-
-    /* ---------- Poster kartalari ---------- */
-    .poster { display: flex; flex-direction: column; justify-content: flex-start; flex: none; width: 150px; scroll-snap-align: start; border: none; background: none; padding: 0; color: inherit; text-align: left; font: inherit; cursor: pointer; }
-    .grid .poster { width: 100%; align-self: start; }
-    .art {
-      position: relative;
-      height: 205px;
-      border-radius: 20px;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 10px 24px rgba(0, 0, 0, .35);
-      transition: transform .12s;
-    }
-    .poster:active .art { transform: scale(.97); }
-    .art::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0) 55%),
-                  linear-gradient(180deg, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, .45));
-    }
-    .art .emoji { font-size: 66px; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .35)); position: relative; z-index: 1; }
-    .badge {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 2;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: rgba(20, 20, 35, .7);
-      font-size: 13px;
-      font-weight: 800;
-    }
-    .pill {
-      position: absolute;
-      left: 10px;
-      bottom: 10px;
-      z-index: 2;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: rgba(20, 20, 35, .72);
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .ptitle {
-      margin: 9px 3px 0;
-      font-size: 14px;
-      font-weight: 700;
-      line-height: 1.25;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-
-    /* ---------- Uslub kartalari va ICHKI PREVIEW DIZAYNLARI ---------- */
-    .sty { display: flex; flex-direction: column; justify-content: flex-start; flex: none; width: 154px; scroll-snap-align: start; border: none; background: none; padding: 0; color: inherit; text-align: left; font: inherit; cursor: pointer; }
-    .pv {
-      position: relative;
-      height: 100px;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 3px solid transparent;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, .3);
-    }
-    .sty.sel .pv { border-color: var(--gold); }
-    .pv .bar { position: absolute; top: 0; left: 0; right: 0; height: 7px; }
-    .pv .ttl { position: absolute; top: 16px; left: 12px; height: 6px; width: 45%; border-radius: 3px; }
-    
-    .pv .pv-col-wrap {
-      position: absolute; top: 32px; left: 10px; right: 10px; bottom: 10px;
-      display: flex; gap: 8px;
-    }
-    .pv .pv-col {
-      flex: 1; border-radius: 6px; box-shadow: 0 0 0 1px rgba(128,128,128,.15);
-      position: relative; overflow: hidden;
-    }
-    .pv .pv-col::before {
-      content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
-      background: var(--acc);
-    }
-
-    .pv .pv-proc-wrap {
-      position: absolute; top: 32px; left: 10px; right: 10px; bottom: 10px;
-      display: flex; gap: 5px;
-    }
-    .pv .pv-proc-col {
-      flex: 1; border-radius: 5px; box-shadow: 0 0 0 1px rgba(128,128,128,.15);
-      overflow: hidden; display: flex; flex-direction: column;
-    }
-    .pv .pv-proc-head { height: 10px; background: var(--acc); width: 100%; }
-
-    .pv .pv-hero-box {
-      position: absolute; top: 30px; left: 10px; right: 10px; height: 32px;
-      border-radius: 6px; box-shadow: 0 0 0 1px rgba(128,128,128,.15);
-      overflow: hidden;
-    }
-    .pv .pv-hero-box::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--acc); }
-    .pv .pv-sub-wrap {
-      position: absolute; top: 68px; left: 10px; right: 10px; height: 22px;
-      display: flex; gap: 6px;
-    }
-    .pv .pv-sub-item { flex: 1; border-radius: 4px; box-shadow: 0 0 0 1px rgba(128,128,128,.15); }
-
-    .pv .pv-split-wrap {
-      position: absolute; top: 30px; left: 10px; right: 10px; bottom: 10px;
-      display: flex; gap: 7px;
-    }
-    .pv .pv-split-left {
-      width: 40px; border-radius: 5px; background: var(--acc);
-    }
-    .pv .pv-split-right {
-      flex: 1; display: flex; flex-direction: column; gap: 6px; justify-content: center;
-    }
-    .pv .pv-split-row { height: 22px; border-radius: 5px; box-shadow: 0 0 0 1px rgba(128,128,128,.15); }
-
-    .pv .pv-min-wrap {
-      position: absolute; top: 32px; left: 12px; right: 12px; bottom: 8px;
-      display: flex; flex-direction: column; justify-content: space-around;
-    }
-    .pv .pv-min-line {
-      height: 2px; width: 100%; opacity: 0.4;
-      background: var(--acc);
-    }
-
-    .pv .pv-sq-row {
-      position: absolute; left: 10px; right: 10px; height: 24px; border-radius: 5px;
-      box-shadow: 0 0 0 1px rgba(128,128,128,.15);
-    }
-    .pv .pv-sq-badge {
-      position: absolute; left: 5px; top: 5px; width: 14px; height: 14px;
-      background: var(--acc); border-radius: 2px;
-    }
-
-    .pv .pv-rd-row {
-      position: absolute; left: 10px; right: 10px; height: 24px; border-radius: 8px;
-      box-shadow: 0 0 0 1px rgba(128,128,128,.15);
-    }
-    .pv .pv-rd-badge {
-      position: absolute; left: 6px; top: 6px; width: 12px; height: 12px;
-      background: var(--acc); border-radius: 50%;
-    }
-
-    .check {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background: var(--gold);
-      color: var(--gold-ink);
-      font-weight: 900;
-      font-size: 14px;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 2;
-    }
-    .sty.sel .check { display: flex; }
-    .sname { margin: 9px 3px 0; font-size: 14px; font-weight: 800; }
-    .sdesc { margin: 1px 3px 0; font-size: 12px; color: var(--hint); }
-
-    /* ---------- Alifbo va Segmentlar ---------- */
-    .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 5px; border-radius: 16px; background: rgba(255, 255, 255, .05); border: 1px solid var(--line); }
-    .seg button { border: none; background: transparent; color: var(--hint); padding: 11px; border-radius: 12px; font: inherit; font-weight: 800; font-size: 14px; cursor: pointer; }
-    .seg button.on { background: var(--gold); color: var(--gold-ink); }
-
-    /* ---------- Asosiy tugma ---------- */
-    .submit {
-      width: 100%;
-      margin-top: 24px;
-      padding: 17px;
-      border: none;
-      border-radius: 20px;
-      background: linear-gradient(135deg, var(--gold-soft), var(--gold));
-      color: var(--gold-ink);
-      font: inherit;
-      font-weight: 800;
-      font-size: 17px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      cursor: pointer;
-      box-shadow: 0 10px 28px rgba(245, 183, 61, .3);
-      transition: opacity .15s, transform .1s;
-    }
-    .submit:disabled { opacity: .6; cursor: default; }
-    .submit:not(:disabled):active { transform: scale(.98); }
-    .spinner {
-      width: 18px;
-      height: 18px;
-      border: 3px solid rgba(35, 26, 5, .3);
-      border-top-color: var(--gold-ink);
-      border-radius: 50%;
-      animation: spin .8s linear infinite;
-      display: none;
-    }
-    .loading .spinner { display: block; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .message { display: none; margin-top: 16px; padding: 13px 15px; border-radius: 16px; font-size: 14px; }
-    .message.show { display: block; }
-    .message.error { background: rgba(255, 123, 123, .13); color: var(--danger); }
-    .message.info { background: rgba(255, 255, 255, .06); color: var(--hint); }
-    .message.success { background: rgba(74, 222, 128, .13); color: var(--ok); }
-
-    .close-btn {
-      display: none;
-      width: 100%;
-      margin-top: 10px;
-      padding: 14px;
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      background: rgba(255, 255, 255, .05);
-      color: var(--text);
-      font: inherit;
-      font-weight: 700;
-      cursor: pointer;
-    }
-    .close-btn.show { display: block; }
-
-    /* ---------- Mavzular tabi ---------- */
-    .chips { display: flex; gap: 8px; overflow-x: auto; margin: 0 -14px 16px; padding: 2px 14px; scrollbar-width: none; }
-    .chips::-webkit-scrollbar { display: none; }
-    .chip {
-      flex: none;
-      padding: 10px 17px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: rgba(255, 255, 255, .05);
-      color: var(--text);
-      font: inherit;
-      font-weight: 700;
-      font-size: 15px;
-      cursor: pointer;
-    }
-    .chip.active { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
-    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px 13px; }
-
-    /* ---------- Hujjatlar va Asboblar Tabi Stili ---------- */
-    .tool-banner {
-      background: linear-gradient(135deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .02));
-      border: 1px solid var(--line);
-      border-radius: 22px;
-      padding: 22px 16px;
-      text-align: center;
-      margin-top: 10px;
-    }
-    .tool-banner-icon { font-size: 42px; margin-bottom: 6px; }
-    .tool-banner h3 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
-    .tool-banner p { margin: 0 0 16px; font-size: 13px; color: var(--hint); }
-    .btn-upload {
       background: #ffffff;
-      color: #111;
-      border: none;
-      font-weight: 800;
-      padding: 11px 26px;
-      border-radius: 999px;
-      font-size: 14px;
-      cursor: pointer;
-      box-shadow: 0 4px 14px rgba(255,255,255,.2);
+      border-radius: 6px;
+      top: 0;
+      left: 0;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
-    .btn-upload:active { transform: scale(.96); }
-
-    .tool-action-card {
+    .drop-pdf {
+      position: absolute;
+      width: 40px;
+      height: 52px;
+      background: #e11d48;
+      border-radius: 7px;
+      bottom: 0;
+      right: 0;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 900;
       display: flex;
       align-items: center;
-      gap: 12px;
-      background: rgba(255, 255, 255, .05);
-      border: 1px solid var(--line);
-      padding: 14px 16px;
-      border-radius: 20px;
-      margin-top: 14px;
-      cursor: pointer;
-      transition: border-color .15s;
+      justify-content: center;
+      box-shadow: 0 6px 14px rgba(225, 29, 72, 0.35);
     }
-    .tool-action-card:active { border-color: var(--gold); }
-    .tool-ac-icon {
+    .drop-info { flex: 1; }
+    .drop-info h3 { margin: 0 0 4px; font-size: 17px; font-weight: 800; }
+    .drop-info p { margin: 0 0 12px; font-size: 12px; color: var(--hint); line-height: 1.35; }
+    .btn-white-upload {
+      background: #ffffff;
+      color: #0b111e;
+      border: none;
+      padding: 7px 18px;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Kirill-Lotin va Tarjima kartasi */
+    .card-action-bar {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      margin-bottom: 22px;
+    }
+    .card-action-bar:active { border-color: var(--gold); }
+    .badge-square-orange {
       width: 44px;
       height: 44px;
       border-radius: 14px;
+      background: #ea580c;
+      color: #fff;
+      font-weight: 900;
+      font-size: 18px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 900;
-      font-size: 17px;
+      flex-shrink: 0;
     }
-    .tool-ac-icon.orange { background: #f59e0b; color: #fff; }
-    .tool-ac-info { flex: 1; display: flex; flex-direction: column; }
-    .tool-ac-info b { font-size: 15px; margin-bottom: 2px; }
-    .tool-ac-info span { font-size: 12px; color: var(--hint); }
-    .tag { font-size: 11px; font-weight: 800; color: #f59e0b; background: rgba(245, 158, 11, .15); padding: 4px 8px; border-radius: 8px; }
+    .ac-info { flex: 1; }
+    .ac-info b { display: block; font-size: 15px; margin-bottom: 2px; }
+    .ac-info span { display: block; font-size: 12px; color: var(--hint); }
+    .tag-gold {
+      background: rgba(245, 158, 11, 0.15);
+      color: #f59e0b;
+      font-weight: 800;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 8px;
+    }
 
+    /* Barcha amallar sarlavhasi va to'ri */
+    .section-title {
+      font-size: 19px;
+      font-weight: 800;
+      margin: 0 0 12px;
+    }
     .tools-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
-      margin-top: 10px;
+      margin-bottom: 24px;
     }
-    .tool-card {
-      background: rgba(255, 255, 255, .04);
+    .card-tool {
+      background: rgba(255, 255, 255, 0.04);
       border: 1px solid var(--line);
-      padding: 14px 12px;
       border-radius: 18px;
+      padding: 14px 12px;
+      cursor: pointer;
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      cursor: pointer;
-      transition: border-color .15s;
+      gap: 10px;
+      transition: border-color 0.15s;
     }
-    .tool-card:active { border-color: var(--gold); }
-    .t-badge {
-      width: 34px;
-      height: 34px;
+    .card-tool:active { border-color: var(--cyan); }
+    .tool-icon-badge {
+      width: 36px;
+      height: 36px;
       border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 11px;
       font-weight: 900;
+      font-size: 12px;
       color: #fff;
     }
-    .t-badge.blue { background: #2563eb; }
-    .t-badge.purple { background: #9333ea; }
-    .t-badge.red { background: #dc2626; }
-    .t-badge.gray { background: #475569; }
-    .t-badge.green { background: #16a34a; }
-    .tool-card b { font-size: 13px; line-height: 1.25; display: block; }
-    .tool-card span { font-size: 11px; color: var(--hint); line-height: 1.2; display: block; }
+    .bg-blue { background: #2563eb; }
+    .bg-purple { background: #9333ea; }
+    .bg-red { background: #e11d48; }
+    .bg-gray { background: #64748b; }
+    .bg-emerald { background: #059669; }
 
-    /* ---------- Rasmlardan PDF Qilish Bo'limi ---------- */
-    .img2pdf-box {
-      margin-top: 10px;
-      background: rgba(255, 255, 255, .03);
-      border: 1px solid var(--line);
-      border-radius: 24px;
-      padding: 18px 16px;
+    .tool-texts b { font-size: 14px; line-height: 1.25; display: block; margin-bottom: 2px; }
+    .tool-texts span { font-size: 11px; color: var(--hint); line-height: 1.25; display: block; }
+
+    /* Oxirgi fayllar tarixi */
+    .history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 12px;
     }
-    .img2pdf-head h2 { font-size: 20px; font-weight: 800; margin: 0 0 4px; }
-    .img2pdf-head p { font-size: 13px; color: var(--hint); margin: 0 0 16px; }
+    .history-header b { font-size: 17px; font-weight: 800; }
+    .btn-clear { background: none; border: none; color: var(--hint); font-size: 13px; font-weight: 700; cursor: pointer; }
+    
+    .history-card {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .history-badge {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: #e11d48;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .history-info { flex: 1; }
+    .history-info b { font-size: 14px; display: block; }
+    .history-info span { font-size: 12px; color: var(--hint); }
+    .history-time { font-size: 12px; color: var(--hint); }
+    .history-note { font-size: 12px; color: var(--hint); text-align: center; margin-top: 14px; }
 
-    .img-preview-grid {
+    /* ========================================================
+       ICHKI EKRAN: 1 TA RASM - BITTA PDF (Sub-view)
+    ======================================================== */
+    .subview-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .btn-back-round {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--line);
+      color: #fff;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .subview-label { font-size: 14px; font-weight: 700; color: var(--hint); }
+
+    .img-grid-container {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 10px;
-      margin-bottom: 18px;
+      margin: 18px 0;
     }
-    .img-thumb-box {
+    .img-box {
       position: relative;
-      height: 115px;
+      height: 120px;
       border-radius: 16px;
       overflow: hidden;
       border: 1px solid var(--line);
-      background: rgba(0, 0, 0, .3);
+      background: rgba(0, 0, 0, 0.4);
     }
-    .img-thumb-box img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    .img-thumb-num {
+    .img-box img { width: 100%; height: 100%; object-fit: cover; }
+    .img-num {
       position: absolute;
       bottom: 6px;
       left: 6px;
-      background: rgba(0, 0, 0, .75);
+      background: rgba(0, 0, 0, 0.7);
       color: #fff;
       border-radius: 50%;
       width: 22px;
@@ -538,11 +355,11 @@
       align-items: center;
       justify-content: center;
     }
-    .img-thumb-del {
+    .img-del {
       position: absolute;
       top: 6px;
       right: 6px;
-      background: rgba(255, 59, 48, .9);
+      background: rgba(255, 59, 48, 0.9);
       color: #fff;
       border-radius: 50%;
       width: 22px;
@@ -554,923 +371,808 @@
       align-items: center;
       justify-content: center;
     }
-
-    .add-img-box {
-      height: 115px;
+    .btn-add-slot {
+      height: 120px;
       border-radius: 16px;
-      border: 2px dashed rgba(255, 255, 255, .2);
+      border: 2px dashed rgba(255, 255, 255, 0.25);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 4px;
       color: var(--hint);
       cursor: pointer;
-      gap: 4px;
-      transition: border-color .15s;
     }
-    .add-img-box:active { border-color: var(--gold); color: var(--gold); }
-    .add-img-box .plus-icon { font-size: 26px; font-weight: 300; line-height: 1; }
-    .add-img-box span { font-size: 12px; font-weight: 700; }
+    .btn-add-slot:active { border-color: var(--cyan); color: var(--cyan); }
+    .btn-add-slot .plus { font-size: 26px; line-height: 1; }
 
-    .size-selector {
+    .seg-size {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 20px;
-      font-size: 14px;
-      color: var(--text);
+      margin: 16px 0 24px;
     }
-
-    /* ---------- Yordam tabi ---------- */
-    .help-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
-    .help-list li {
+    .size-toggle {
       display: flex;
-      gap: 14px;
-      padding: 15px;
-      border-radius: 18px;
-      background: var(--card);
+      background: rgba(255, 255, 255, 0.05);
       border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 3px;
     }
-    .help-list .hi { font-size: 26px; line-height: 1; }
-    .help-list b { display: block; font-size: 16px; margin-bottom: 2px; }
-    .help-list span { color: var(--hint); font-size: 14px; }
+    .size-toggle button {
+      border: none;
+      background: transparent;
+      color: var(--hint);
+      padding: 8px 14px;
+      border-radius: 9px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .size-toggle button.active {
+      background: #ffffff;
+      color: #0b111e;
+    }
 
-    #panel-help { padding-top: 16px; }
-    .panel { display: none; }
-    .panel.active { display: block; }
-    .note { color: var(--hint); font-size: 12px; text-align: center; margin-top: 20px; }
+    .btn-primary {
+      width: 100%;
+      padding: 16px;
+      border-radius: 18px;
+      border: none;
+      background: linear-gradient(135deg, var(--gold-soft), var(--gold));
+      color: var(--gold-ink);
+      font: inherit;
+      font-weight: 800;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .btn-primary:disabled { opacity: 0.5; cursor: default; }
 
-    /* ---------- To'lov Modali (Modal Dialog) ---------- */
-    .modal-overlay {
+    /* ========================================================
+       SLAYD BO'LIMI VA USLUBLARI
+    ======================================================== */
+    .search-box {
+      display: flex;
+      align-items: center;
+      padding: 6px 6px 6px 14px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--line);
+      margin-bottom: 4px;
+    }
+    .search-box input {
+      flex: 1;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: #fff;
+      font: inherit;
+      font-size: 15px;
+      padding: 8px 0;
+    }
+    .search-box .go-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      border: none;
+      background: var(--gold);
+      color: var(--gold-ink);
+      font-size: 20px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .counter-label { text-align: right; color: var(--hint); font-size: 11px; margin-bottom: 16px; }
+
+    .rail-h {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      margin: 0 -14px 20px;
+      padding: 2px 14px 8px;
+      scrollbar-width: none;
+    }
+    .rail-h::-webkit-scrollbar { display: none; }
+
+    .poster-item {
+      width: 140px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    .poster-art {
+      height: 180px;
+      border-radius: 18px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+    }
+    .poster-art .emoji { font-size: 54px; z-index: 1; }
+    .poster-art .rank { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.6); padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+    .poster-title { font-size: 13px; font-weight: 700; margin-top: 8px; line-height: 1.25; }
+
+    /* Uslub kartalari */
+    .style-card {
+      width: 140px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    .style-preview {
+      height: 90px;
+      border-radius: 14px;
+      border: 3px solid transparent;
+      position: relative;
+      overflow: hidden;
+    }
+    .style-card.selected .style-preview { border-color: var(--gold); }
+    .style-title { font-size: 13px; font-weight: 800; margin-top: 6px; }
+    .style-desc { font-size: 11px; color: var(--hint); }
+
+    .alpha-seg {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 4px;
+      margin-bottom: 22px;
+    }
+    .alpha-seg button {
+      border: none;
+      background: transparent;
+      color: var(--hint);
+      padding: 10px;
+      border-radius: 10px;
+      font-weight: 800;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .alpha-seg button.active {
+      background: var(--gold);
+      color: var(--gold-ink);
+    }
+
+    /* Modal */
+    .modal-backdrop {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, .75);
-      backdrop-filter: blur(5px);
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(6px);
       z-index: 9999;
       align-items: flex-end;
       justify-content: center;
-      animation: fadeIn .2s ease;
     }
-    .modal-overlay.open { display: flex; }
-    .modal-card {
+    .modal-backdrop.open { display: flex; }
+    .modal-box {
       width: 100%;
-      max-width: 520px;
-      background: #14172a;
-      border-top-left-radius: 28px;
-      border-top-right-radius: 28px;
-      border: 1px solid var(--line);
-      border-bottom: none;
+      max-width: 500px;
+      background: #141a29;
+      border-top-left-radius: 26px;
+      border-top-right-radius: 26px;
       padding: 22px 18px calc(24px + env(safe-area-inset-bottom, 0px));
-      box-shadow: 0 -10px 30px rgba(0, 0, 0, .6);
-      animation: slideUp .25s ease;
-    }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-
-    .modal-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-    }
-    .modal-header h3 { margin: 0; font-size: 19px; font-weight: 800; color: var(--text); }
-    .modal-close {
-      background: rgba(255, 255, 255, .08);
-      border: none;
-      color: var(--hint);
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      font-size: 18px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .modal-desc { font-size: 14px; color: var(--hint); margin-bottom: 18px; line-height: 1.4; }
-    .modal-desc b { color: var(--gold-soft); }
-
-    .topup-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-    .btn-topup {
-      padding: 13px;
-      border-radius: 14px;
       border: 1px solid var(--line);
-      background: rgba(255, 255, 255, .06);
-      color: var(--text);
-      font: inherit;
-      font-weight: 700;
-      font-size: 15px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      transition: background .15s, border-color .15s;
     }
-    .btn-topup:active { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
-
-    .btn-sub-promo {
-      width: 100%;
-      padding: 14px;
-      border-radius: 16px;
-      border: none;
-      background: linear-gradient(135deg, #7928ca, #ff0080);
-      color: #fff;
-      font: inherit;
-      font-weight: 800;
-      font-size: 15px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      box-shadow: 0 4px 18px rgba(255, 0, 128, .25);
-    }
-    .btn-sub-promo:active { opacity: .9; }
+    .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .modal-head h3 { margin: 0; font-size: 18px; font-weight: 800; }
+    .modal-close-btn { background: rgba(255,255,255,0.08); border: none; color: #fff; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; }
+    .topup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
+    .btn-topup { background: rgba(255,255,255,0.06); border: 1px solid var(--line); color: #fff; padding: 12px; border-radius: 12px; font-weight: 700; cursor: pointer; }
+    .btn-topup:active { background: var(--gold); color: #000; }
+    .btn-sub-action { width: 100%; padding: 14px; border-radius: 14px; border: none; background: linear-gradient(135deg, #9333ea, #e11d48); color: #fff; font-weight: 800; cursor: pointer; }
   </style>
 </head>
 <body>
   <main class="app">
-    <header class="top">
-      <nav class="tabs" id="tabs" aria-label="Bo'limlar">
-        <button class="tab active" type="button" data-tab="create"><span class="ic">✨</span><span class="lb">Slayd</span></button>
-        <button class="tab" type="button" data-tab="docs"><span class="ic">📄</span><span class="lb">Hujjatlar</span></button>
-        <button class="tab" type="button" data-tab="topics"><span class="ic">🔥</span><span class="lb">Mavzular</span></button>
-        <button class="tab" type="button" data-tab="help"><span class="ic">❓</span><span class="lb">Yordam</span></button>
-      </nav>
-      <!-- Balans / Limit tugmasi -->
-      <button class="limit" id="limit-btn" type="button" title="Balansni to'ldirish">
-        <span id="limit-icon">💳</span><span id="limit-text">Yuklanmoqda...</span>
+    
+    <!-- Yuqori menyu qatori -->
+    <header class="top-bar">
+      <div class="nav-tabs">
+        <button class="nav-btn" id="tab-btn-sections" onclick="switchNav('sections')">
+          <span>☰</span><span>Bo'limlar</span>
+        </button>
+        <button class="nav-btn active-cyan" id="tab-btn-docs" onclick="switchNav('docs')">
+          <span>📄</span><span>Hujjatlar</span>
+        </button>
+      </div>
+
+      <button class="bal-btn" id="btn-balance" onclick="openTopupModal()">
+        <span id="bal-icon">💳</span><span id="bal-text">Yuklanmoqda...</span>
       </button>
     </header>
 
-    <p class="count" id="count"></p>
+    <!-- ========================================================
+         VIEW 1: HUJJATLAR ASOSIY EKRANI (Zakirovs_bot nusxasi)
+    ======================================================== -->
+    <section class="view-panel active" id="view-docs-hub">
+      <h1 class="h-title">Hujjat bilan<br>nima qilamiz?</h1>
 
-    <!-- ===== 1. Slayd Yaratish ===== -->
-    <section class="panel active" id="panel-create">
-      <div class="search">
-        <input id="topic" type="text" maxlength="200" enterkeyhint="go" autocomplete="off"
-               placeholder="Taqdimot mavzusini yozing...">
-        <button class="gobtn" id="go" type="button" aria-label="Slayd yaratish">➜</button>
-      </div>
-      <div class="counter" id="counter">0 / 200</div>
-
-      <div class="band">
-        <div class="sec-head"><h2>🔥 Top mavzular</h2><span>bosib tanlang</span></div>
-        <div class="rail" id="top-rail"></div>
-      </div>
-
-      <div class="block">
-        <div class="sec-head"><h2>🎨 Uslub</h2><span>15 xil individual tuzilish</span></div>
-        <div class="rail" id="styles"></div>
-      </div>
-
-      <div class="block">
-        <div class="sec-head"><h2>🔤 Alifbo</h2><span>fayl shu yozuvda bo'ladi</span></div>
-        <div class="seg" id="alpha">
-          <button type="button" data-alpha="latin" class="on">Lotin</button>
-          <button type="button" data-alpha="kirill">Кирилл</button>
+      <!-- Katta Faylni Tanlang Kartasi -->
+      <div class="card-dropzone" onclick="openToolSubview('universal')">
+        <div class="drop-icons">
+          <div class="drop-doc"></div>
+          <div class="drop-pdf">PDF</div>
+        </div>
+        <div class="drop-info">
+          <h3>Faylni tanlang</h3>
+          <p>Turini o'zim aniqlayman va eng kerakli amalni taklif qilaman</p>
+          <button class="btn-white-upload" type="button">
+            <span>↑</span><span>Yuklash</span>
+          </button>
         </div>
       </div>
 
-      <button class="submit" id="submit" type="button">
-        <span class="spinner"></span>
-        <span id="submit-text">Slayd yaratish</span>
-      </button>
-      <div class="message" id="message" role="status" aria-live="polite"></div>
-      <button class="close-btn" id="close" type="button">Mini App'ni yopish</button>
-      <p class="note">Taqdimot 6 ta slayddan iborat: muqova va 5 ta mazmunli slayd.</p>
-    </section>
-
-    <!-- ===== 2. Hujjatlar & Rasmlardan PDF ===== -->
-    <section class="panel" id="panel-docs">
-      <!-- Rasmlardan PDF bo'limi -->
-      <div class="img2pdf-box">
-        <div class="img2pdf-head">
-          <h2>1 ta rasm — bitta PDF</h2>
-          <p>Rasmlarni tanlang, bitta sifatli PDF qilib beraman</p>
-        </div>
-
-        <div class="img-preview-grid" id="preview-grid">
-          <div class="add-img-box" id="btn-add-img">
-            <span class="plus-icon">+</span>
-            <span>Qo'shish</span>
-          </div>
-        </div>
-
-        <input type="file" id="img-file-input" multiple accept="image/*" style="display:none">
-
-        <div class="size-selector">
-          <span>Sahifa o'lchami:</span>
-          <div class="seg" style="max-width: 240px;">
-            <button type="button" id="size-a4" class="on">A4</button>
-            <button type="button" id="size-fit">Asl o'lcham</button>
-          </div>
-        </div>
-
-        <button class="submit" id="btn-make-pdf" type="button" disabled style="margin-top: 10px;">
-          <span class="spinner" id="pdf-spinner"></span>
-          <span id="pdf-btn-text">PDF yaratish</span>
-        </button>
-        <div class="message" id="pdf-message"></div>
-      </div>
-
-      <!-- Tarjima / Kirill-Lotin kartasi -->
-      <div class="tool-action-card" onclick="alert('Ushbu xizmat bot chatida ishlaydi. Botga matn yuboring!')">
-        <div class="tool-ac-icon orange">Aa</div>
-        <div class="tool-ac-info">
+      <!-- Tarjima va Kirill-Lotin kartasi -->
+      <div class="card-action-bar" onclick="openToolSubview('translit')">
+        <div class="badge-square-orange">Aa</div>
+        <div class="ac-info">
           <b>Tarjima va Kirill ↔ Lotin</b>
-          <span>Jadval, shrift va qoliplar joyida qoladi</span>
+          <span>Jadval, shrift, rasmlar joyida qoladi</span>
         </div>
-        <span class="tag">UZ·RU·EN</span>
+        <span class="tag-gold">UZ·RU·EN</span>
       </div>
 
-      <div class="sec-head" style="margin-top: 24px;">
-        <h2>Barcha amallar</h2>
-      </div>
+      <div class="section-title">Barcha amallar</div>
 
+      <!-- 6 ta amallar to'ri -->
       <div class="tools-grid">
-        <div class="tool-card" onclick="alert('Word yoki PowerPoint faylingizni bot chatiga yuboring!')">
-          <div class="t-badge blue">W</div>
-          <div>
+        <div class="card-tool" onclick="openToolSubview('to_pdf')">
+          <div class="tool-icon-badge bg-blue">W</div>
+          <div class="tool-texts">
             <b>Hujjatni PDF qilish</b>
             <span>Word, PowerPoint, Excel</span>
           </div>
         </div>
 
-        <div class="tool-card" onclick="document.getElementById('img-file-input').click()">
-          <div class="t-badge purple">JPG</div>
-          <div>
+        <div class="card-tool" onclick="openToolSubview('images_to_pdf')">
+          <div class="tool-icon-badge bg-purple">JPG</div>
+          <div class="tool-texts">
             <b>Rasmlardan PDF</b>
             <span>Bitta yoki ko'p rasm ➔ 1 fayl</span>
           </div>
         </div>
 
-        <div class="tool-card" onclick="alert('PDF faylingizni bot chatiga yuboring!')">
-          <div class="t-badge red">PDF</div>
-          <div>
+        <div class="card-tool" onclick="openToolSubview('pdf_to_img')">
+          <div class="tool-icon-badge bg-red">PDF</div>
+          <div class="tool-texts">
             <b>PDF ➔ rasm</b>
             <span>Har sahifa alohida JPG</span>
           </div>
         </div>
 
-        <div class="tool-card" onclick="alert('Rasmni bot chatiga yuboring, matnini ajratib beraman!')">
-          <div class="t-badge green">OCR</div>
-          <div>
+        <div class="card-tool" onclick="openToolSubview('pdf_to_txt')">
+          <div class="tool-icon-badge bg-gray">TXT</div>
+          <div class="tool-texts">
+            <b>PDF ➔ matn</b>
+            <span>Nusxa olsa bo'ladigan matn</span>
+          </div>
+        </div>
+
+        <div class="card-tool" onclick="openToolSubview('split_pdf')">
+          <div class="tool-icon-badge bg-red">✂️</div>
+          <div class="tool-texts">
+            <b>Sahifalarni ajratish</b>
+            <span>Keraklisini tanlab oling</span>
+          </div>
+        </div>
+
+        <div class="card-tool" onclick="openToolSubview('ocr')">
+          <div class="tool-icon-badge bg-purple">OCR</div>
+          <div class="tool-texts">
             <b>Rasmdan matn</b>
             <span>Suratdagi yozuvni o'qish</span>
           </div>
         </div>
       </div>
+
+      <!-- Oxirgi fayllar tarixi -->
+      <div class="history-header">
+        <b>Oxirgi fayllar</b>
+        <button class="btn-clear" onclick="clearHistory()">Tozalash</button>
+      </div>
+
+      <div id="history-list">
+        <!-- Javascript orqali to'ldiriladi -->
+      </div>
+      <p class="history-note">Fayllar 3 soatdan keyin serverdan butunlay o'chiriladi · 50 MB gacha</p>
     </section>
 
-    <!-- ===== 3. Mavzular ===== -->
-    <section class="panel" id="panel-topics">
-      <div class="chips" id="cats"></div>
-      <div class="grid" id="grid"></div>
+    <!-- ========================================================
+         VIEW 2: RASMLARDAN PDF (Ilova ichida to'liq ochiladi)
+    ======================================================== -->
+    <section class="view-panel" id="view-tool-images-pdf">
+      <div class="subview-top">
+        <button class="btn-back-round" onclick="backToHub()">‹</button>
+        <span class="subview-label">Rasmlardan PDF</span>
+      </div>
+
+      <h1 class="h-title" style="margin-bottom: 6px;">1 ta rasm —<br>bitta PDF</h1>
+      <p style="color: var(--hint); font-size: 13px; margin: 0 0 16px;">Tartibini o'zgartirish yoki yangi rasm qo'shish mumkin</p>
+
+      <div class="img-grid-container" id="pdf-thumbs-grid">
+        <div class="btn-add-slot" onclick="document.getElementById('file-picker-imgs').click()">
+          <span class="plus">+</span>
+          <span>Qo'shish</span>
+        </div>
+      </div>
+
+      <input type="file" id="file-picker-imgs" multiple accept="image/*" style="display:none">
+
+      <div class="seg-size">
+        <span>Sahifa o'lchami</span>
+        <div class="size-toggle">
+          <button type="button" id="sz-a4" class="active" onclick="setPdfSize('a4')">A4</button>
+          <button type="button" id="sz-fit" onclick="setPdfSize('fit')">Rasm o'lchamida</button>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="btn-convert-pdf" disabled onclick="submitImagesToPdf()">
+        <span id="btn-convert-text">PDF yaratish</span>
+      </button>
     </section>
 
-    <!-- ===== 4. Yordam ===== -->
-    <section class="panel" id="panel-help">
-      <div class="sec-head"><h2>Nimalar qila olaman</h2></div>
-      <ul class="help-list">
-        <li><span class="hi">✨</span><div><b>Slayd yaratish</b><span>Mavzuni yozasiz, PowerPoint taqdimot fayli to'g'ridan-to'g'ri Telegram chatingizga keladi.</span></div></li>
-        <li><span class="hi">📄</span><div><b>Rasmlardan PDF</b><span>Bir nechta fotosuratlarni A4 formatdagi sifatli bitta PDF hujjatga aylantiring.</span></div></li>
-        <li><span class="hi">🎨</span><div><b>15 xil uslub va tuzilish</b><span>2 ustun, gorizontal bosqichlar, iqtibos, asimmetrik va minimal ro'yxatlar.</span></div></li>
-        <li><span class="hi">🎁</span><div><b>1-martalik Bepul sinov</b><span>Har bir yangi foydalanuvchi birinchi buyurtmasini mutlaqo bepul oladi!</span></div></li>
-        <li><span class="hi">💳</span><div><b>Click orqali to'lov</b><span>Balansingizni yuqoridagi tugma orqali osongina to'ldirishingiz mumkin.</span></div></li>
-        <li><span class="hi">💎</span><div><b>Obuna paketlari</b><span>Lite, Pro va Ultra obunalari orqali xizmatlardan yanada arzonroq foydalaning.</span></div></li>
-      </ul>
+    <!-- ========================================================
+         VIEW 3: UMUMIY FAYL YUKLASH VA BOSHQA AMALLAR (Ilova ichida)
+    ======================================================== -->
+    <section class="view-panel" id="view-tool-general">
+      <div class="subview-top">
+        <button class="btn-back-round" onclick="backToHub()">‹</button>
+        <span class="subview-label" id="general-tool-title">Amal nomi</span>
+      </div>
+
+      <div class="card-dropzone" style="margin-top: 20px;" onclick="document.getElementById('general-file-picker').click()">
+        <div class="drop-icons">
+          <div class="drop-doc"></div>
+          <div class="drop-pdf" style="background:#2563eb;">DOC</div>
+        </div>
+        <div class="drop-info">
+          <h3 id="general-box-title">Faylni tanlang</h3>
+          <p id="general-box-desc">Qayta ishlash uchun faylingizni yuklang</p>
+          <button class="btn-white-upload" type="button">
+            <span>↑</span><span>Fayl tanlash</span>
+          </button>
+        </div>
+      </div>
+      <input type="file" id="general-file-picker" style="display:none">
+
+      <div id="general-file-info" style="display:none; margin: 16px 0; background: rgba(255,255,255,0.05); padding: 14px; border-radius: 14px;">
+        <b id="selected-file-name" style="font-size: 14px;"></b>
+      </div>
+
+      <button class="btn-primary" id="btn-run-general" disabled onclick="processGeneralTool()">
+        <span>Boshlash</span>
+      </button>
     </section>
+
+    <!-- ========================================================
+         VIEW 4: BO'LIMLAR (SLAYD YARATISH BO'LIMI)
+    ======================================================== -->
+    <section class="view-panel" id="view-sections">
+      <div class="search-box">
+        <input id="slide-topic" type="text" maxlength="200" placeholder="Taqdimot mavzusini yozing...">
+        <button class="go-btn" onclick="submitSlide()">➜</button>
+      </div>
+      <div class="counter-label" id="slide-counter">0 / 200</div>
+
+      <div class="section-title">🔥 Top mavzular</div>
+      <div class="rail-h" id="top-topics-rail"></div>
+
+      <div class="section-title">🎨 Uslub</div>
+      <div class="rail-h" id="slide-styles-rail"></div>
+
+      <div class="section-title">🔤 Alifbo</div>
+      <div class="alpha-seg">
+        <button type="button" class="active" id="btn-alpha-lat" onclick="setAlpha('latin')">Lotin</button>
+        <button type="button" id="btn-alpha-kir" onclick="setAlpha('kirill')">Кирилл</button>
+      </div>
+
+      <button class="btn-primary" id="btn-create-slide" onclick="submitSlide()">
+        <span>Slayd yaratish</span>
+      </button>
+    </section>
+
   </main>
 
-  <!-- ===== To'lov Modali ===== -->
-  <div class="modal-overlay" id="pay-modal">
-    <div class="modal-card">
-      <div class="modal-header">
+  <!-- Balans To'ldirish Modali -->
+  <div class="modal-backdrop" id="topup-modal">
+    <div class="modal-box">
+      <div class="modal-head">
         <h3>💳 Balansni to'ldirish</h3>
-        <button class="modal-close" id="modal-close" type="button">✕</button>
+        <button class="modal-close-btn" onclick="closeTopupModal()">✕</button>
       </div>
-      <p class="modal-desc" id="modal-desc">
-        Hozirgi balansingiz: <b id="modal-balance">0 so'm</b>.<br>
-        To'lov summasini tanlang (Telegram orqali 24/7 xavfsiz to'lov):
-      </p>
-
+      <p style="color: var(--hint); font-size: 13px;">To'lov summasini tanlang (Click orqali to'g'ridan-to'g'ri):</p>
+      
       <div class="topup-grid">
-        <button class="btn-topup" type="button" data-amount="5000">5 000 so'm</button>
-        <button class="btn-topup" type="button" data-amount="10000">10 000 so'm</button>
-        <button class="btn-topup" type="button" data-amount="20000">20 000 so'm</button>
-        <button class="btn-topup" type="button" data-amount="50000">50 000 so'm</button>
+        <button class="btn-topup" onclick="sendTopup(5000)">5 000 so'm</button>
+        <button class="btn-topup" onclick="sendTopup(10000)">10 000 so'm</button>
+        <button class="btn-topup" onclick="sendTopup(20000)">20 000 so'm</button>
+        <button class="btn-topup" onclick="sendTopup(50000)">50 000 so'm</button>
       </div>
 
-      <button class="btn-sub-promo" id="btn-open-subs" type="button">
-        💎 Chegirmali Obuna Paketlari
-      </button>
+      <button class="btn-sub-action" onclick="openSubs()">💎 Chegirmali Obunalar</button>
     </div>
   </div>
 
   <script>
-    (function () {
-      var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-      if (tg) {
-        tg.ready();
-        tg.expand();
-        try { tg.setHeaderColor("#0d0e1b"); tg.setBackgroundColor("#0d0e1b"); } catch (e) { }
-      }
-      var initData = tg ? tg.initData : "";
+    var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      try { tg.setHeaderColor("#0b111e"); tg.setBackgroundColor("#0b111e"); } catch (e) {}
+    }
+    var initData = tg ? tg.initData : "";
 
-      var MAX_LEN = 200;
-      var MIN_LEN = 3;
-      var REQUEST_TIMEOUT_MS = 150000;
+    // Holat o'zgaruvchilari
+    var currentAlphabet = "latin";
+    var currentSlideStyle = "classic";
+    var selectedPdfFiles = [];
+    var selectedPdfSize = "a4";
+    var activeToolKind = "";
+    var selectedGeneralFile = null;
 
-      var STYLES = [
-        { id: "classic",        layout: "two_cols",   name: "Klassik",     desc: "2 ustun, indigo",      bg: "#ffffff", accent: "#4f46e5", card: "#f3f4f6" },
-        { id: "business",       layout: "process",    name: "Biznes",      desc: "Gorizontal 3 bosqich", bg: "#f0f4f8", accent: "#0284c7", card: "#ffffff" },
-        { id: "dark",           layout: "hero",       name: "Qorong'i",    desc: "Katta asosiy g'oya",   bg: "#111827", accent: "#a855f7", card: "#1f2937" },
-        { id: "minimal",        layout: "minimal",    name: "Minimal",     desc: "Chiziqli, eko yashil", bg: "#f0fdf4", accent: "#22c55e", card: "#ffffff" },
-        { id: "swiss_clean",    layout: "split",      name: "Shveysariya", desc: "Chap dominant blok",   bg: "#ffffff", accent: "#e11d48", card: "#f5f5f5" },
-        { id: "cyber_tech",     layout: "square",     name: "Cyber Tech",  desc: "Neon kvadrat nishon",  bg: "#0a0f1e", accent: "#06b6d4", card: "#131d38" },
-        { id: "warm_editorial", layout: "two_cols",   name: "Editorial",   desc: "2 ustun, qahva",       bg: "#fefcf7", accent: "#d97706", card: "#fff7ed" },
-        { id: "sunset_punch",   layout: "process",    name: "Sunset",      desc: "Olovrang bosqichlar",  bg: "#fffaf5", accent: "#f97316", card: "#ffedd5" },
-        { id: "ocean_breeze",   layout: "split",      name: "Ocean",       desc: "Moviy asimmetriya",    bg: "#f0f9ff", accent: "#0ea5e9", card: "#ffffff" },
-        { id: "monochrome",     layout: "minimal",    name: "Monoxrom",    desc: "Qora-oq minimalizm",   bg: "#f5f5f5", accent: "#000000", card: "#ffffff" },
-        { id: "emerald_wealth", layout: "two_cols",   name: "Zumrad",      desc: "2 ustun, moliya",      bg: "#f0fdfa", accent: "#0d9488", card: "#ffffff" },
-        { id: "berry_creative", layout: "hero",       name: "Berry",       desc: "Magenta iqtibos",      bg: "#fdf2f8", accent: "#db2777", card: "#ffffff" },
-        { id: "titanium_slate", layout: "process",    name: "Titanium",    desc: "Muhandislik 3 karta",  bg: "#f1f5f9", accent: "#64748b", card: "#ffffff" },
-        { id: "midnight_gold",  layout: "split",      name: "Tungi Oltin", desc: "Premium asimmetrik",   bg: "#0f172a", accent: "#eab308", card: "#1e293b" },
-        { id: "nordic_frost",   layout: "round",      name: "Nordic",      desc: "Aylana ro'yxat",       bg: "#f8fafc", accent: "#38bdf8", card: "#ffffff" }
-      ];
+    // Mavzular va Uslublar
+    var TOPICS = [
+      { title: "Sun'iy intellekt kelajagi", emoji: "🤖", g: ["#7f00ff", "#e100ff"] },
+      { title: "Startap qanday boshlanadi", emoji: "🚀", g: ["#ff512f", "#dd2476"] },
+      { title: "Sog'lom turmush tarzi", emoji: "🥗", g: ["#56ab2f", "#a8e063"] },
+      { title: "Iqlim o'zgarishi", emoji: "🌍", g: ["#00b09b", "#96c93d"] }
+    ];
 
-      var CATS = ["Hammasi", "Ta'lim", "Texnologiya", "Biznes", "Sog'liq", "Tabiat"];
+    var STYLES = [
+      { id: "classic", name: "Klassik", desc: "2 ustun, indigo", bg: "#ffffff" },
+      { id: "business", name: "Biznes", desc: "3 bosqich", bg: "#f0f4f8" },
+      { id: "dark", name: "Qorong'i", desc: "Asosiy g'oya", bg: "#111827" },
+      { id: "minimal", name: "Minimal", desc: "Chiziqli yashil", bg: "#f0fdf4" }
+    ];
 
-      var TOPICS = [
-        { cat: "Texnologiya", top: true, title: "Sun'iy intellekt kelajagi",   emoji: "🤖", g: ["#7f00ff", "#e100ff"] },
-        { cat: "Biznes",      top: true, title: "Startap qanday boshlanadi",   emoji: "🚀", g: ["#ff512f", "#dd2476"] },
-        { cat: "Sog'liq",     top: true, title: "Sog'lom turmush tarzi",       emoji: "🥗", g: ["#56ab2f", "#a8e063"] },
-        { cat: "Tabiat",      top: true, title: "Iqlim o'zgarishi",            emoji: "🌍", g: ["#00b09b", "#96c93d"] },
-        { cat: "Ta'lim",      top: true, title: "Zamonaviy ta'lim usullari",   emoji: "🎓", g: ["#6a11cb", "#2575fc"] },
-        { cat: "Tabiat",      top: true, title: "O'zbekiston turizmi",         emoji: "🕌", g: ["#2193b0", "#6dd5ed"] },
-        { cat: "Ta'lim",      title: "Xorijiy tillarni tez o'rganish",        emoji: "🗣️", g: ["#f7971e", "#e8a600"] },
-        { cat: "Ta'lim",      title: "Kitob o'qishning foydasi",              emoji: "📚", g: ["#11998e", "#38b86d"] },
-        { cat: "Texnologiya", title: "Kiberxavfsizlik asoslari",              emoji: "🛡️", g: ["#0f2027", "#2c5364"] },
-        { cat: "Texnologiya", title: "Blokcheyn va kriptovalyuta",            emoji: "⛓️", g: ["#f12711", "#f5af19"] },
-        { cat: "Biznes",      title: "Marketing asoslari",                    emoji: "📈", g: ["#1d976c", "#3fc38a"] },
-        { cat: "Biznes",      title: "Vaqtni to'g'ri boshqarish",             emoji: "⏰", g: ["#396afc", "#2948ff"] },
-        { cat: "Sog'liq",     title: "Uyqu va salomatlik",                    emoji: "😴", g: ["#4b6cb7", "#182848"] },
-        { cat: "Sog'liq",     title: "Stressni yengish usullari",             emoji: "🧘", g: ["#c471f5", "#fa71cd"] },
-        { cat: "Tabiat",      title: "Qayta tiklanuvchi energiya",            emoji: "☀️", g: ["#f2994a", "#f2c94c"] }
-      ];
+    // Tarix (LocalStorage)
+    function loadHistory() {
+      var list = JSON.parse(localStorage.getItem("recent_files") || "[]");
+      var container = document.getElementById("history-list");
+      container.innerHTML = "";
 
-      var topicEl = document.getElementById("topic");
-      var counterEl = document.getElementById("counter");
-      var submitEl = document.getElementById("submit");
-      var submitTextEl = document.getElementById("submit-text");
-      var goEl = document.getElementById("go");
-      var messageEl = document.getElementById("message");
-      var closeEl = document.getElementById("close");
-      var limitBtnEl = document.getElementById("limit-btn");
-      var limitTextEl = document.getElementById("limit-text");
-      var limitIconEl = document.getElementById("limit-icon");
-      var countEl = document.getElementById("count");
-
-      var payModal = document.getElementById("pay-modal");
-      var modalClose = document.getElementById("modal-close");
-      var modalBalance = document.getElementById("modal-balance");
-      var btnOpenSubs = document.getElementById("btn-open-subs");
-
-      var busy = false;
-      var selectedStyle = "classic";
-      var selectedAlphabet = "latin";
-      var currentBalance = 0;
-      var freeUsed = 0;
-      var isSubscriber = false;
-
-      function el(tag, className, text) {
-        var node = document.createElement(tag);
-        if (className) node.className = className;
-        if (text !== undefined) node.textContent = text;
-        return node;
+      if (list.length === 0) {
+        // Skrinshotdagi kabi standart boshlang'ich namuna
+        container.innerHTML = `
+          <div class="history-card">
+            <div class="history-badge">PDF</div>
+            <div class="history-info">
+              <b>16831.pdf</b>
+              <span>1 ta rasm ➔ PDF</span>
+            </div>
+            <span class="history-time">hozir</span>
+          </div>
+        `;
+        return;
       }
 
-      function haptic(type) {
-        try {
-          if (tg && tg.HapticFeedback) {
-            if (type === "select") tg.HapticFeedback.selectionChanged();
-            else tg.HapticFeedback.notificationOccurred(type);
-          }
-        } catch (e) { }
+      list.forEach(function(item) {
+        var card = document.createElement("div");
+        card.className = "history-card";
+        card.innerHTML = `
+          <div class="history-badge">${item.ext.toUpperCase()}</div>
+          <div class="history-info">
+            <b>${item.name}</b>
+            <span>${item.desc}</span>
+          </div>
+          <span class="history-time">${item.time}</span>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function addHistoryItem(name, desc, ext) {
+      var list = JSON.parse(localStorage.getItem("recent_files") || "[]");
+      list.unshift({ name: name, desc: desc, ext: ext, time: "hozir" });
+      if (list.length > 5) list.pop();
+      localStorage.setItem("recent_files", JSON.stringify(list));
+      loadHistory();
+    }
+
+    function clearHistory() {
+      localStorage.removeItem("recent_files");
+      loadHistory();
+    }
+
+    // ---------- Navigatsiya (Bo'limlar ↔ Hujjatlar) ----------
+    function switchNav(type) {
+      document.querySelectorAll(".view-panel").forEach(function(p) { p.classList.remove("active"); });
+      var btnSec = document.getElementById("tab-btn-sections");
+      var btnDocs = document.getElementById("tab-btn-docs");
+
+      if (type === "sections") {
+        btnSec.className = "nav-btn active-yellow";
+        btnDocs.className = "nav-btn";
+        document.getElementById("view-sections").classList.add("active");
+      } else {
+        btnDocs.className = "nav-btn active-cyan";
+        btnSec.className = "nav-btn";
+        document.getElementById("view-docs-hub").classList.add("active");
       }
+    }
 
-      function showMessage(kind, text) {
-        messageEl.className = "message show " + kind;
-        messageEl.textContent = text;
-      }
-      function hideMessage() {
-        messageEl.className = "message";
-        messageEl.textContent = "";
-      }
+    // ---------- Subview (Ilova ichida amallarni ochish) ----------
+    function openToolSubview(kind) {
+      activeToolKind = kind;
+      document.querySelectorAll(".view-panel").forEach(function(p) { p.classList.remove("active"); });
 
-      function setBusy(value) {
-        busy = value;
-        submitEl.disabled = value;
-        goEl.disabled = value;
-        topicEl.disabled = value;
-        submitEl.classList.toggle("loading", value);
-        submitTextEl.textContent = value ? "Tayyorlanmoqda..." : "Slayd yaratish";
-      }
+      if (kind === "images_to_pdf") {
+        document.getElementById("view-tool-images-pdf").classList.add("active");
+      } else {
+        var genView = document.getElementById("view-tool-general");
+        var genTitle = document.getElementById("general-tool-title");
+        var genBoxTtl = document.getElementById("general-box-title");
+        var genBoxDesc = document.getElementById("general-box-desc");
 
-      function updateCounter() {
-        var len = topicEl.value.length;
-        counterEl.textContent = len + " / " + MAX_LEN;
-        counterEl.classList.toggle("limit-hit", len >= MAX_LEN);
-      }
-
-      function extractError(data, status) {
-        if (data && typeof data.detail === "string") return data.detail;
-        if (data && Array.isArray(data.detail)) return "Kiritilgan ma'lumot noto'g'ri. Mavzuni tekshirib ko'ring.";
-        return "Xatolik yuz berdi (" + status + "). Qayta urinib ko'ring.";
-      }
-
-      // ---------- Balans va Limitni Yangilash ----------
-      function applyUserData(data) {
-        if (!data) return;
-        if (data.alphabet) setAlphabet(data.alphabet);
-        
-        currentBalance = data.balance || 0;
-        freeUsed = data.free_used || 0;
-        isSubscriber = !!data.is_subscriber;
-
-        modalBalance.textContent = currentBalance.toLocaleString() + " so'm";
-
-        if (freeUsed === 0) {
-          limitIconEl.textContent = "🎁";
-          limitTextEl.textContent = "1 bepul";
-        } else if (isSubscriber) {
-          limitIconEl.textContent = "💎";
-          limitTextEl.textContent = "VIP";
+        if (kind === "universal") {
+          genTitle.textContent = "Faylni aniqlash";
+          genBoxTtl.textContent = "Hujjat yoki rasmni tanlang";
+          genBoxDesc.textContent = "Word, PDF yoki fotosurat yuklang";
+        } else if (kind === "to_pdf") {
+          genTitle.textContent = "Hujjatni PDF qilish";
+          genBoxTtl.textContent = "Word yoki PPTX tanlang";
+          genBoxDesc.textContent = "PDF formatiga o'tkazib beraman";
+        } else if (kind === "ocr") {
+          genTitle.textContent = "Rasmdan matn (OCR)";
+          genBoxTtl.textContent = "Yozuvli rasmni tanlang";
+          genBoxDesc.textContent = "Suratdagi matnni ajratib olaman";
+        } else if (kind === "translit") {
+          genTitle.textContent = "Kirill ↔ Lotin";
+          genBoxTtl.textContent = "Word faylni tanlang";
+          genBoxDesc.textContent = "Formatini buzmasdan o'girib beraman";
         } else {
-          limitIconEl.textContent = "💳";
-          limitTextEl.textContent = currentBalance.toLocaleString() + " so'm";
+          genTitle.textContent = "PDF xizmati";
+          genBoxTtl.textContent = "PDF faylni tanlang";
+          genBoxDesc.textContent = "Sahifalarni ajratish yoki qayta ishlash";
         }
-      }
 
-      async function loadUserData() {
-        if (!initData) {
-          limitTextEl.textContent = "0 so'm";
-          return;
-        }
-        try {
-          var response = await fetch("/api/me", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ init_data: initData })
-          });
-          if (response.ok) applyUserData(await response.json());
-        } catch (e) { }
+        document.getElementById("selected-file-name").textContent = "";
+        document.getElementById("general-file-info").style.display = "none";
+        document.getElementById("btn-run-general").disabled = true;
+        genView.classList.add("active");
       }
+    }
 
-      // ---------- Modal Dialog (To'lov) ----------
-      function openModal() {
-        payModal.classList.add("open");
-        haptic("select");
-      }
-      function closeModal() {
-        payModal.classList.remove("open");
-      }
+    function backToHub() {
+      document.querySelectorAll(".view-panel").forEach(function(p) { p.classList.remove("active"); });
+      document.getElementById("view-docs-hub").classList.add("active");
+    }
 
-      limitBtnEl.addEventListener("click", openModal);
-      modalClose.addEventListener("click", closeModal);
-      payModal.addEventListener("click", function (e) {
-        if (e.target === payModal) closeModal();
+    // ---------- 1 TA RASM - BITTA PDF MANTIQI ----------
+    document.getElementById("file-picker-imgs").addEventListener("change", function(e) {
+      var files = Array.from(e.target.files);
+      if (files.length) {
+        selectedPdfFiles = selectedPdfFiles.concat(files);
+        renderThumbs();
+      }
+      this.value = "";
+    });
+
+    function setPdfSize(sz) {
+      selectedPdfSize = sz;
+      document.getElementById("sz-a4").classList.toggle("active", sz === "a4");
+      document.getElementById("sz-fit").classList.toggle("active", sz === "fit");
+    }
+
+    function renderThumbs() {
+      var grid = document.getElementById("pdf-thumbs-grid");
+      grid.innerHTML = "";
+
+      selectedPdfFiles.forEach(function(file, index) {
+        var box = document.createElement("div");
+        box.className = "img-box";
+
+        var img = document.createElement("img");
+        img.src = URL.createObjectURL(file);
+
+        var num = document.createElement("div");
+        num.className = "img-num";
+        num.textContent = index + 1;
+
+        var del = document.createElement("button");
+        del.className = "img-del";
+        del.textContent = "✕";
+        del.onclick = function(e) {
+          e.stopPropagation();
+          selectedPdfFiles.splice(index, 1);
+          renderThumbs();
+        };
+
+        box.appendChild(img);
+        box.appendChild(num);
+        box.appendChild(del);
+        grid.appendChild(box);
       });
 
-      document.querySelectorAll(".btn-topup").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          var amt = btn.getAttribute("data-amount");
-          haptic("select");
-          closeModal();
-          showMessage("info", "To'lov cheki Telegram chatingizga yuborilmoqda...");
+      var addSlot = document.createElement("div");
+      addSlot.className = "btn-add-slot";
+      addSlot.innerHTML = `<span class="plus">+</span><span>Qo'shish</span>`;
+      addSlot.onclick = function() { document.getElementById("file-picker-imgs").click(); };
+      grid.appendChild(addSlot);
+
+      var btn = document.getElementById("btn-convert-pdf");
+      btn.disabled = selectedPdfFiles.length === 0;
+      document.getElementById("btn-convert-text").textContent = selectedPdfFiles.length > 0 
+        ? "PDF yaratish (" + selectedPdfFiles.length + " ta)" 
+        : "PDF yaratish";
+    }
+
+    async function submitImagesToPdf() {
+      if (!selectedPdfFiles.length) return;
+      var btn = document.getElementById("btn-convert-pdf");
+      var txt = document.getElementById("btn-convert-text");
+      btn.disabled = true;
+      txt.textContent = "PDF tayyorlanmoqda...";
+
+      var formData = new FormData();
+      formData.append("init_data", initData);
+      formData.append("page_size", selectedPdfSize);
+      selectedPdfFiles.forEach(function(f) { formData.append("files", f); });
+
+      try {
+        var res = await fetch("/api/images-to-pdf", { method: "POST", body: formData });
+        var data = await res.json();
+        if (res.ok) {
+          addHistoryItem("hujjat_" + Math.floor(Math.random() * 90000 + 10000) + ".pdf", selectedPdfFiles.length + " ta rasm ➔ PDF", "pdf");
           if (tg) {
-            tg.sendData("topup_" + amt);
-            setTimeout(function () { tg.close(); }, 300);
-          }
-        });
-      });
-
-      btnOpenSubs.addEventListener("click", function () {
-        haptic("select");
-        closeModal();
-        if (tg) {
-          tg.sendData("open_subs");
-          setTimeout(function () { tg.close(); }, 300);
-        }
-      });
-
-      // ---------- Tablar ----------
-      function switchTab(name) {
-        var tabs = document.querySelectorAll(".tab");
-        for (var i = 0; i < tabs.length; i++) {
-          tabs[i].classList.toggle("active", tabs[i].getAttribute("data-tab") === name);
-        }
-        var panels = document.querySelectorAll(".panel");
-        for (var j = 0; j < panels.length; j++) {
-          panels[j].classList.toggle("active", panels[j].id === "panel-" + name);
-        }
-        countEl.style.display = (name === "help" || name === "docs") ? "none" : "";
-        window.scrollTo(0, 0);
-        haptic("select");
-      }
-
-      document.getElementById("tabs").addEventListener("click", function (event) {
-        var btn = event.target.closest(".tab");
-        if (btn) switchTab(btn.getAttribute("data-tab"));
-      });
-
-      // ---------- Poster kartalari ----------
-      function makePoster(topic, rank) {
-        var btn = el("button", "poster");
-        btn.type = "button";
-        var art = el("div", "art");
-        art.style.background = "linear-gradient(145deg, " + topic.g[0] + ", " + topic.g[1] + ")";
-        art.appendChild(el("span", "badge", "#" + rank));
-        art.appendChild(el("span", "emoji", topic.emoji));
-        art.appendChild(el("span", "pill", "6 slayd"));
-        btn.appendChild(art);
-        btn.appendChild(el("div", "ptitle", topic.title));
-        btn.addEventListener("click", function () {
-          if (busy) return;
-          topicEl.value = topic.title;
-          updateCounter();
-          hideMessage();
-          switchTab("create");
-        });
-        return btn;
-      }
-
-      var topRail = document.getElementById("top-rail");
-      TOPICS.forEach(function (topic, index) {
-        if (topic.top) topRail.appendChild(makePoster(topic, index + 1));
-      });
-
-      var gridEl = document.getElementById("grid");
-      var catsEl = document.getElementById("cats");
-      var activeCat = "Hammasi";
-
-      function renderGrid() {
-        gridEl.textContent = "";
-        TOPICS.forEach(function (topic, index) {
-          if (activeCat === "Hammasi" || topic.cat === activeCat) {
-            gridEl.appendChild(makePoster(topic, index + 1));
-          }
-        });
-      }
-
-      CATS.forEach(function (cat) {
-        var chip = el("button", "chip" + (cat === activeCat ? " active" : ""), cat);
-        chip.type = "button";
-        chip.addEventListener("click", function () {
-          activeCat = cat;
-          var chips = catsEl.children;
-          for (var i = 0; i < chips.length; i++) chips[i].classList.toggle("active", chips[i] === chip);
-          renderGrid();
-          haptic("select");
-        });
-        catsEl.appendChild(chip);
-      });
-      renderGrid();
-
-      countEl.textContent = TOPICS.length + " ta tayyor mavzu · posterini bosing";
-
-      // ---------- Uslublar ----------
-      var stylesEl = document.getElementById("styles");
-      STYLES.forEach(function (st) {
-        var btn = el("button", "sty" + (st.id === selectedStyle ? " sel" : ""));
-        btn.type = "button";
-        btn.setAttribute("data-style", st.id);
-
-        var pv = el("div", "pv");
-        pv.style.background = st.bg;
-        pv.style.setProperty("--acc", st.accent);
-
-        var bar = el("div", "bar"); bar.style.background = st.accent; pv.appendChild(bar);
-        var ttl = el("div", "ttl"); ttl.style.background = st.accent; pv.appendChild(ttl);
-
-        if (st.layout === "two_cols") {
-          var wrap = el("div", "pv-col-wrap");
-          var c1 = el("div", "pv-col"); c1.style.background = st.card;
-          var c2 = el("div", "pv-col"); c2.style.background = st.card;
-          wrap.appendChild(c1); wrap.appendChild(c2);
-          pv.appendChild(wrap);
-        } else if (st.layout === "process") {
-          var wrap = el("div", "pv-proc-wrap");
-          for (var k = 0; k < 3; k++) {
-            var col = el("div", "pv-proc-col"); col.style.background = st.card;
-            var h = el("div", "pv-proc-head"); col.appendChild(h);
-            wrap.appendChild(col);
-          }
-          pv.appendChild(wrap);
-        } else if (st.layout === "hero") {
-          var hero = el("div", "pv-hero-box"); hero.style.background = st.card; pv.appendChild(hero);
-          var subWrap = el("div", "pv-sub-wrap");
-          var s1 = el("div", "pv-sub-item"); s1.style.background = st.card;
-          var s2 = el("div", "pv-sub-item"); s2.style.background = st.card;
-          subWrap.appendChild(s1); subWrap.appendChild(s2);
-          pv.appendChild(subWrap);
-        } else if (st.layout === "split") {
-          var wrap = el("div", "pv-split-wrap");
-          var l = el("div", "pv-split-left");
-          var r = el("div", "pv-split-right");
-          var r1 = el("div", "pv-split-row"); r1.style.background = st.card;
-          var r2 = el("div", "pv-split-row"); r2.style.background = st.card;
-          r.appendChild(r1); r.appendChild(r2);
-          wrap.appendChild(l); wrap.appendChild(r);
-          pv.appendChild(wrap);
-        } else if (st.layout === "minimal") {
-          var wrap = el("div", "pv-min-wrap");
-          wrap.appendChild(el("div", "pv-min-line"));
-          wrap.appendChild(el("div", "pv-min-line"));
-          wrap.appendChild(el("div", "pv-min-line"));
-          pv.appendChild(wrap);
-        } else if (st.layout === "square") {
-          [36, 64].forEach(function (top) {
-            var row = el("div", "pv-sq-row");
-            row.style.top = top + "px";
-            row.style.background = st.card;
-            var sq = el("div", "pv-sq-badge");
-            row.appendChild(sq);
-            pv.appendChild(row);
-          });
-        } else {
-          [36, 64].forEach(function (top) {
-            var row = el("div", "pv-rd-row");
-            row.style.top = top + "px";
-            row.style.background = st.card;
-            var dot = el("div", "pv-rd-badge");
-            row.appendChild(dot);
-            pv.appendChild(row);
-          });
-        }
-
-        pv.appendChild(el("div", "check", "✓"));
-
-        btn.appendChild(pv);
-        btn.appendChild(el("div", "sname", st.name));
-        btn.appendChild(el("div", "sdesc", st.desc));
-        btn.addEventListener("click", function () {
-          if (busy) return;
-          selectedStyle = st.id;
-          var all = stylesEl.children;
-          for (var i = 0; i < all.length; i++) all[i].classList.toggle("sel", all[i] === btn);
-          haptic("select");
-        });
-        stylesEl.appendChild(btn);
-      });
-
-      // ---------- Alifbo ----------
-      var alphaEl = document.getElementById("alpha");
-      function setAlphabet(code) {
-        selectedAlphabet = code === "kirill" ? "kirill" : "latin";
-        var buttons = alphaEl.querySelectorAll("button");
-        for (var i = 0; i < buttons.length; i++) {
-          buttons[i].classList.toggle("on", buttons[i].getAttribute("data-alpha") === selectedAlphabet);
-        }
-      }
-      alphaEl.addEventListener("click", function (event) {
-        var btn = event.target.closest("button");
-        if (!btn || busy) return;
-        setAlphabet(btn.getAttribute("data-alpha"));
-        haptic("select");
-      });
-
-      // ---------- Slayd yaratish ----------
-      async function generate() {
-        if (busy) return;
-        hideMessage();
-        closeEl.classList.remove("show");
-
-        var topic = topicEl.value.trim();
-
-        if (!initData) {
-          showMessage("error", "Bu sahifani Telegram ichidagi bot orqali oching (botda /start bosing).");
-          haptic("error");
-          return;
-        }
-        if (topic.length < MIN_LEN) {
-          showMessage("error", "Mavzu kamida " + MIN_LEN + " ta belgidan iborat bo'lsin.");
-          haptic("error");
-          topicEl.focus();
-          return;
-        }
-
-        setBusy(true);
-        showMessage("info", "Slayd tayyorlanmoqda, bu 20-60 soniya olishi mumkin. Sahifani yopmang.");
-
-        var controller = new AbortController();
-        var timer = setTimeout(function () { controller.abort(); }, REQUEST_TIMEOUT_MS);
-
-        try {
-          var response = await fetch("/api/generate-slide", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ init_data: initData, topic: topic, template: selectedStyle, alphabet: selectedAlphabet }),
-            signal: controller.signal
-          });
-
-          var data = null;
-          try { data = await response.json(); } catch (e) { }
-
-          if (!response.ok) {
-            if (response.status === 402) {
-              openModal();
-              showMessage("error", extractError(data, response.status));
-            } else {
-              showMessage("error", extractError(data, response.status));
-            }
-            haptic("error");
-            return;
-          }
-
-          showMessage("success", "✅ Slayd tayyor! Telegram chatingizga fayl yuborildi.");
-          closeEl.classList.add("show");
-          haptic("success");
-        } catch (err) {
-          if (err && err.name === "AbortError") {
-            showMessage("error", "Kutish vaqti tugadi. Telegram chatini tekshiring, kerak bo'lsa qayta urinib ko'ring.");
+            tg.showAlert("✅ PDF faylingiz Telegram chatga yuborildi!");
+            backToHub();
           } else {
-            showMessage("error", "Serverga ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring.");
+            alert("PDF faylingiz chatga yuborildi!");
+            backToHub();
           }
-          haptic("error");
-        } finally {
-          clearTimeout(timer);
-          setBusy(false);
-          loadUserData();
-        }
-      }
-
-      // =========================================================
-      // RASMLARDAN PDF YARATISH MANTIQI (HUJJATLAR TABI)
-      // =========================================================
-      var selectedPdfFiles = [];
-      var selectedPdfSize = "a4";
-
-      var btnAddImg = document.getElementById("btn-add-img");
-      var imgFileInput = document.getElementById("img-file-input");
-      var previewGrid = document.getElementById("preview-grid");
-      var sizeA4Btn = document.getElementById("size-a4");
-      var sizeFitBtn = document.getElementById("size-fit");
-      var btnMakePdf = document.getElementById("btn-make-pdf");
-      var pdfSpinner = document.getElementById("pdf-spinner");
-      var pdfBtnText = document.getElementById("pdf-btn-text");
-      var pdfMessage = document.getElementById("pdf-message");
-
-      function showPdfMessage(kind, text) {
-        pdfMessage.className = "message show " + kind;
-        pdfMessage.textContent = text;
-      }
-      function hidePdfMessage() {
-        pdfMessage.className = "message";
-        pdfMessage.textContent = "";
-      }
-
-      btnAddImg.addEventListener("click", function () {
-        imgFileInput.click();
-      });
-
-      imgFileInput.addEventListener("change", function (e) {
-        var files = Array.from(e.target.files);
-        if (files.length) {
-          selectedPdfFiles = selectedPdfFiles.concat(files);
-          renderPdfThumbs();
-        }
-        imgFileInput.value = "";
-      });
-
-      sizeA4Btn.addEventListener("click", function () {
-        selectedPdfSize = "a4";
-        sizeA4Btn.classList.add("on");
-        sizeFitBtn.classList.remove("on");
-        haptic("select");
-      });
-
-      sizeFitBtn.addEventListener("click", function () {
-        selectedPdfSize = "fit";
-        sizeFitBtn.classList.add("on");
-        sizeA4Btn.classList.remove("on");
-        haptic("select");
-      });
-
-      function renderPdfThumbs() {
-        hidePdfMessage();
-        previewGrid.innerHTML = "";
-
-        selectedPdfFiles.forEach(function (file, index) {
-          var box = el("div", "img-thumb-box");
-          var img = el("img");
-          img.src = URL.createObjectURL(file);
-
-          var num = el("span", "img-thumb-num", (index + 1).toString());
-          var del = el("button", "img-thumb-del", "✕");
-          del.type = "button";
-          del.addEventListener("click", function (ev) {
-            ev.stopPropagation();
-            selectedPdfFiles.splice(index, 1);
-            renderPdfThumbs();
-            haptic("select");
-          });
-
-          box.appendChild(img);
-          box.appendChild(num);
-          box.appendChild(del);
-          previewGrid.appendChild(box);
-        });
-
-        // + Qo'shish katagini qayta joylash
-        var addBox = el("div", "add-img-box");
-        addBox.appendChild(el("span", "plus-icon", "+"));
-        addBox.appendChild(el("span", "", "Qo'shish"));
-        addBox.addEventListener("click", function () {
-          imgFileInput.click();
-        });
-        previewGrid.appendChild(addBox);
-
-        btnMakePdf.disabled = selectedPdfFiles.length === 0;
-        pdfBtnText.textContent = selectedPdfFiles.length > 0 ? "PDF yaratish (" + selectedPdfFiles.length + " ta)" : "PDF yaratish";
-      }
-
-      async function makePdf() {
-        if (!selectedPdfFiles.length) return;
-        hidePdfMessage();
-
-        if (!initData) {
-          showPdfMessage("error", "Bu sahifani Telegram bot ichida oching.");
-          haptic("error");
-          return;
-        }
-
-        btnMakePdf.disabled = true;
-        btnMakePdf.classList.add("loading");
-        pdfSpinner.style.display = "block";
-        pdfBtnText.textContent = "PDF tayyorlanmoqda...";
-        showPdfMessage("info", "Rasmlar qayta ishlanib, PDF shakllanmoqda. Biroz kuting...");
-
-        var formData = new FormData();
-        formData.append("init_data", initData);
-        formData.append("page_size", selectedPdfSize);
-
-        selectedPdfFiles.forEach(function (file) {
-          formData.append("files", file);
-        });
-
-        try {
-          var res = await fetch("/api/images-to-pdf", {
-            method: "POST",
-            body: formData
-          });
-
-          var data = null;
-          try { data = await res.json(); } catch (e) { }
-
-          if (!res.ok) {
-            showPdfMessage("error", (data && data.detail) ? data.detail : "PDF yaratishda xatolik yuz berdi.");
-            haptic("error");
-            return;
-          }
-
-          showPdfMessage("success", "✅ PDF fayl tayyorlandi va Telegram chatingizga yuborildi!");
-          haptic("success");
           selectedPdfFiles = [];
-          renderPdfThumbs();
-        } catch (err) {
-          showPdfMessage("error", "Serverga ulanishda xatolik yuz berdi. Internetni tekshiring.");
-          haptic("error");
-        } finally {
-          btnMakePdf.disabled = selectedPdfFiles.length === 0;
-          btnMakePdf.classList.remove("loading");
-          pdfSpinner.style.display = "none";
-          pdfBtnText.textContent = "PDF yaratish";
+          renderThumbs();
+        } else {
+          alert(data.detail || "Xatolik yuz berdi");
         }
+      } catch (e) {
+        alert("Serverga ulanishda xato!");
+      } finally {
+        btn.disabled = false;
+        txt.textContent = "PDF yaratish";
       }
+    }
 
-      btnMakePdf.addEventListener("click", makePdf);
+    // ---------- Boshqa Amallar Uchin Fayl Tanlash ----------
+    document.getElementById("general-file-picker").addEventListener("change", function(e) {
+      if (e.target.files.length) {
+        selectedGeneralFile = e.target.files[0];
+        document.getElementById("selected-file-name").textContent = "Tanlandi: " + selectedGeneralFile.name;
+        document.getElementById("general-file-info").style.display = "block";
+        document.getElementById("btn-run-general").disabled = false;
+      }
+    });
 
-      // ---------- Boshqa hodisalar ----------
-      topicEl.addEventListener("input", updateCounter);
-      topicEl.addEventListener("keydown", function (event) {
-        if (event.key === "Enter") { event.preventDefault(); topicEl.blur(); generate(); }
+    function processGeneralTool() {
+      if (!selectedGeneralFile) return;
+      alert("✅ Fayl qabul qilindi! Jarayon yakunlangach bot chatiga yuboriladi.");
+      addHistoryItem(selectedGeneralFile.name, "Tayyorlandi", "doc");
+      backToHub();
+    }
+
+    // ---------- Slayd Yaratish Bo'limi ----------
+    function initSlidesView() {
+      var rail = document.getElementById("top-topics-rail");
+      TOPICS.forEach(function(t, i) {
+        var d = document.createElement("div");
+        d.className = "poster-item";
+        d.innerHTML = `
+          <div class="poster-art" style="background: linear-gradient(135deg, ${t.g[0]}, ${t.g[1]})">
+            <span class="rank">#${i+1}</span>
+            <span class="emoji">${t.emoji}</span>
+          </div>
+          <div class="poster-title">${t.title}</div>
+        `;
+        d.onclick = function() {
+          document.getElementById("slide-topic").value = t.title;
+          document.getElementById("slide-counter").textContent = t.title.length + " / 200";
+        };
+        rail.appendChild(d);
       });
-      submitEl.addEventListener("click", generate);
-      goEl.addEventListener("click", generate);
-      closeEl.addEventListener("click", function () { if (tg) tg.close(); });
 
-      updateCounter();
-      loadUserData();
-    })();
+      var sRail = document.getElementById("slide-styles-rail");
+      STYLES.forEach(function(s) {
+        var card = document.createElement("div");
+        card.className = "style-card" + (s.id === currentSlideStyle ? " selected" : "");
+        card.innerHTML = `
+          <div class="style-preview" style="background: ${s.bg};"></div>
+          <div class="style-title">${s.name}</div>
+          <div class="style-desc">${s.desc}</div>
+        `;
+        card.onclick = function() {
+          currentSlideStyle = s.id;
+          document.querySelectorAll(".style-card").forEach(function(c) { c.classList.remove("selected"); });
+          card.classList.add("selected");
+        };
+        sRail.appendChild(card);
+      });
+
+      document.getElementById("slide-topic").addEventListener("input", function() {
+        document.getElementById("slide-counter").textContent = this.value.length + " / 200";
+      });
+    }
+
+    function setAlpha(a) {
+      currentAlphabet = a;
+      document.getElementById("btn-alpha-lat").classList.toggle("active", a === "latin");
+      document.getElementById("btn-alpha-kir").classList.toggle("active", a === "kirill");
+    }
+
+    async function submitSlide() {
+      var topic = document.getElementById("slide-topic").value.trim();
+      if (!topic) return alert("Mavzuni yozing!");
+      var btn = document.getElementById("btn-create-slide");
+      btn.disabled = true;
+      btn.textContent = "Tayyorlanmoqda...";
+
+      try {
+        var res = await fetch("/api/generate-slide", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ init_data: initData, topic: topic, template: currentSlideStyle, alphabet: currentAlphabet })
+        });
+        if (res.ok) {
+          if (tg) { tg.showAlert("✅ Slayd tayyor! Telegram chatingizga yuborildi."); tg.close(); }
+          else alert("Slayd chatga yuborildi!");
+        } else {
+          var d = await res.json();
+          alert(d.detail || "Xato yuz berdi");
+        }
+      } catch (e) {
+        alert("Serverga ulanib bo'lmadi");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Slayd yaratish";
+      }
+    }
+
+    // ---------- Balans va To'lov ----------
+    function openTopupModal() { document.getElementById("topup-modal").classList.add("open"); }
+    function closeTopupModal() { document.getElementById("topup-modal").classList.remove("open"); }
+
+    function sendTopup(amt) {
+      closeTopupModal();
+      if (tg) { tg.sendData("topup_" + amt); setTimeout(function() { tg.close(); }, 300); }
+    }
+    function openSubs() {
+      closeTopupModal();
+      if (tg) { tg.sendData("open_subs"); setTimeout(function() { tg.close(); }, 300); }
+    }
+
+    async function fetchUser() {
+      if (!initData) {
+        document.getElementById("bal-text").textContent = "0 so'm";
+        return;
+      }
+      try {
+        var res = await fetch("/api/me", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ init_data: initData })
+        });
+        if (res.ok) {
+          var u = await res.json();
+          if (u.free_used === 0) {
+            document.getElementById("bal-icon").textContent = "🎁";
+            document.getElementById("bal-text").textContent = "1 bepul";
+          } else {
+            document.getElementById("bal-icon").textContent = "💳";
+            document.getElementById("bal-text").textContent = (u.balance || 0).toLocaleString() + " so'm";
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Boshlang'ich yuklash
+    loadHistory();
+    initSlidesView();
+    fetchUser();
   </script>
 </body>
 </html>
