@@ -3303,6 +3303,263 @@ async def api_images_to_pdf(
             os.remove(file_path)
 
 
+# =========================================================
+# HUJJATLAR BO'LIMI: YANGI REAL ISHLOVCHI API ENDPOINTLAR
+# =========================================================
+
+# 1. RASMDAN MATN (OCR) - GEMINI ORQALI
+@app.post("/api/ocr")
+async def api_ocr(
+    init_data: str = Form(...),
+    file: UploadFile = File(...)
+):
+    auth = verify_telegram_init_data(init_data)
+    user_id = auth["user_id"]
+    await track_user(user_id, auth["user"].get("first_name"), auth["user"].get("username"))
+
+    content = await file.read()
+    started_time = time.monotonic()
+    
+    try:
+        response = await gemini_client.aio.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=[
+                genai_types.Part.from_bytes(data=content, mime_type=file.content_type or "image/jpeg"),
+                "Ushbu rasmdagi barcha yozuv va matnlarni xatosiz, to'liq ko'chirib ber. Izoh qo'shma, faqat matnning o'zini qaytar."
+            ]
+        )
+        extracted_text = (response.text or "").strip()
+        if not extracted_text:
+            extracted_text = "Rasmdan hech qanday matn aniqlanmadi."
+
+        duration_sec = max(1, round(time.monotonic() - started_time))
+        char_count = len(extracted_text)
+
+        if char_count > 3800:
+            doc_path = os.path.join(tempfile.gettempdir(), f"matn_{uuid.uuid4().hex[:6]}.txt")
+            with open(doc_path, "w", encoding="utf-8") as f:
+                f.write(extracted_text)
+            await bot.send_document(
+                chat_id=user_id,
+                document=types.FSInputFile(doc_path, filename="ajratilgan_matn.txt"),
+                caption=f"📝 <b>Rasmdan ajratilgan matn:</b>\n📊 Hajmi: {char_count} ta belgi",
+                parse_mode="HTML"
+            )
+            if os.path.exists(doc_path):
+                os.remove(doc_path)
+        else:
+            await bot.send_message(
+                chat_id=user_id,
+                text=f"📝 <b>Rasmdan ajratilgan matn:</b>\n\n{extracted_text}",
+                parse_mode="HTML"
+            )
+
+        return {
+            "success": True,
+            "text": extracted_text,
+            "char_count": char_count,
+            "duration": duration_sec
+        }
+    except Exception as exc:
+        logger.exception("OCR jarayonida xato")
+        raise HTTPException(status_code=500, detail="Rasmni o'qishda xatolik yuz berdi.")
+
+
+# 2. OCR MATNINI WORD (.DOCX) SIFATIDA YUBORISH
+class OcrDocxRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    init_data: str
+    text: str
+
+@app.post("/api/ocr-to-docx")
+async def api_ocr_to_docx(req: OcrDocxRequest):
+    auth = verify_telegram_init_data(req.init_data)
+    user_id = auth["user_id"]
+
+    if not req.text.strip():
+        raise HTTPException(status_code=400, detail="Matn mavjud emas.")
+
+    doc = Document()
+    doc.sections[0].left_margin = Cm(3.0)
+    doc.sections[0].right_margin = Cm(1.5)
+    doc.sections[0].top_margin = Cm(2.0)
+    doc.sections[0].bottom_margin = Cm(2.0)
+
+    for para in req.text.split("\n"):
+        if para.strip():
+            p = doc.add_paragraph()
+            p.paragraph_format.line_spacing = 1.5
+            run = p.add_run(para.strip())
+            run.font.name = DOC_FONT
+
+    file_path = os.path.join(tempfile.gettempdir(), f"matn_{uuid.uuid4().hex[:6]}.docx")
+    try:
+        doc.save(file_path)
+        await bot.send_document(
+            chat_id=user_id,
+            document=types.FSInputFile(file_path, filename="rasm_matni.docx"),
+            caption="📄 <b>Rasmdagi matn Word (.docx) formatida tayyorlandi!</b>",
+            parse_mode="HTML"
+        )
+        return {"success": True}
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+
+# 3. HUJJATNI TARJIMA QILISH VA KIRILL <-> LOTIN O'GIRISH (.DOCX)
+@app.post("/api/translate-doc")
+async def api_translate_doc(
+    init_data: str = Form(...),
+    target_lang: str = Form(...),  # 'ru', 'en', 'uz_lat', 'uz_cyr'
+    source_lang: str = Form("auto"),
+    file: UploadFile = File(...)
+):
+    auth = verify_telegram_init_data(init_data)
+    user_id = auth["user_id"]
+    await track_user(user_id, auth["user"].get("first_name"), auth["user"].get("username"))
+
+    content = await file.read()
+    try:
+        source_doc = Document(io.BytesIO(content))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Faqat Word (.docx) fayllari qabul qilinadi.")
+
+    paragraphs_text = [p.text for p in source_doc.paragraphs if p.text.strip()]
+    if not paragraphs_text:
+        raise HTTPException(status_code=400, detail="Fayl ichida matn topilmadi.")
+
+    out_doc = Document()
+    out_doc.sections[0].left_margin = Cm(3.0)
+    out_doc.sections[0].right_margin = Cm(1.5)
+    out_doc.sections[0].top_margin = Cm(2.0)
+    out_doc.sections[0].bottom_margin = Cm(2.0)
+
+    if target_lang in ("uz_lat", "uz_cyr"):
+        target_alphabet = LATIN if target_lang == "uz_lat" else KIRILL
+        for p in source_doc.paragraphs:
+            if p.text.strip():
+                np = out_doc.add_paragraph()
+                np.paragraph_format.line_spacing = 1.5
+                run = np.add_run(fix_text(p.text, target_alphabet))
+                run.font.name = DOC_FONT
+    else:
+        lang_names = {"ru": "rus", "en": "ingliz", "uz": "o'zbek (lotin)"}
+        dest = lang_names.get(target_lang, "rus")
+        full_text = "\n\n".join(paragraphs_text[:40])
+        prompt = (
+            f"Siz professional tarjimonsiz. Quyidagi ilmiy/akademik matnni mazmunini qisqartirmasdan, "
+            f"ravon va aniq {dest} tiliga tarjima qilib bering:\n\n{full_text}"
+        )
+        try:
+            resp = await call_gemini(prompt, timeout=GEMINI_DOC_TIMEOUT_SECONDS)
+            for translated_para in resp.split("\n\n"):
+                if translated_para.strip():
+                    np = out_doc.add_paragraph()
+                    np.paragraph_format.line_spacing = 1.5
+                    run = np.add_run(translated_para.strip())
+                    run.font.name = DOC_FONT
+        except Exception:
+            raise HTTPException(status_code=502, detail="AI orqali tarjima qilishda xatolik bo'ldi.")
+
+    file_path = os.path.join(tempfile.gettempdir(), f"tarjima_{uuid.uuid4().hex[:6]}.docx")
+    try:
+        out_doc.save(file_path)
+        doc_input = types.FSInputFile(file_path, filename=f"tarjima_{file.filename}")
+        await bot.send_document(
+            chat_id=user_id,
+            document=doc_input,
+            caption=f"✅ <b>Hujjat tarjima qilindi!</b>\n🌐 Til: {target_lang.upper()}\n📄 Fayl: {file.filename}",
+            parse_mode="HTML"
+        )
+        return {"success": True}
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+
+# 4. PDF -> MATN (.TXT) VA CHATGA YUBORISH
+@app.post("/api/pdf-to-txt")
+async def api_pdf_to_txt(
+    init_data: str = Form(...),
+    file: UploadFile = File(...)
+):
+    auth = verify_telegram_init_data(init_data)
+    user_id = auth["user_id"]
+
+    content = await file.read()
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(content))
+        full_text = ""
+        for i, page in enumerate(reader.pages):
+            text = page.extract_text()
+            if text:
+                full_text += f"\n--- {i+1}-sahifa ---\n" + text
+
+        if not full_text.strip():
+            raise HTTPException(status_code=400, detail="PDF ichida ko'chiriladigan matn topilmadi.")
+
+        file_path = os.path.join(tempfile.gettempdir(), f"pdf_matn_{uuid.uuid4().hex[:6]}.txt")
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(full_text)
+
+        await bot.send_document(
+            chat_id=user_id,
+            document=types.FSInputFile(file_path, filename="pdf_matni.txt"),
+            caption=f"📄 <b>PDF matni ajratib olindi!</b>\nSahifalar: {len(reader.pages)} ta",
+            parse_mode="HTML"
+        )
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        return {"success": True, "pages": len(reader.pages)}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("PDF matnini ajratishda xato")
+        raise HTTPException(status_code=500, detail="PDF matnini ajratishda xatolik yuz berdi.")
+
+
+# 5. SAHIFALARNI AJRATISH (SPLIT PDF)
+@app.post("/api/split-pdf")
+async def api_split_pdf(
+    init_data: str = Form(...),
+    file: UploadFile = File(...)
+):
+    auth = verify_telegram_init_data(init_data)
+    user_id = auth["user_id"]
+
+    content = await file.read()
+    try:
+        from pypdf import PdfReader, PdfWriter
+        reader = PdfReader(io.BytesIO(content))
+        total_pages = len(reader.pages)
+        if total_pages < 2:
+            raise HTTPException(status_code=400, detail="PDF kamida 2 sahifadan iborat bo'lishi kerak.")
+
+        limit = min(5, total_pages)
+        for i in range(limit):
+            writer = PdfWriter()
+            writer.add_page(reader.pages[i])
+            out_p = os.path.join(tempfile.gettempdir(), f"sahifa_{i+1}_{uuid.uuid4().hex[:4]}.pdf")
+            with open(out_p, "wb") as f_out:
+                writer.write(f_out)
+            await bot.send_document(
+                chat_id=user_id,
+                document=types.FSInputFile(out_p, filename=f"sahifa_{i+1}.pdf"),
+                caption=f"📄 <b>{i+1}-sahifa</b> (jami {total_pages} tadan)"
+            )
+            if os.path.exists(out_p):
+                os.remove(out_p)
+
+        return {"success": True, "pages": limit}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("PDF sahifalarini ajratishda xato")
+        raise HTTPException(status_code=500, detail="PDF sahifalarini ajratishda xatolik yuz berdi.")
+
+
 if __name__ == "__main__":
     import uvicorn
 
