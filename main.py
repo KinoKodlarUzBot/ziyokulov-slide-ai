@@ -168,7 +168,37 @@ SUBSCRIPTIONS = {
     }
 }
 
-REFERRAL_BONUS = 2000  # Do'sti to'lov qilganda taklif qiluvchiga beriladigan bonus
+REFERRAL_BONUS = 2000
+
+PRICING_INFO_TEXT = """
+💰 <b>Xizmatlar narxlari</b>
+--------------------------------------
+
+📊 <b>SLAYD YARATISH NARXLARI:</b>
+Taqdimot yaratish narxlari quyidagicha:
+
+🟠 <b>Standart: 3, 4, 5 reja asosida</b>
+• <b>3 000 so'm</b> - 10-15 slayd (3-4 reja)
+• <b>5 000 so'm</b> - 20-25 slayd (5 reja)
+
+--------------------------------------
+
+📄 <b>MUSTAQIL ISH / REFERAT YARATISH NARXLARI:</b>
+Bir dona mavzu uchun fayl yaratish narxlari:
+
+🟠 <b>Standart:</b>
+• <b>4 000 so'm</b> - 3 ta reja asosida (10-15 sahifa)
+• <b>5 000 so'm</b> - 4 ta reja asosida (15-25 sahifa)
+• <b>6 000 so'm</b> - 5 ta reja asosida (20-30 sahifa)
+
+--------------------------------------
+
+📚 <b>BOSHQA ILMIY ISHLAR:</b>
+• <b>Kurs ishi:</b> 10 000 so'm (30-40 sahifa, 3 bob)
+• <b>Ilmiy maqola:</b> 3 000 so'm
+• <b>Tezis:</b> 3 000 so'm
+• <b>Test / Krossvord:</b> 2 500 so'm
+"""
 
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN Railway Variables bo'limida sozlanmagan.")
@@ -445,7 +475,6 @@ class RateLimiter:
         )
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created)")
         
-        # Ustunlarni avtomatik moslashtirish
         columns = {row[1] for row in self._conn.execute("PRAGMA table_info(users)")}
         if "balance" not in columns:
             self._conn.execute("ALTER TABLE users ADD COLUMN balance INTEGER NOT NULL DEFAULT 0")
@@ -523,7 +552,6 @@ class RateLimiter:
         return False
 
     def handle_payment_reward(self, user_id: int, amount: int, kind: str) -> int | None:
-        """Foydalanuvchi to'lov qilganda refererga bonus berish va to'lovni qayd qilish"""
         now = time.time()
         referrer_to_reward = None
         with self._lock:
@@ -2158,7 +2186,7 @@ def generate_pptx(topic: str, slide_data: list[dict], template_style: str, outpu
 
 
 # =========================================================
-# BOT HANDLERS & PAYMENT FLOW
+# BOT HANDLERS & INLINE KEYBOARDS
 # =========================================================
 BTN_SLIDE = "📕 Yangi taqdimot (Slayd)"
 BTN_SELF = "📘 Yangi mustaqil ish"
@@ -2239,11 +2267,14 @@ def open_app_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def format_window(seconds: int) -> str:
-    minutes = max(1, seconds // 60)
-    if minutes >= 60 and minutes % 60 == 0:
-        return f"{minutes // 60} soat"
-    return f"{minutes} daqiqa"
+def insufficient_balance_kb() -> InlineKeyboardMarkup:
+    """Balans yetmaganda chiqadigan tugmalar"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="💳 Balansni to'ldirish", callback_data="open_topup_menu")],
+            [InlineKeyboardButton(text="🧾 Xizmat narxlari", callback_data="show_pricing_info")],
+        ]
+    )
 
 
 def outline_selection_keyboard(kind: str) -> InlineKeyboardMarkup:
@@ -2286,6 +2317,16 @@ def subscriptions_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def format_window(seconds: int) -> str:
+    minutes = max(1, seconds // 60)
+    if minutes >= 60 and minutes % 60 == 0:
+        return f"{minutes // 60} soat"
+    return f"{minutes} daqiqa"
+
+
+# =========================================================
+# BOT COMMANDS & PAYMENT CALLBACKS
+# =========================================================
 @dp.message(CommandStart())
 async def start_cmd(message: types.Message, state: FSMContext, command: CommandObject = None):
     await state.clear()
@@ -2294,7 +2335,6 @@ async def start_cmd(message: types.Message, state: FSMContext, command: CommandO
     await track_user(user_id, message.from_user.first_name if message.from_user else None,
                      message.from_user.username if message.from_user else None)
 
-    # Referal parametrini tekshirish (/start ref_12345)
     if command and command.args and command.args.startswith("ref_"):
         try:
             referrer_id = int(command.args.replace("ref_", ""))
@@ -2328,6 +2368,24 @@ async def start_cmd(message: types.Message, state: FSMContext, command: CommandO
         reply_markup=main_keyboard(),
         parse_mode="HTML",
     )
+
+
+@dp.callback_query(F.data == "show_pricing_info")
+async def cb_show_pricing_info(call: types.CallbackQuery):
+    await call.message.answer(PRICING_INFO_TEXT, parse_mode="HTML")
+    await call.answer()
+
+
+@dp.callback_query(F.data == "open_topup_menu")
+async def cb_open_topup_menu(call: types.CallbackQuery):
+    account = await asyncio.to_thread(rate_limiter.get_user_account, call.from_user.id)
+    await call.message.answer(
+        f"💳 <b>Sizning balansingiz:</b> {account['balance']:,} so'm\n\n"
+        "Balansni to'ldirish uchun summani tanlang:",
+        reply_markup=topup_keyboard(),
+        parse_mode="HTML",
+    )
+    await call.answer()
 
 
 @dp.message(F.text == BTN_REFERRAL)
@@ -2405,7 +2463,7 @@ async def subscriptions_cmd(event: types.Message | types.CallbackQuery):
 @dp.callback_query(F.data.startswith("topup_"))
 async def topup_payment_handler(callback: types.CallbackQuery):
     amount = int(callback.data.split("_")[1])
-    prices = [LabeledPrice(label="Balans to'ldirish", amount=amount * 100)] # UZS tiyinda
+    prices = [LabeledPrice(label="Balans to'ldirish", amount=amount * 100)]
     
     await bot.send_invoice(
         chat_id=callback.from_user.id,
@@ -2459,7 +2517,6 @@ async def process_successful_payment(message: types.Message):
         await asyncio.to_thread(rate_limiter.update_balance, user_id, amount)
         account = await asyncio.to_thread(rate_limiter.get_user_account, user_id)
         
-        # Referal bonusini tekshirish
         referrer = await asyncio.to_thread(rate_limiter.handle_payment_reward, user_id, amount, "topup")
         if referrer:
             try:
@@ -2484,7 +2541,6 @@ async def process_successful_payment(message: types.Message):
         sub = SUBSCRIPTIONS[sub_key]
         await asyncio.to_thread(rate_limiter.activate_subscription, user_id, sub_key)
         
-        # Referal bonusini tekshirish
         referrer = await asyncio.to_thread(rate_limiter.handle_payment_reward, user_id, sub["price"], f"sub_{sub_key}")
         if referrer:
             try:
@@ -2505,105 +2561,68 @@ async def process_successful_payment(message: types.Message):
         )
 
 
+# =========================================================
+# XIZMAT TUGMALARI BOSILGANDA BIRINCHI BO'LIB BALANS TEKSHIRUVI
+# =========================================================
 @dp.message(F.text == BTN_SLIDE)
-async def slide_btn(message: types.Message, state: FSMContext):
+async def slide_btn_handler(message: types.Message, state: FSMContext):
     await state.clear()
-    await message.answer(
-        "Taqdimot yaratish uchun mavzuni yozing yoki pastdagi Mini App orqali 15 xil dizayndan tanlang 👇",
-        reply_markup=open_app_keyboard(),
-    )
+    user_id = message.from_user.id
+    account = await asyncio.to_thread(rate_limiter.get_user_account, user_id)
+    now = time.time()
+
+    is_free = (account["free_used"] == 0)
+    is_sub_valid = False
+    if account["subscription_until"] > now:
+        sub = SUBSCRIPTIONS.get(account["sub_tier"])
+        if sub and account["daily_used"] < sub["daily_limit"]:
+            is_sub_valid = True
+
+    # Agar bepuli tugagan va puli 3000 so'mdan kam bo'lsa -> Darhol to'lov oynasi
+    if not is_free and not is_sub_valid and account["balance"] < 3000:
+        await message.answer(
+            "❗️ <b>Balansingizda yetarli mablag' mavjud emas!</b>",
+            reply_markup=insufficient_balance_kb(),
+            parse_mode="HTML"
+        )
+        return
+
     await state.set_state(DocOrder.waiting_topic)
     await state.update_data(kind="slayd")
-    await message.answer(topic_prompt_text("slayd"), reply_markup=cancel_keyboard())
-
-
-@dp.message(F.text == BTN_LIMIT)
-async def limit_btn(message: types.Message, state: FSMContext):
-    await state.clear()
-    remaining = await asyncio.to_thread(rate_limiter.remaining, message.from_user.id)
     await message.answer(
-        f"📊 Sizda <b>{remaining}</b> / {RATE_LIMIT_REQUESTS} ta so'rov qoldi.\n"
-        f"Limit oxirgi {format_window(RATE_LIMIT_WINDOW_SECONDS)} bo'yicha hisoblanadi.",
-        parse_mode="HTML",
-        reply_markup=main_keyboard(),
+        "Taqdimot yaratish uchun mavzuni yozing yoki pastdagi Mini App orqali dizayn tanlang 👇",
+        reply_markup=open_app_keyboard(),
     )
-
-
-@dp.message(Command("help"))
-@dp.message(F.text == BTN_HELP)
-async def help_btn(message: types.Message, state: FSMContext):
-    await state.clear()
-    await message.answer(
-        "❓ <b>Qanday ishlaydi?</b>\n\n"
-        "1. Pastdagi tugmalardan kerakli xizmatni tanlang.\n"
-        "2. Mavzuni yozing va reja sonini tanlang.\n"
-        "3. Birinchi buyurtmangiz 100% BEPUL tayyorlanadi.\n"
-        "4. Keyingi buyurtmalarni hamyonbop narxlarda Click orqali xarid qilasiz.\n\n"
-        "📱 <b>Slayd:</b> PowerPoint, WPS Office yoki Google Slides bilan ochiladi.\n"
-        "📄 <b>Word fayllar:</b> Word, WPS Office yoki Google Docs bilan ochiladi."
-        + (f"\n\n📩 Aloqa: {html.escape(SUPPORT_CONTACT)}" if SUPPORT_CONTACT else ""),
-        parse_mode="HTML",
-        reply_markup=main_keyboard(),
-    )
-
-
-def alphabet_keyboard(current: str) -> InlineKeyboardMarkup:
-    def mark(code: str) -> str:
-        return ("✅ " if current == code else "") + ALPHABET_NAMES[code]
-
-    return InlineKeyboardMarkup(
-        inline_keyboard=[[
-            InlineKeyboardButton(text=mark(LATIN), callback_data="alpha:latin"),
-            InlineKeyboardButton(text=mark(KIRILL), callback_data="alpha:kirill"),
-        ]]
-    )
-
-
-def alphabet_text(current: str) -> str:
-    return (
-        "🔤 <b>Alifbo</b>\n\n"
-        "Tayyor fayllar (slayd va Word) qaysi alifboda bo'lsin?\n"
-        f"Hozirgi tanlov: <b>{ALPHABET_NAMES[current]}</b>"
-    )
-
-
-@dp.message(Command("alifbo"))
-@dp.message(F.text == BTN_ALPHABET)
-async def alphabet_btn(message: types.Message, state: FSMContext):
-    await state.clear()
-    current = await get_user_alphabet(message.from_user.id)
-    await message.answer(
-        alphabet_text(current),
-        parse_mode="HTML",
-        reply_markup=alphabet_keyboard(current),
-    )
-
-
-@dp.callback_query(F.data.in_({"alpha:latin", "alpha:kirill"}))
-async def alphabet_choice(callback: types.CallbackQuery):
-    code = normalize_alphabet((callback.data or "").split(":", 1)[-1])
-    user = callback.from_user
-    await track_user(user.id, user.first_name, user.username)
-    await set_user_alphabet(user.id, code)
-    if callback.message:
-        try:
-            await callback.message.edit_text(
-                alphabet_text(code), parse_mode="HTML", reply_markup=alphabet_keyboard(code)
-            )
-        except Exception:
-            pass
-    await callback.answer(f"Tanlandi: {ALPHABET_NAMES[code]}")
-
-
-def topic_prompt_text(kind: str) -> str:
-    hint = TOPIC_HINTS.get(kind, "Mavzuni yozing")
-    return f"✍️ {hint}.\nMasalan: <i>Sun'iy intellektning ta'limdagi o'rni</i>"
+    await message.answer(topic_prompt_text("slayd"), reply_markup=cancel_keyboard(), parse_mode="HTML")
 
 
 @dp.message(F.text.in_(set(KIND_BY_BUTTON)))
-async def document_btn(message: types.Message, state: FSMContext):
+async def document_btn_handler(message: types.Message, state: FSMContext):
     kind = KIND_BY_BUTTON[message.text]
     await state.clear()
+    user_id = message.from_user.id
+    account = await asyncio.to_thread(rate_limiter.get_user_account, user_id)
+    now = time.time()
+
+    is_free = (account["free_used"] == 0)
+    is_sub_valid = False
+    if account["subscription_until"] > now:
+        sub = SUBSCRIPTIONS.get(account["sub_tier"])
+        if sub and account["daily_used"] < sub["daily_limit"]:
+            is_sub_valid = True
+
+    min_price = 4000 if kind in ("referat", "mustaqil") else (PRICING.get(kind, 3000) if isinstance(PRICING.get(kind), int) else 3000)
+
+    # Agar bepuli tugagan, obunasi yo'q va puli yetmasa -> Darhol to'lov oynasi (2-rasmdagi kabi)
+    if not is_free and not is_sub_valid and account["balance"] < min_price:
+        await message.answer(
+            "❗️ <b>Balansingizda yetarli mablag' mavjud emas!</b>",
+            reply_markup=insufficient_balance_kb(),
+            parse_mode="HTML"
+        )
+        return
+
+    # Mablag' yetarli yoki bepul bo'lsa -> Mavzu so'raladi
     await state.set_state(DocOrder.waiting_topic)
     await state.update_data(kind=kind)
     await message.answer(
@@ -2625,7 +2644,7 @@ async def receive_topic(message: types.Message, state: FSMContext):
 
     await state.update_data(topic=topic)
 
-    # 3/4/5 reja tanlash (Slayd, Referat, Mustaqil ish)
+    # 3, 4, 5 reja tanlash (Slayd, Referat, Mustaqil ish)
     if kind in ("slayd", "referat", "mustaqil"):
         await state.set_state(DocOrder.waiting_outline)
         await message.answer(
@@ -2636,7 +2655,6 @@ async def receive_topic(message: types.Message, state: FSMContext):
         )
         return
 
-    # Boshqa hujjat turlari (kurs, maqola, test va h.k.)
     await state.clear()
     price = PRICING.get(kind, 3000)
     await check_and_run_order(message, kind, topic, reja_count=None, price=price)
@@ -2672,15 +2690,11 @@ async def check_and_run_order(message: types.Message, kind: str, topic: str,
 
     if not is_free and not is_sub_valid:
         if account["balance"] < price:
-            shortage = price - account["balance"]
-            text = (
-                f"❗️ <b>Balansingizda yetarli mablag' mavjud emas!</b>\n\n"
-                f"📋 Xizmat narxi: <b>{price:,} so'm</b>\n"
-                f"💳 Balansingiz: <b>{account['balance']:,} so'm</b>\n"
-                f"❌ Yetishmayapti: <b>{shortage:,} so'm</b>\n\n"
-                f"Davom etish uchun hisobingizni to'ldiring:"
+            await message.answer(
+                "❗️ <b>Balansingizda yetarli mablag' mavjud emas!</b>",
+                reply_markup=insufficient_balance_kb(),
+                parse_mode="HTML"
             )
-            await message.answer(text, reply_markup=topup_keyboard(), parse_mode="HTML")
             return
         else:
             await asyncio.to_thread(rate_limiter.update_balance, user_id, -price)
@@ -2689,7 +2703,6 @@ async def check_and_run_order(message: types.Message, kind: str, topic: str,
     elif is_sub_valid:
         await asyncio.to_thread(rate_limiter.inc_daily_used, user_id)
 
-    # Reja bo'yicha sahifa taqsimoti
     pages = None
     if reja_count == 3:
         pages = (10, 15)
@@ -2849,8 +2862,91 @@ async def run_document(message: types.Message, kind: str, topic: str, pages=None
 
 
 # =========================================================
-# ADMIN KOMANDALARI (STATISTIKA & BROADCAST)
+# QO'SHIMCHA SOZLAMALAR VA ADMIN BUYRUQLARI
 # =========================================================
+def alphabet_keyboard(current: str) -> InlineKeyboardMarkup:
+    def mark(code: str) -> str:
+        return ("✅ " if current == code else "") + ALPHABET_NAMES[code]
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[
+            InlineKeyboardButton(text=mark(LATIN), callback_data="alpha:latin"),
+            InlineKeyboardButton(text=mark(KIRILL), callback_data="alpha:kirill"),
+        ]]
+    )
+
+
+def alphabet_text(current: str) -> str:
+    return (
+        "🔤 <b>Alifbo</b>\n\n"
+        "Tayyor fayllar (slayd va Word) qaysi alifboda bo'lsin?\n"
+        f"Hozirgi tanlov: <b>{ALPHABET_NAMES[current]}</b>"
+    )
+
+
+@dp.message(Command("alifbo"))
+@dp.message(F.text == BTN_ALPHABET)
+async def alphabet_btn(message: types.Message, state: FSMContext):
+    await state.clear()
+    current = await get_user_alphabet(message.from_user.id)
+    await message.answer(
+        alphabet_text(current),
+        parse_mode="HTML",
+        reply_markup=alphabet_keyboard(current),
+    )
+
+
+@dp.callback_query(F.data.in_({"alpha:latin", "alpha:kirill"}))
+async def alphabet_choice(callback: types.CallbackQuery):
+    code = normalize_alphabet((callback.data or "").split(":", 1)[-1])
+    user = callback.from_user
+    await track_user(user.id, user.first_name, user.username)
+    await set_user_alphabet(user.id, code)
+    if callback.message:
+        try:
+            await callback.message.edit_text(
+                alphabet_text(code), parse_mode="HTML", reply_markup=alphabet_keyboard(code)
+            )
+        except Exception:
+            pass
+    await callback.answer(f"Tanlandi: {ALPHABET_NAMES[code]}")
+
+
+def topic_prompt_text(kind: str) -> str:
+    hint = TOPIC_HINTS.get(kind, "Mavzuni yozing")
+    return f"✍️ {hint}.\nMasalan: <i>Sun'iy intellektning ta'limdagi o'rni</i>"
+
+
+@dp.message(F.text == BTN_LIMIT)
+async def limit_btn(message: types.Message, state: FSMContext):
+    await state.clear()
+    remaining = await asyncio.to_thread(rate_limiter.remaining, message.from_user.id)
+    await message.answer(
+        f"📊 Sizda <b>{remaining}</b> / {RATE_LIMIT_REQUESTS} ta so'rov qoldi.\n"
+        f"Limit oxirgi {format_window(RATE_LIMIT_WINDOW_SECONDS)} bo'yicha hisoblanadi.",
+        parse_mode="HTML",
+        reply_markup=main_keyboard(),
+    )
+
+
+@dp.message(Command("help"))
+@dp.message(F.text == BTN_HELP)
+async def help_btn(message: types.Message, state: FSMContext):
+    await state.clear()
+    await message.answer(
+        "❓ <b>Qanday ishlaydi?</b>\n\n"
+        "1. Pastdagi tugmalardan kerakli xizmatni tanlang.\n"
+        "2. Mavzuni yozing va reja sonini belgilang.\n"
+        "3. Birinchi buyurtmangiz 100% BEPUL tayyorlanadi.\n"
+        "4. Keyingi buyurtmalarni Click orqali xarid qilasiz.\n\n"
+        "📱 <b>Slayd:</b> PowerPoint, WPS Office yoki Google Slides bilan ochiladi.\n"
+        "📄 <b>Word fayllar:</b> Word, WPS Office yoki Google Docs bilan ochiladi."
+        + (f"\n\n📩 Aloqa: {html.escape(SUPPORT_CONTACT)}" if SUPPORT_CONTACT else ""),
+        parse_mode="HTML",
+        reply_markup=main_keyboard(),
+    )
+
+
 @dp.message(Command("stats"))
 async def stats_cmd(message: types.Message):
     if not message.from_user or message.from_user.id not in ADMIN_IDS:
@@ -2896,7 +2992,7 @@ async def broadcast_cmd(message: types.Message, command: CommandObject):
         try:
             await bot.send_message(uid, broadcast_text, parse_mode="HTML")
             sent += 1
-            await asyncio.sleep(0.05)  # Telegram flood limitiga tushmaslik uchun
+            await asyncio.sleep(0.05)
         except Exception:
             failed += 1
 
@@ -2989,7 +3085,7 @@ async def lifespan(app: FastAPI):
         logger.info("Ilova to'xtatildi.")
 
 
-app = FastAPI(title="Slide AI Generator", version="3.4.0", lifespan=lifespan)
+app = FastAPI(title="Slide AI Generator", version="3.5.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
@@ -3035,7 +3131,6 @@ async def api_generate_slide(req: SlideRequest):
     now = time.time()
     price = 3000 if req.slides <= 10 else 5000
     
-    # Bepul sinov yoki Obuna yoki Balans tekshiruvi
     is_free = (account["free_used"] == 0)
     is_sub_valid = False
     if not is_free and account["subscription_until"] > now:
