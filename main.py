@@ -20,7 +20,7 @@ from urllib.parse import parse_qsl
 
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.exceptions import TelegramForbiddenError
-from aiogram.filters import Command, CommandStart
+from aiogram.filters import Command, CommandStart, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
@@ -167,6 +167,8 @@ SUBSCRIPTIONS = {
         "desc": "30 kun davomida kuniga 10 tagacha bepul generatsiya"
     }
 }
+
+REFERRAL_BONUS = 2000  # Do'sti to'lov qilganda taklif qiluvchiga beriladigan bonus
 
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN Railway Variables bo'limida sozlanmagan.")
@@ -420,7 +422,17 @@ class RateLimiter:
             "sub_tier TEXT NOT NULL DEFAULT '', "
             "daily_used INTEGER NOT NULL DEFAULT 0, "
             "last_used_date TEXT NOT NULL DEFAULT '', "
-            "alphabet TEXT NOT NULL DEFAULT 'latin')"
+            "alphabet TEXT NOT NULL DEFAULT 'latin', "
+            "invited_by INTEGER DEFAULT NULL, "
+            "referral_rewarded INTEGER NOT NULL DEFAULT 0)"
+        )
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS payments ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "user_id INTEGER NOT NULL, "
+            "amount INTEGER NOT NULL, "
+            "kind TEXT NOT NULL, "
+            "created REAL NOT NULL)"
         )
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS orders ("
@@ -433,7 +445,7 @@ class RateLimiter:
         )
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created)")
         
-        # Ustunlar mavjudligini tekshirish
+        # Ustunlarni avtomatik moslashtirish
         columns = {row[1] for row in self._conn.execute("PRAGMA table_info(users)")}
         if "balance" not in columns:
             self._conn.execute("ALTER TABLE users ADD COLUMN balance INTEGER NOT NULL DEFAULT 0")
@@ -447,6 +459,10 @@ class RateLimiter:
             self._conn.execute("ALTER TABLE users ADD COLUMN last_used_date TEXT NOT NULL DEFAULT ''")
         if "alphabet" not in columns:
             self._conn.execute("ALTER TABLE users ADD COLUMN alphabet TEXT NOT NULL DEFAULT 'latin'")
+        if "invited_by" not in columns:
+            self._conn.execute("ALTER TABLE users ADD COLUMN invited_by INTEGER DEFAULT NULL")
+        if "referral_rewarded" not in columns:
+            self._conn.execute("ALTER TABLE users ADD COLUMN referral_rewarded INTEGER NOT NULL DEFAULT 0")
         self._conn.commit()
 
     def get_user_account(self, user_id: int) -> dict:
@@ -454,7 +470,7 @@ class RateLimiter:
         today = datetime.now().strftime("%Y-%m-%d")
         with self._lock:
             row = self._conn.execute(
-                "SELECT user_id, free_used, balance, subscription_until, sub_tier, daily_used, last_used_date, alphabet "
+                "SELECT user_id, free_used, balance, subscription_until, sub_tier, daily_used, last_used_date, alphabet, invited_by "
                 "FROM users WHERE user_id = ?",
                 (user_id,),
             ).fetchone()
@@ -466,7 +482,7 @@ class RateLimiter:
                 )
                 self._conn.commit()
                 row = self._conn.execute(
-                    "SELECT user_id, free_used, balance, subscription_until, sub_tier, daily_used, last_used_date, alphabet "
+                    "SELECT user_id, free_used, balance, subscription_until, sub_tier, daily_used, last_used_date, alphabet, invited_by "
                     "FROM users WHERE user_id = ?",
                     (user_id,),
                 ).fetchone()
@@ -478,7 +494,7 @@ class RateLimiter:
                 )
                 self._conn.commit()
                 row = self._conn.execute(
-                    "SELECT user_id, free_used, balance, subscription_until, sub_tier, daily_used, last_used_date, alphabet "
+                    "SELECT user_id, free_used, balance, subscription_until, sub_tier, daily_used, last_used_date, alphabet, invited_by "
                     "FROM users WHERE user_id = ?",
                     (user_id,),
                 ).fetchone()
@@ -492,7 +508,48 @@ class RateLimiter:
             "daily_used": row[5],
             "last_used_date": row[6],
             "alphabet": row[7],
+            "invited_by": row[8],
         }
+
+    def register_referral(self, user_id: int, referrer_id: int) -> bool:
+        if user_id == referrer_id:
+            return False
+        with self._lock:
+            row = self._conn.execute("SELECT invited_by, first_seen FROM users WHERE user_id = ?", (user_id,)).fetchone()
+            if row and row[0] is None:
+                self._conn.execute("UPDATE users SET invited_by = ? WHERE user_id = ?", (referrer_id, user_id))
+                self._conn.commit()
+                return True
+        return False
+
+    def handle_payment_reward(self, user_id: int, amount: int, kind: str) -> int | None:
+        """Foydalanuvchi to'lov qilganda refererga bonus berish va to'lovni qayd qilish"""
+        now = time.time()
+        referrer_to_reward = None
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO payments (user_id, amount, kind, created) VALUES (?, ?, ?, ?)",
+                (user_id, amount, kind, now),
+            )
+            row = self._conn.execute("SELECT invited_by, referral_rewarded FROM users WHERE user_id = ?", (user_id,)).fetchone()
+            if row and row[0] and row[1] == 0:
+                referrer_id = row[0]
+                self._conn.execute("UPDATE users SET referral_rewarded = 1 WHERE user_id = ?", (user_id,))
+                self._conn.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (REFERRAL_BONUS, referrer_id))
+                referrer_to_reward = referrer_id
+            self._conn.commit()
+        return referrer_to_reward
+
+    def get_referral_stats(self, user_id: int) -> tuple[int, int]:
+        with self._lock:
+            (total_invites,) = self._conn.execute("SELECT COUNT(*) FROM users WHERE invited_by = ?", (user_id,)).fetchone()
+            (active_rewards,) = self._conn.execute("SELECT COUNT(*) FROM users WHERE invited_by = ? AND referral_rewarded = 1", (user_id,)).fetchone()
+            return total_invites, active_rewards * REFERRAL_BONUS
+
+    def get_all_user_ids(self) -> list[int]:
+        with self._lock:
+            rows = self._conn.execute("SELECT user_id FROM users").fetchall()
+            return [r[0] for r in rows]
 
     def update_balance(self, user_id: int, delta: int) -> int:
         with self._lock:
@@ -594,6 +651,8 @@ class RateLimiter:
                 "SELECT COUNT(*) FROM users WHERE last_seen >= ?", (day_ago,)
             ).fetchone()
             (total_ok,) = self._conn.execute("SELECT COUNT(*) FROM orders WHERE ok = 1").fetchone()
+            (total_revenue,) = self._conn.execute("SELECT COALESCE(SUM(amount), 0) FROM payments").fetchone()
+            (active_subs,) = self._conn.execute("SELECT COUNT(*) FROM users WHERE subscription_until > ?", (time.time(),)).fetchone()
             rows = self._conn.execute(
                 "SELECT kind, ok, COUNT(*) FROM orders WHERE created >= ? GROUP BY kind, ok",
                 (day_ago,),
@@ -606,6 +665,8 @@ class RateLimiter:
             "new_24h": new_24h,
             "active_24h": active_24h,
             "total_ok": total_ok,
+            "total_revenue": total_revenue,
+            "active_subs": active_subs,
             "by_kind": by_kind,
         }
 
@@ -2109,6 +2170,7 @@ BTN_THESIS = "📑 Tezis yaratish"
 BTN_CROSSWORD = "🧩 Krossvord yaratish"
 BTN_BALANCE = "💳 Balans / To'lov"
 BTN_SUBS = "💎 Obunalar"
+BTN_REFERRAL = "🎁 Do'stni taklif qilish"
 BTN_ALPHABET = "🔤 Alifbo"
 BTN_LIMIT = "📊 Limitim"
 BTN_HELP = "❓ Yordam"
@@ -2150,7 +2212,8 @@ def main_keyboard() -> ReplyKeyboardMarkup:
             [KeyboardButton(text=BTN_ARTICLE), KeyboardButton(text=BTN_THESIS)],
             [KeyboardButton(text=BTN_CROSSWORD), KeyboardButton(text=BTN_ALPHABET)],
             [KeyboardButton(text=BTN_BALANCE), KeyboardButton(text=BTN_SUBS)],
-            [KeyboardButton(text=BTN_LIMIT), KeyboardButton(text=BTN_HELP)],
+            [KeyboardButton(text=BTN_REFERRAL), KeyboardButton(text=BTN_LIMIT)],
+            [KeyboardButton(text=BTN_HELP)],
         ],
         resize_keyboard=True,
         input_field_placeholder="Pastdagi tugmalardan birini tanlang",
@@ -2224,13 +2287,21 @@ def subscriptions_keyboard() -> InlineKeyboardMarkup:
 
 
 @dp.message(CommandStart())
-async def start_cmd(message: types.Message, state: FSMContext):
+async def start_cmd(message: types.Message, state: FSMContext, command: CommandObject = None):
     await state.clear()
     user_id = message.from_user.id if message.from_user else 0
     name = html.escape(message.from_user.first_name) if message.from_user else "do'st"
     await track_user(user_id, message.from_user.first_name if message.from_user else None,
                      message.from_user.username if message.from_user else None)
-    
+
+    # Referal parametrini tekshirish (/start ref_12345)
+    if command and command.args and command.args.startswith("ref_"):
+        try:
+            referrer_id = int(command.args.replace("ref_", ""))
+            await asyncio.to_thread(rate_limiter.register_referral, user_id, referrer_id)
+        except ValueError:
+            pass
+
     account = await asyncio.to_thread(rate_limiter.get_user_account, user_id)
     now = time.time()
     
@@ -2238,7 +2309,7 @@ async def start_cmd(message: types.Message, state: FSMContext):
     if account["subscription_until"] > now:
         sub_info = SUBSCRIPTIONS.get(account["sub_tier"], {})
         days_left = max(1, int((account["subscription_until"] - now) // 86400))
-        sub_text = f"\n💎 <b>Obuna holati:</b> {sub_info.get('title', '')} ({days_left} kun qoldi, bugungi limit: {account['daily_used']}/{sub_info.get('daily_limit', 0)})"
+        sub_text = f"\n💎 <b>Obuna:</b> {sub_info.get('title', '')} ({days_left} kun qoldi, limit: {account['daily_used']}/{sub_info.get('daily_limit', 0)})"
 
     free_text = "🎁 <b>Sizda 1 dona BEPUL xizmat sinovi mavjud!</b>\n" if account["free_used"] == 0 else ""
 
@@ -2257,6 +2328,32 @@ async def start_cmd(message: types.Message, state: FSMContext):
         reply_markup=main_keyboard(),
         parse_mode="HTML",
     )
+
+
+@dp.message(F.text == BTN_REFERRAL)
+async def referral_cmd(message: types.Message):
+    user_id = message.from_user.id
+    me = await bot.get_me()
+    ref_link = f"https://t.me/{me.username}?start=ref_{user_id}"
+    invites, earned = await asyncio.to_thread(rate_limiter.get_referral_stats, user_id)
+    
+    text = (
+        "🎁 <b>Do'stlarni taklif qiling va pul ishlang!</b>\n\n"
+        f"Har bir taklif qilingan do'stingiz birinchi marta botda to'lov qilganida, sizning balansingizga "
+        f"avtomatik tarzda <b>+{REFERRAL_BONUS:,} so'm</b> bonus beriladi!\n\n"
+        f"👥 Taklif qilgan do'stlaringiz soni: <b>{invites} ta</b>\n"
+        f"💵 Ishlangan jami bonuslar: <b>{earned:,} so'm</b>\n\n"
+        f"🔗 <b>Sizning shaxsiy referal havolangiz:</b>\n"
+        f"<code>{ref_link}</code>\n\n"
+        f"Ushbu havolani do'stlaringiz yoki guruhlarga ulashing 👇"
+    )
+    share_kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="🚀 Do'stlarga yuborish",
+            url=f"https://t.me/share/url?url={ref_link}&text=Sun'iy%20intellekt%20yordamida%20bepul%20taqdimot%20va%20mustaqil%20ishlar%20tayyorlang!"
+        )
+    ]])
+    await message.answer(text, reply_markup=share_kb, parse_mode="HTML")
 
 
 @dp.message(Command("cancel"))
@@ -2354,12 +2451,27 @@ async def process_pre_checkout(pre_checkout: PreCheckoutQuery):
 async def process_successful_payment(message: types.Message):
     sp = message.successful_payment
     payload = sp.invoice_payload
+    user_id = message.from_user.id
 
     if payload.startswith("topup_"):
         parts = payload.split("_")
         amount = int(parts[2])
-        await asyncio.to_thread(rate_limiter.update_balance, message.from_user.id, amount)
-        account = await asyncio.to_thread(rate_limiter.get_user_account, message.from_user.id)
+        await asyncio.to_thread(rate_limiter.update_balance, user_id, amount)
+        account = await asyncio.to_thread(rate_limiter.get_user_account, user_id)
+        
+        # Referal bonusini tekshirish
+        referrer = await asyncio.to_thread(rate_limiter.handle_payment_reward, user_id, amount, "topup")
+        if referrer:
+            try:
+                await bot.send_message(
+                    referrer,
+                    f"🎁 <b>Tabriklaymiz!</b> Siz taklif qilgan do'stingiz botda to'lov qildi.\n"
+                    f"Sizning hisobingizga <b>+{REFERRAL_BONUS:,} so'm</b> bonus qo'shildi!",
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
+
         await message.answer(
             f"✅ <b>To'lov qabul qilindi!</b>\n\n"
             f"Hisobingizga <b>+{amount:,} so'm</b> qo'shildi.\n"
@@ -2368,9 +2480,23 @@ async def process_successful_payment(message: types.Message):
             parse_mode="HTML",
         )
     elif payload.startswith("sub_"):
-        sub_key = payload.replace(f"sub_{message.from_user.id}_", "")
-        await asyncio.to_thread(rate_limiter.activate_subscription, message.from_user.id, sub_key)
+        sub_key = payload.replace(f"sub_{user_id}_", "")
         sub = SUBSCRIPTIONS[sub_key]
+        await asyncio.to_thread(rate_limiter.activate_subscription, user_id, sub_key)
+        
+        # Referal bonusini tekshirish
+        referrer = await asyncio.to_thread(rate_limiter.handle_payment_reward, user_id, sub["price"], f"sub_{sub_key}")
+        if referrer:
+            try:
+                await bot.send_message(
+                    referrer,
+                    f"🎁 <b>Tabriklaymiz!</b> Siz taklif qilgan do'stingiz obuna sotib oldi.\n"
+                    f"Sizning hisobingizga <b>+{REFERRAL_BONUS:,} so'm</b> bonus qo'shildi!",
+                    parse_mode="HTML"
+                )
+            except Exception:
+                pass
+
         await message.answer(
             f"🎉 <b>Tabriklaymiz! {sub['title']} obunasi muvaffaqiyatli yoqildi!</b>\n\n"
             f"Endi xizmatlardan qulay va chegirmali tartibda foydalanishingiz mumkin.",
@@ -2536,17 +2662,14 @@ async def check_and_run_order(message: types.Message, kind: str, topic: str,
     account = await asyncio.to_thread(rate_limiter.get_user_account, user_id)
     now = time.time()
 
-    # 1. Bepul sinov bormi?
     is_free = (account["free_used"] == 0)
     is_sub_valid = False
 
-    # 2. Obunani tekshirish
     if not is_free and account["subscription_until"] > now:
         sub = SUBSCRIPTIONS.get(account["sub_tier"])
         if sub and account["daily_used"] < sub["daily_limit"]:
             is_sub_valid = True
 
-    # 3. Agar bepul ham emas, obunasi ham bo'lmasa -> Balansni tekshirish
     if not is_free and not is_sub_valid:
         if account["balance"] < price:
             shortage = price - account["balance"]
@@ -2725,6 +2848,9 @@ async def run_document(message: types.Message, kind: str, topic: str, pages=None
             logger.warning("Vaqtinchalik faylni o'chirib bo'lmadi: %s", file_path)
 
 
+# =========================================================
+# ADMIN KOMANDALARI (STATISTIKA & BROADCAST)
+# =========================================================
 @dp.message(Command("stats"))
 async def stats_cmd(message: types.Message):
     if not message.from_user or message.from_user.id not in ADMIN_IDS:
@@ -2733,13 +2859,15 @@ async def stats_cmd(message: types.Message):
     labels = {"slayd": "Taqdimot"}
     labels.update({key: meta["label"] for key, meta in DOC_KINDS.items()})
     lines = [
-        "📈 <b>Statistika</b>",
-        f"👥 Jami foydalanuvchi: <b>{stats['total_users']}</b>",
+        "📈 <b>Bot Statistikasi & Moliya</b>",
+        f"👥 Jami foydalanuvchilar: <b>{stats['total_users']}</b>",
         f"🆕 24 soatda yangi: <b>{stats['new_24h']}</b>",
         f"🟢 24 soatda faol: <b>{stats['active_24h']}</b>",
-        f"✅ Jami tayyor ish: <b>{stats['total_ok']}</b>",
+        f"💎 Faol obunachilar: <b>{stats['active_subs']}</b>",
+        f"💰 Jami tushum (Daromad): <b>{stats['total_revenue']:,} so'm</b>",
+        f"✅ Jami tayyor ishlar: <b>{stats['total_ok']}</b>",
         "",
-        "<b>Oxirgi 24 soat:</b>",
+        "<b>Oxirgi 24 soatdagi buyurtmalar:</b>",
     ]
     if stats["by_kind"]:
         for kind, (ok_count, fail_count) in sorted(stats["by_kind"].items()):
@@ -2747,6 +2875,37 @@ async def stats_cmd(message: types.Message):
     else:
         lines.append("• hali buyurtma yo'q")
     await message.answer("\n".join(lines), parse_mode="HTML")
+
+
+@dp.message(Command("send"))
+@dp.message(Command("broadcast"))
+async def broadcast_cmd(message: types.Message, command: CommandObject):
+    if not message.from_user or message.from_user.id not in ADMIN_IDS:
+        return
+    if not command.args:
+        await message.answer("⚠️ Xabar matnini kiriting!\nFormat: <code>/send Xabar matni</code>", parse_mode="HTML")
+        return
+
+    broadcast_text = command.args
+    users = await asyncio.to_thread(rate_limiter.get_all_user_ids)
+    
+    status_msg = await message.answer(f"⏳ Xabar {len(users)} ta foydalanuvchiga yuborilmoqda...")
+    sent, failed = 0, 0
+
+    for uid in users:
+        try:
+            await bot.send_message(uid, broadcast_text, parse_mode="HTML")
+            sent += 1
+            await asyncio.sleep(0.05)  # Telegram flood limitiga tushmaslik uchun
+        except Exception:
+            failed += 1
+
+    await status_msg.edit_text(
+        f"✅ <b>Xabar yuborish yakunlandi!</b>\n\n"
+        f"📤 Yuborildi: <b>{sent} ta</b>\n"
+        f"🚫 Bloklagan/yetkazilmadi: <b>{failed} ta</b>",
+        parse_mode="HTML"
+    )
 
 
 @dp.message(F.text)
@@ -2830,7 +2989,7 @@ async def lifespan(app: FastAPI):
         logger.info("Ilova to'xtatildi.")
 
 
-app = FastAPI(title="Slide AI Generator", version="3.3.0", lifespan=lifespan)
+app = FastAPI(title="Slide AI Generator", version="3.4.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
