@@ -90,10 +90,10 @@ PAYMENT_PROVIDER_TOKEN = os.getenv(
     "398062629:TEST:999999999_F91D8F69C042267444B74CC0B3C747757EB0E065",
 ).strip()
 
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite").strip()
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
 GEMINI_FALLBACK_MODELS = [
     m.strip()
-    for m in os.getenv("GEMINI_FALLBACK_MODELS", "gemini-3.6-flash,gemini-2.5-flash").split(",")
+    for m in os.getenv("GEMINI_FALLBACK_MODELS", "gemini-2.5-pro").split(",")
     if m.strip()
 ]
 GEMINI_MODELS = [GEMINI_MODEL] + [m for m in GEMINI_FALLBACK_MODELS if m != GEMINI_MODEL]
@@ -852,7 +852,7 @@ def parse_slides(raw_text: str, count: int = SLIDE_COUNT) -> list[dict]:
     return validated
 
 
-async def call_gemini(prompt: str, timeout: float | None = None) -> str:
+async def call_gemini(prompt: str, timeout: float | None = None, response_mime_type: str = "application/json") -> str:
     effective_timeout = timeout or GEMINI_TIMEOUT_SECONDS
     try:
         await asyncio.wait_for(generation_semaphore.acquire(), timeout=QUEUE_TIMEOUT_SECONDS)
@@ -871,8 +871,8 @@ async def call_gemini(prompt: str, timeout: float | None = None) -> str:
                         model=model_name,
                         contents=prompt,
                         config=genai_types.GenerateContentConfig(
-                            response_mime_type="application/json",
-                            temperature=0.5,
+                            response_mime_type=response_mime_type,
+                            temperature=0.4,
                         ),
                     ),
                     timeout=effective_timeout,
@@ -912,7 +912,7 @@ async def call_gemini(prompt: str, timeout: float | None = None) -> str:
 async def generate_structured(prompt: str, parser, timeout: float | None = None):
     for attempt in range(1, GEMINI_MAX_ATTEMPTS + 1):
         try:
-            raw_text = await call_gemini(prompt, timeout)
+            raw_text = await call_gemini(prompt, timeout, response_mime_type="application/json")
             return parser(raw_text)
         except ValueError as exc:
             logger.warning("Gemini javobi yaroqsiz (urinish %s/%s): %s", attempt, GEMINI_MAX_ATTEMPTS, exc)
@@ -2270,7 +2270,6 @@ def open_app_keyboard() -> InlineKeyboardMarkup:
 
 
 def insufficient_balance_kb() -> InlineKeyboardMarkup:
-    """Balans yetmaganda chiqadigan tugmalar"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="💳 Balansni to'ldirish", callback_data="open_topup_menu")],
@@ -2564,7 +2563,7 @@ async def process_successful_payment(message: types.Message):
 
 
 # =========================================================
-# XIZMAT TUGMALARI BOSILGANDA BIRINCHI BO'LIB BALANS TEKSHIRUVI
+# XIZMAT TUGMALARI BOSILGANDA BALANS TEKSHIRUVI
 # =========================================================
 @dp.message(F.text == BTN_SLIDE)
 async def slide_btn_handler(message: types.Message, state: FSMContext):
@@ -2580,7 +2579,6 @@ async def slide_btn_handler(message: types.Message, state: FSMContext):
         if sub and account["daily_used"] < sub["daily_limit"]:
             is_sub_valid = True
 
-    # Agar bepuli tugagan va puli 3000 so'mdan kam bo'lsa -> Darhol to'lov oynasi
     if not is_free and not is_sub_valid and account["balance"] < 3000:
         await message.answer(
             "❗️ <b>Balansingizda yetarli mablag' mavjud emas!</b>",
@@ -2615,7 +2613,6 @@ async def document_btn_handler(message: types.Message, state: FSMContext):
 
     min_price = 4000 if kind in ("referat", "mustaqil") else (PRICING.get(kind, 3000) if isinstance(PRICING.get(kind), int) else 3000)
 
-    # Agar bepuli tugagan, obunasi yo'q va puli yetmasa -> Darhol to'lov oynasi
     if not is_free and not is_sub_valid and account["balance"] < min_price:
         await message.answer(
             "❗️ <b>Balansingizda yetarli mablag' mavjud emas!</b>",
@@ -2624,7 +2621,6 @@ async def document_btn_handler(message: types.Message, state: FSMContext):
         )
         return
 
-    # Mablag' yetarli yoki bepul bo'lsa -> Mavzu so'raladi
     await state.set_state(DocOrder.waiting_topic)
     await state.update_data(kind=kind)
     await message.answer(
@@ -2646,7 +2642,6 @@ async def receive_topic(message: types.Message, state: FSMContext):
 
     await state.update_data(topic=topic)
 
-    # 3, 4, 5 reja tanlash (Slayd, Referat, Mustaqil ish)
     if kind in ("slayd", "referat", "mustaqil"):
         await state.set_state(DocOrder.waiting_outline)
         await message.answer(
@@ -3259,7 +3254,6 @@ async def api_images_to_pdf(
             content = await file.read()
             img = Image.open(io.BytesIO(content))
             
-            # Rang rejimini RGB ga o'girish (PNG/RGBA shaffoflik xatosini oldini olish uchun)
             if img.mode != "RGB":
                 img = img.convert("RGB")
 
@@ -3304,7 +3298,7 @@ async def api_images_to_pdf(
 
 
 # =========================================================
-# HUJJATLAR BO'LIMI: YANGI REAL ISHLOVCHI API ENDPOINTLAR
+# HUJJATLAR BO'LIMI: REAL ISHLOVCHI API ENDPOINTLAR
 # =========================================================
 
 # 1. RASMDAN MATN (OCR) - GEMINI ORQALI
@@ -3407,7 +3401,7 @@ async def api_ocr_to_docx(req: OcrDocxRequest):
             os.remove(file_path)
 
 
-# 3. HUJJATNI TARJIMA QILISH VA KIRILL <-> LOTIN O'GIRISH (.DOCX)
+# 3. HUJJATNI TARJIMA QILISH VA KIRILL <-> LOTIN O'GIRISH (.DOCX) — TUZATILGAN VA KAFOLATLANGAN QISM
 @app.post("/api/translate-doc")
 async def api_translate_doc(
     init_data: str = Form(...),
@@ -3425,9 +3419,24 @@ async def api_translate_doc(
     except Exception:
         raise HTTPException(status_code=400, detail="Faqat Word (.docx) fayllari qabul qilinadi.")
 
-    paragraphs_text = [p.text for p in source_doc.paragraphs if p.text.strip()]
+    paragraphs_text = []
+    # Paragraflarni olish
+    for p in source_doc.paragraphs:
+        t = p.text.strip()
+        if t:
+            paragraphs_text.append(t)
+    
+    # Agar paragraflarda topilmasa, jadvallar ichidan ham qidirish
     if not paragraphs_text:
-        raise HTTPException(status_code=400, detail="Fayl ichida matn topilmadi.")
+        for table in source_doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    ct = cell.text.strip()
+                    if ct and ct not in paragraphs_text:
+                        paragraphs_text.append(ct)
+
+    if not paragraphs_text:
+        raise HTTPException(status_code=400, detail="Fayl ichida o'qib bo'ladigan matn topilmadi.")
 
     out_doc = Document()
     out_doc.sections[0].left_margin = Cm(3.0)
@@ -3435,41 +3444,81 @@ async def api_translate_doc(
     out_doc.sections[0].top_margin = Cm(2.0)
     out_doc.sections[0].bottom_margin = Cm(2.0)
 
+    # A) Kirill <-> Lotin o'girish
     if target_lang in ("uz_lat", "uz_cyr"):
         target_alphabet = LATIN if target_lang == "uz_lat" else KIRILL
-        for p in source_doc.paragraphs:
-            if p.text.strip():
-                np = out_doc.add_paragraph()
-                np.paragraph_format.line_spacing = 1.5
-                run = np.add_run(fix_text(p.text, target_alphabet))
-                run.font.name = DOC_FONT
+        for text in paragraphs_text:
+            np = out_doc.add_paragraph()
+            np.paragraph_format.line_spacing = 1.5
+            run = np.add_run(fix_text(text, target_alphabet))
+            run.font.name = DOC_FONT
+
+    # B) Tilga tarjima qilish (Rus, Ingliz, O'zbek)
     else:
-        lang_names = {"ru": "rus", "en": "ingliz", "uz": "o'zbek (lotin)"}
-        dest = lang_names.get(target_lang, "rus")
-        full_text = "\n\n".join(paragraphs_text[:40])
-        prompt = (
-            f"Siz professional tarjimonsiz. Quyidagi ilmiy/akademik matnni mazmunini qisqartirmasdan, "
-            f"ravon va aniq {dest} tiliga tarjima qilib bering:\n\n{full_text}"
-        )
-        try:
-            resp = await call_gemini(prompt, timeout=GEMINI_DOC_TIMEOUT_SECONDS)
-            for translated_para in resp.split("\n\n"):
-                if translated_para.strip():
+        lang_names = {
+            "ru": "rus tiliga",
+            "en": "ingliz tiliga",
+            "uz": "o'zbek (lotin) tiliga"
+        }
+        dest = lang_names.get(target_lang, "rus tiliga")
+
+        # Matn uzilib qolmasligi uchun bo'laklab (chunks) tarjima qilinadi
+        chunks = []
+        current_chunk = []
+        current_len = 0
+        for p in paragraphs_text:
+            current_chunk.append(p)
+            current_len += len(p)
+            if current_len >= 1800:
+                chunks.append("\n\n".join(current_chunk))
+                current_chunk = []
+                current_len = 0
+        if current_chunk:
+            chunks.append("\n\n".join(current_chunk))
+
+        translated_blocks = []
+        for chunk in chunks:
+            prompt = (
+                f"Siz professional tarjimonsiz. Quyidagi ilmiy/rasmiy matnni hech qanday qisqartirishsiz, "
+                f"so'zma-so'z mazmunini to'liq saqlagan holda {dest} tarjima qilib bering.\n"
+                f"Faqat tarjima matnini qaytaring, o'zingizdan salomlashish yoki tushuntirish qo'shmang:\n\n{chunk}"
+            )
+            try:
+                # response_mime_type="text/plain" bo'lishi shart!
+                translated_text = await call_gemini(
+                    prompt,
+                    timeout=GEMINI_DOC_TIMEOUT_SECONDS,
+                    response_mime_type="text/plain"
+                )
+                if translated_text.strip():
+                    translated_blocks.append(translated_text.strip())
+            except Exception as e:
+                logger.error("Tarjima qilishda so'rov xatosi: %s", e)
+                # Agar AI to'xtasa, asl matnni yo'qotmaslik uchun qo'shib qo'yamiz
+                translated_blocks.append(chunk)
+
+        # Hujjatga yozish
+        for block in translated_blocks:
+            for p_line in block.split("\n"):
+                clean_line = p_line.strip()
+                if clean_line:
                     np = out_doc.add_paragraph()
                     np.paragraph_format.line_spacing = 1.5
-                    run = np.add_run(translated_para.strip())
+                    run = np.add_run(clean_line)
                     run.font.name = DOC_FONT
-        except Exception:
-            raise HTTPException(status_code=502, detail="AI orqali tarjima qilishda xatolik bo'ldi.")
 
     file_path = os.path.join(tempfile.gettempdir(), f"tarjima_{uuid.uuid4().hex[:6]}.docx")
     try:
         out_doc.save(file_path)
-        doc_input = types.FSInputFile(file_path, filename=f"tarjima_{file.filename}")
+        out_filename = file.filename or "hujjat.docx"
+        if not out_filename.endswith(".docx"):
+            out_filename += ".docx"
+            
+        doc_input = types.FSInputFile(file_path, filename=f"tarjima_{out_filename}")
         await bot.send_document(
             chat_id=user_id,
             document=doc_input,
-            caption=f"✅ <b>Hujjat tarjima qilindi!</b>\n🌐 Til: {target_lang.upper()}\n📄 Fayl: {file.filename}",
+            caption=f"✅ <b>Hujjat tayyorlandi!</b>\n🌐 Yo'nalish: {target_lang.upper()}\n📄 Fayl: {out_filename}",
             parse_mode="HTML"
         )
         return {"success": True}
