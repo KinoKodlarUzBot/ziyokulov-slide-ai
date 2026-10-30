@@ -41,7 +41,6 @@
       padding: 14px 14px calc(34px + env(safe-area-inset-bottom, 0px));
     }
 
-    /* ---------- Yuqori qator: tablar + balans ---------- */
     .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
     .tabs {
@@ -97,7 +96,6 @@
 
     .count { color: var(--hint); margin: 16px 2px 12px; font-size: 15px; }
 
-    /* ---------- Qidiruv va kiritish ---------- */
     .search {
       display: flex;
       align-items: center;
@@ -216,7 +214,6 @@
       overflow: hidden;
     }
 
-    /* ---------- Uslub kartalari va ICHKI PREVIEW DIZAYNLARI (15 XIL) ---------- */
     .sty { display: flex; flex-direction: column; justify-content: flex-start; flex: none; width: 154px; scroll-snap-align: start; border: none; background: none; padding: 0; color: inherit; text-align: left; font: inherit; cursor: pointer; }
     .pv {
       position: relative;
@@ -230,79 +227,32 @@
     .pv .bar { position: absolute; top: 0; left: 0; right: 0; height: 7px; }
     .pv .ttl { position: absolute; top: 16px; left: 12px; height: 6px; width: 45%; border-radius: 3px; }
     
-    .pv .pv-col-wrap {
-      position: absolute; top: 32px; left: 10px; right: 10px; bottom: 10px;
-      display: flex; gap: 8px;
-    }
-    .pv .pv-col {
-      flex: 1; border-radius: 6px; box-shadow: 0 0 0 1px rgba(128,128,128,.15);
-      position: relative; overflow: hidden;
-    }
-    .pv .pv-col::before {
-      content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
-      background: var(--acc);
-    }
+    .pv .pv-col-wrap { position: absolute; top: 32px; left: 10px; right: 10px; bottom: 10px; display: flex; gap: 8px; }
+    .pv .pv-col { flex: 1; border-radius: 6px; box-shadow: 0 0 0 1px rgba(128,128,128,.15); position: relative; overflow: hidden; }
+    .pv .pv-col::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--acc); }
 
-    .pv .pv-proc-wrap {
-      position: absolute; top: 32px; left: 10px; right: 10px; bottom: 10px;
-      display: flex; gap: 5px;
-    }
-    .pv .pv-proc-col {
-      flex: 1; border-radius: 5px; box-shadow: 0 0 0 1px rgba(128,128,128,.15);
-      overflow: hidden; display: flex; flex-direction: column;
-    }
+    .pv .pv-proc-wrap { position: absolute; top: 32px; left: 10px; right: 10px; bottom: 10px; display: flex; gap: 5px; }
+    .pv .pv-proc-col { flex: 1; border-radius: 5px; box-shadow: 0 0 0 1px rgba(128,128,128,.15); overflow: hidden; display: flex; flex-direction: column; }
     .pv .pv-proc-head { height: 10px; background: var(--acc); width: 100%; }
 
-    .pv .pv-hero-box {
-      position: absolute; top: 30px; left: 10px; right: 10px; height: 32px;
-      border-radius: 6px; box-shadow: 0 0 0 1px rgba(128,128,128,.15);
-      overflow: hidden;
-    }
+    .pv .pv-hero-box { position: absolute; top: 30px; left: 10px; right: 10px; height: 32px; border-radius: 6px; box-shadow: 0 0 0 1px rgba(128,128,128,.15); overflow: hidden; }
     .pv .pv-hero-box::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--acc); }
-    .pv .pv-sub-wrap {
-      position: absolute; top: 68px; left: 10px; right: 10px; height: 22px;
-      display: flex; gap: 6px;
-    }
+    .pv .pv-sub-wrap { position: absolute; top: 68px; left: 10px; right: 10px; height: 22px; display: flex; gap: 6px; }
     .pv .pv-sub-item { flex: 1; border-radius: 4px; box-shadow: 0 0 0 1px rgba(128,128,128,.15); }
 
-    .pv .pv-split-wrap {
-      position: absolute; top: 30px; left: 10px; right: 10px; bottom: 10px;
-      display: flex; gap: 7px;
-    }
-    .pv .pv-split-left {
-      width: 40px; border-radius: 5px; background: var(--acc);
-    }
-    .pv .pv-split-right {
-      flex: 1; display: flex; flex-direction: column; gap: 6px; justify-content: center;
-    }
+    .pv .pv-split-wrap { position: absolute; top: 30px; left: 10px; right: 10px; bottom: 10px; display: flex; gap: 7px; }
+    .pv .pv-split-left { width: 40px; border-radius: 5px; background: var(--acc); }
+    .pv .pv-split-right { flex: 1; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
     .pv .pv-split-row { height: 22px; border-radius: 5px; box-shadow: 0 0 0 1px rgba(128,128,128,.15); }
 
-    .pv .pv-min-wrap {
-      position: absolute; top: 32px; left: 12px; right: 12px; bottom: 8px;
-      display: flex; flex-direction: column; justify-content: space-around;
-    }
-    .pv .pv-min-line {
-      height: 2px; width: 100%; opacity: 0.4;
-      background: var(--acc);
-    }
+    .pv .pv-min-wrap { position: absolute; top: 32px; left: 12px; right: 12px; bottom: 8px; display: flex; flex-direction: column; justify-content: space-around; }
+    .pv .pv-min-line { height: 2px; width: 100%; opacity: 0.4; background: var(--acc); }
 
-    .pv .pv-sq-row {
-      position: absolute; left: 10px; right: 10px; height: 24px; border-radius: 5px;
-      box-shadow: 0 0 0 1px rgba(128,128,128,.15);
-    }
-    .pv .pv-sq-badge {
-      position: absolute; left: 5px; top: 5px; width: 14px; height: 14px;
-      background: var(--acc); border-radius: 2px;
-    }
+    .pv .pv-sq-row { position: absolute; left: 10px; right: 10px; height: 24px; border-radius: 5px; box-shadow: 0 0 0 1px rgba(128,128,128,.15); }
+    .pv .pv-sq-badge { position: absolute; left: 5px; top: 5px; width: 14px; height: 14px; background: var(--acc); border-radius: 2px; }
 
-    .pv .pv-rd-row {
-      position: absolute; left: 10px; right: 10px; height: 24px; border-radius: 8px;
-      box-shadow: 0 0 0 1px rgba(128,128,128,.15);
-    }
-    .pv .pv-rd-badge {
-      position: absolute; left: 6px; top: 6px; width: 12px; height: 12px;
-      background: var(--acc); border-radius: 50%;
-    }
+    .pv .pv-rd-row { position: absolute; left: 10px; right: 10px; height: 24px; border-radius: 8px; box-shadow: 0 0 0 1px rgba(128,128,128,.15); }
+    .pv .pv-rd-badge { position: absolute; left: 6px; top: 6px; width: 12px; height: 12px; background: var(--acc); border-radius: 50%; }
 
     .check {
       position: absolute;
@@ -324,12 +274,10 @@
     .sname { margin: 9px 3px 0; font-size: 14px; font-weight: 800; }
     .sdesc { margin: 1px 3px 0; font-size: 12px; color: var(--hint); }
 
-    /* ---------- Alifbo ---------- */
     .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 5px; border-radius: 16px; background: rgba(255, 255, 255, .05); border: 1px solid var(--line); }
     .seg button { border: none; background: transparent; color: var(--hint); padding: 13px; border-radius: 12px; font: inherit; font-weight: 800; font-size: 15px; cursor: pointer; }
     .seg button.on { background: var(--gold); color: var(--gold-ink); }
 
-    /* ---------- Asosiy tugma ---------- */
     .submit {
       width: 100%;
       margin-top: 24px;
@@ -384,16 +332,8 @@
     }
     .close-btn.show { display: block; }
 
-    /* ========================================================
-       HUJJATLAR MENYUSI DIZAYNLARI (Zakirovs_bot nusxasi)
-    ======================================================== */
-    .h-title {
-      font-size: 28px;
-      font-weight: 900;
-      line-height: 1.15;
-      margin: 10px 0 16px;
-      letter-spacing: -0.5px;
-    }
+    /* ---------- Hujjatlar Menyusi (Zakirovs_bot Nusxasi) ---------- */
+    .h-title { font-size: 28px; font-weight: 900; line-height: 1.15; margin: 10px 0 16px; letter-spacing: -0.5px; }
 
     .card-dropzone {
       background: linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
@@ -408,54 +348,13 @@
       transition: border-color 0.15s;
     }
     .card-dropzone:active { border-color: var(--cyan); }
-    .drop-icons {
-      position: relative;
-      width: 54px;
-      height: 60px;
-      flex-shrink: 0;
-    }
-    .drop-doc {
-      position: absolute;
-      width: 38px;
-      height: 50px;
-      background: #ffffff;
-      border-radius: 6px;
-      top: 0;
-      left: 0;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    }
-    .drop-pdf {
-      position: absolute;
-      width: 40px;
-      height: 52px;
-      background: #e11d48;
-      border-radius: 7px;
-      bottom: 0;
-      right: 0;
-      color: #fff;
-      font-size: 10px;
-      font-weight: 900;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 6px 14px rgba(225, 29, 72, 0.35);
-    }
+    .drop-icons { position: relative; width: 54px; height: 60px; flex-shrink: 0; }
+    .drop-doc { position: absolute; width: 38px; height: 50px; background: #ffffff; border-radius: 6px; top: 0; left: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+    .drop-pdf { position: absolute; width: 40px; height: 52px; background: #e11d48; border-radius: 7px; bottom: 0; right: 0; color: #fff; font-size: 10px; font-weight: 900; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 14px rgba(225, 29, 72, 0.35); }
     .drop-info { flex: 1; }
     .drop-info h3 { margin: 0 0 4px; font-size: 17px; font-weight: 800; }
     .drop-info p { margin: 0 0 12px; font-size: 12px; color: var(--hint); line-height: 1.35; }
-    .btn-white-upload {
-      background: #ffffff;
-      color: #0b111e;
-      border: none;
-      padding: 7px 18px;
-      border-radius: 999px;
-      font-weight: 800;
-      font-size: 13px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
+    .btn-white-upload { background: #ffffff; color: #0b111e; border: none; padding: 7px 18px; border-radius: 999px; font-weight: 800; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 
     .card-action-bar {
       background: rgba(255, 255, 255, 0.05);
@@ -469,60 +368,16 @@
       margin-bottom: 22px;
     }
     .card-action-bar:active { border-color: var(--gold); }
-    .badge-square-orange {
-      width: 44px;
-      height: 44px;
-      border-radius: 14px;
-      background: #ea580c;
-      color: #fff;
-      font-weight: 900;
-      font-size: 18px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
+    .badge-square-orange { width: 44px; height: 44px; border-radius: 14px; background: #ea580c; color: #fff; font-weight: 900; font-size: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .ac-info { flex: 1; }
     .ac-info b { display: block; font-size: 15px; margin-bottom: 2px; }
     .ac-info span { display: block; font-size: 12px; color: var(--hint); }
-    .tag-gold {
-      background: rgba(245, 158, 11, 0.15);
-      color: #f59e0b;
-      font-weight: 800;
-      font-size: 12px;
-      padding: 4px 8px;
-      border-radius: 8px;
-    }
+    .tag-gold { background: rgba(245, 158, 11, 0.15); color: #f59e0b; font-weight: 800; font-size: 12px; padding: 4px 8px; border-radius: 8px; }
 
-    .tools-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 24px;
-    }
-    .card-tool {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      padding: 14px 12px;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      transition: border-color 0.15s;
-    }
+    .tools-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+    .card-tool { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); border-radius: 18px; padding: 14px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 10px; transition: border-color 0.15s; }
     .card-tool:active { border-color: var(--cyan); }
-    .tool-icon-badge {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 900;
-      font-size: 12px;
-      color: #fff;
-    }
+    .tool-icon-badge { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; color: #fff; }
     .bg-blue { background: #2563eb; }
     .bg-purple { background: #9333ea; }
     .bg-red { background: #e11d48; }
@@ -546,18 +401,7 @@
       gap: 12px;
       margin-bottom: 8px;
     }
-    .history-badge {
-      width: 38px;
-      height: 38px;
-      border-radius: 10px;
-      background: #e11d48;
-      color: #fff;
-      font-size: 11px;
-      font-weight: 900;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+    .history-badge { width: 38px; height: 38px; border-radius: 10px; background: #e11d48; color: #fff; font-size: 11px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
     .history-info { flex: 1; }
     .history-info b { font-size: 14px; display: block; }
     .history-info span { font-size: 12px; color: var(--hint); }
@@ -565,131 +409,30 @@
     .history-note { font-size: 12px; color: var(--hint); text-align: center; margin-top: 14px; }
 
     /* ---------- Skaner va Animatsiya (17875 & 17881) ---------- */
-    .scan-container {
-      position: relative;
-      width: 220px;
-      height: 220px;
-      margin: 10px auto 26px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .scan-doc-img {
-      width: 170px;
-      height: 200px;
-      object-fit: cover;
-      border-radius: 16px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-      border: 1px solid var(--line);
-    }
-    .scan-laser-line {
-      position: absolute;
-      top: 10px;
-      left: 15px;
-      right: 15px;
-      height: 3px;
-      background: #34d399;
-      box-shadow: 0 0 12px #34d399;
-      border-radius: 2px;
-      animation: scanLaser 2s infinite ease-in-out alternate;
-    }
-    @keyframes scanLaser {
-      0% { top: 15px; opacity: 0.4; }
-      50% { opacity: 1; }
-      100% { top: 195px; opacity: 0.8; }
-    }
+    .scan-container { position: relative; width: 220px; height: 220px; margin: 10px auto 26px; display: flex; align-items: center; justify-content: center; }
+    .scan-doc-img { width: 170px; height: 200px; object-fit: cover; border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); border: 1px solid var(--line); }
+    .scan-laser-line { position: absolute; top: 10px; left: 15px; right: 15px; height: 3px; background: #34d399; box-shadow: 0 0 12px #34d399; border-radius: 2px; animation: scanLaser 2s infinite ease-in-out alternate; }
+    @keyframes scanLaser { 0% { top: 15px; opacity: 0.4; } 50% { opacity: 1; } 100% { top: 195px; opacity: 0.8; } }
 
-    .status-step-list {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      width: 100%;
-      max-width: 280px;
-      margin: 0 auto 20px;
-      text-align: left;
-    }
-    .status-step-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--hint);
-      transition: color 0.2s;
-    }
+    .status-step-list { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 280px; margin: 0 auto 20px; text-align: left; }
+    .status-step-item { display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 600; color: var(--hint); transition: color 0.2s; }
     .status-step-item.active { color: #ffffff; font-weight: 700; }
     .status-step-item.done { color: var(--ok); }
-    .step-dot {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      border: 1.5px solid var(--hint);
-      flex-shrink: 0;
-    }
-    .status-step-item.active .step-dot {
-      border-color: #ffffff;
-      border-top-color: transparent;
-      animation: spinDot 0.8s linear infinite;
-    }
-    .status-step-item.done .step-dot {
-      border-color: var(--ok);
-      background: var(--ok);
-      color: #0b111e;
-      font-weight: 900;
-    }
+    .step-dot { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; border: 1.5px solid var(--hint); flex-shrink: 0; }
+    .status-step-item.active .step-dot { border-color: #ffffff; border-top-color: transparent; animation: spinDot 0.8s linear infinite; }
+    .status-step-item.done .step-dot { border-color: var(--ok); background: var(--ok); color: #0b111e; font-weight: 900; }
     @keyframes spinDot { to { transform: rotate(360deg); } }
 
     /* ---------- OCR Natija Ekranlari (17877) ---------- */
-    .ocr-result-card {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--line);
-      border-radius: 20px;
-      padding: 16px;
-      margin: 14px 0 20px;
-      max-height: 240px;
-      overflow-y: auto;
-      font-size: 14px;
-      line-height: 1.5;
-      color: var(--text);
-      white-space: pre-wrap;
-    }
+    .ocr-result-card { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line); border-radius: 20px; padding: 16px; margin: 14px 0 20px; max-height: 240px; overflow-y: auto; font-size: 14px; line-height: 1.5; color: var(--text); white-space: pre-wrap; }
     .metric-badges { display: flex; justify-content: center; gap: 10px; margin-bottom: 12px; }
     .metric-pill { background: rgba(255, 255, 255, 0.07); padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--hint); }
     .sent-notice { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--ok); font-size: 13px; font-weight: 700; margin-bottom: 18px; }
     .action-row-double { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-    .btn-secondary {
-      padding: 14px;
-      border-radius: 16px;
-      border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.06);
-      color: #ffffff;
-      font-weight: 700;
-      font-size: 14px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
+    .btn-secondary { padding: 14px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.06); color: #ffffff; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
 
     /* ---------- Ziyoqulov AI Qizil Shtampi (17895) ---------- */
-    .stamp-container {
-      position: relative;
-      width: 200px;
-      height: 250px;
-      margin: 10px auto 18px;
-      background: #ffffff;
-      border-radius: 14px;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+    .stamp-container { position: relative; width: 200px; height: 250px; margin: 10px auto 18px; background: #ffffff; border-radius: 14px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5); overflow: hidden; display: flex; align-items: center; justify-content: center; }
     .stamp-preview-img { width: 100%; height: 100%; object-fit: cover; }
     .red-stamp-badge {
       position: absolute;
@@ -717,72 +460,13 @@
 
     /* ---------- Rasmlardan PDF kataklari ---------- */
     .subview-top { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
-    .btn-back-round {
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid var(--line);
-      color: #fff;
-      font-size: 18px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-    }
+    .btn-back-round { width: 38px; height: 38px; border-radius: 50%; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); color: #fff; font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
     .img-grid-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0; }
-    .img-box {
-      position: relative;
-      height: 120px;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid var(--line);
-      background: rgba(0, 0, 0, 0.4);
-    }
+    .img-box { position: relative; height: 120px; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.4); }
     .img-box img { width: 100%; height: 100%; object-fit: cover; }
-    .img-num {
-      position: absolute;
-      bottom: 6px;
-      left: 6px;
-      background: rgba(0, 0, 0, 0.7);
-      color: #fff;
-      border-radius: 50%;
-      width: 22px;
-      height: 22px;
-      font-size: 11px;
-      font-weight: 800;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .img-del {
-      position: absolute;
-      top: 6px;
-      right: 6px;
-      background: rgba(255, 59, 48, 0.9);
-      color: #fff;
-      border-radius: 50%;
-      width: 22px;
-      height: 22px;
-      border: none;
-      font-size: 12px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .btn-add-slot {
-      height: 120px;
-      border-radius: 16px;
-      border: 2px dashed rgba(255, 255, 255, 0.25);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
-      color: var(--hint);
-      cursor: pointer;
-    }
+    .img-num { position: absolute; bottom: 6px; left: 6px; background: rgba(0, 0, 0, 0.7); color: #fff; border-radius: 50%; width: 22px; height: 22px; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+    .img-del { position: absolute; top: 6px; right: 6px; background: rgba(255, 59, 48, 0.9); color: #fff; border-radius: 50%; width: 22px; height: 22px; border: none; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .btn-add-slot { height: 120px; border-radius: 16px; border: 2px dashed rgba(255, 255, 255, 0.25); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: var(--hint); cursor: pointer; }
     .btn-add-slot:active { border-color: var(--cyan); color: var(--cyan); }
     .btn-add-slot .plus { font-size: 26px; line-height: 1; }
 
@@ -791,34 +475,14 @@
     .size-toggle button { border: none; background: transparent; color: var(--hint); padding: 8px 14px; border-radius: 9px; font-weight: 700; font-size: 13px; cursor: pointer; }
     .size-toggle button.active { background: #ffffff; color: #0b111e; }
 
-    /* ---------- Mavzular tabi ---------- */
     .chips { display: flex; gap: 8px; overflow-x: auto; margin: 0 -14px 16px; padding: 2px 14px; scrollbar-width: none; }
     .chips::-webkit-scrollbar { display: none; }
-    .chip {
-      flex: none;
-      padding: 10px 17px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: rgba(255, 255, 255, .05);
-      color: var(--text);
-      font: inherit;
-      font-weight: 700;
-      font-size: 15px;
-      cursor: pointer;
-    }
+    .chip { flex: none; padding: 10px 17px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, .05); color: var(--text); font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; }
     .chip.active { background: var(--gold); border-color: var(--gold); color: var(--gold-ink); }
     .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px 13px; }
 
-    /* ---------- Yordam tabi ---------- */
     .help-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
-    .help-list li {
-      display: flex;
-      gap: 14px;
-      padding: 15px;
-      border-radius: 18px;
-      background: var(--card);
-      border: 1px solid var(--line);
-    }
+    .help-list li { display: flex; gap: 14px; padding: 15px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); }
     .help-list .hi { font-size: 26px; line-height: 1; }
     .help-list b { display: block; font-size: 16px; margin-bottom: 2px; }
     .help-list span { color: var(--hint); font-size: 14px; }
@@ -828,94 +492,27 @@
     .panel.active { display: block; }
     .note { color: var(--hint); font-size: 12px; text-align: center; margin-top: 20px; }
 
-    /* ---------- To'lov Modali ---------- */
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, .75);
-      backdrop-filter: blur(5px);
-      z-index: 9999;
-      align-items: flex-end;
-      justify-content: center;
-      animation: fadeIn .2s ease;
-    }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, .75); backdrop-filter: blur(5px); z-index: 9999; align-items: flex-end; justify-content: center; animation: fadeIn .2s ease; }
     .modal-overlay.open { display: flex; }
-    .modal-card {
-      width: 100%;
-      max-width: 520px;
-      background: #14172a;
-      border-top-left-radius: 28px;
-      border-top-right-radius: 28px;
-      border: 1px solid var(--line);
-      border-bottom: none;
-      padding: 22px 18px calc(24px + env(safe-area-inset-bottom, 0px));
-      box-shadow: 0 -10px 30px rgba(0, 0, 0, .6);
-      animation: slideUp .25s ease;
-    }
+    .modal-card { width: 100%; max-width: 520px; background: #14172a; border-top-left-radius: 28px; border-top-right-radius: 28px; border: 1px solid var(--line); border-bottom: none; padding: 22px 18px calc(24px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -10px 30px rgba(0, 0, 0, .6); animation: slideUp .25s ease; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
     .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
     .modal-header h3 { margin: 0; font-size: 19px; font-weight: 800; color: var(--text); }
-    .modal-close {
-      background: rgba(255, 255, 255, .08);
-      border: none;
-      color: var(--hint);
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      font-size: 18px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+    .modal-close { background: rgba(255, 255, 255, .08); border: none; color: var(--hint); width: 32px; height: 32px; border-radius: 50%; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
     .modal-desc { font-size: 14px; color: var(--hint); margin-bottom: 18px; line-height: 1.4; }
     .modal-desc b { color: var(--gold-soft); }
 
     .topup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-    .btn-topup {
-      padding: 13px;
-      border-radius: 14px;
-      border: 1px solid var(--line);
-      background: rgba(255, 255, 255, .06);
-      color: var(--text);
-      font: inherit;
-      font-weight: 700;
-      font-size: 15px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      transition: background .15s, border-color .15s;
-    }
+    .btn-topup { padding: 13px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255, 255, 255, .06); color: var(--text); font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
     .btn-topup:active { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
 
-    .btn-sub-promo {
-      width: 100%;
-      padding: 14px;
-      border-radius: 16px;
-      border: none;
-      background: linear-gradient(135deg, #7928ca, #ff0080);
-      color: #fff;
-      font: inherit;
-      font-weight: 800;
-      font-size: 15px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      box-shadow: 0 4px 18px rgba(255, 0, 128, .25);
-    }
-    .btn-sub-promo:active { opacity: .9; }
+    .btn-sub-promo { width: 100%; padding: 14px; border-radius: 16px; border: none; background: linear-gradient(135deg, #7928ca, #ff0080); color: #fff; font: inherit; font-weight: 800; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 18px rgba(255, 0, 128, .25); }
   </style>
 </head>
 <body>
   <main class="app">
-    <!-- Yuqori qator: Tablar + Balans -->
     <header class="top">
       <nav class="tabs" id="tabs" aria-label="Bo'limlar">
         <button class="tab active" type="button" data-tab="create"><span class="ic">✨</span><span class="lb">Yaratish</span></button>
@@ -923,7 +520,6 @@
         <button class="tab" type="button" data-tab="topics"><span class="ic">🔥</span><span class="lb">Mavzular</span></button>
         <button class="tab" type="button" data-tab="help"><span class="ic">❓</span><span class="lb">Yordam</span></button>
       </nav>
-      <!-- Balans / Limit tugmasi -->
       <button class="limit" id="limit-btn" type="button" title="Balansni to'ldirish">
         <span id="limit-icon">💳</span><span id="limit-text">Yuklanmoqda...</span>
       </button>
@@ -931,11 +527,10 @@
 
     <p class="count" id="count"></p>
 
-    <!-- ===== 1. Slayd Yaratish (Asl Oyna) ===== -->
+    <!-- ===== 1. Slayd Yaratish ===== -->
     <section class="panel active" id="panel-create">
       <div class="search">
-        <input id="topic" type="text" maxlength="200" enterkeyhint="go" autocomplete="off"
-               placeholder="Taqdimot mavzusini yozing...">
+        <input id="topic" type="text" maxlength="200" enterkeyhint="go" autocomplete="off" placeholder="Taqdimot mavzusini yozing...">
         <button class="gobtn" id="go" type="button" aria-label="Slayd yaratish">➜</button>
       </div>
       <div class="counter" id="counter">0 / 200</div>
@@ -967,11 +562,10 @@
       <p class="note">Taqdimot 6 ta slayddan iborat: muqova va 5 ta mazmunli slayd.</p>
     </section>
 
-    <!-- ===== 2. HUJJATLAR ASOSIY MENYUSI (Zakirovs_bot Nusxasi) ===== -->
+    <!-- ===== 2. HUJJATLAR ASOSIY MENYUSI ===== -->
     <section class="panel" id="panel-docs">
       <h1 class="h-title">Hujjat bilan<br>nima qilamiz?</h1>
 
-      <!-- Katta Faylni Tanlang Kartasi -->
       <div class="card-dropzone" onclick="triggerUniversalPicker()">
         <div class="drop-icons">
           <div class="drop-doc"></div>
@@ -980,13 +574,10 @@
         <div class="drop-info">
           <h3>Faylni tanlang</h3>
           <p>Turini o'zim aniqlayman va eng kerakli amalni taklif qilaman</p>
-          <button class="btn-white-upload" type="button">
-            <span>↑</span><span>Yuklash</span>
-          </button>
+          <button class="btn-white-upload" type="button"><span>↑</span><span>Yuklash</span></button>
         </div>
       </div>
 
-      <!-- Tarjima va Kirill-Lotin kartasi -->
       <div class="card-action-bar" onclick="triggerTranslatePicker()">
         <div class="badge-square-orange">Aa</div>
         <div class="ac-info">
@@ -998,58 +589,33 @@
 
       <div class="sec-head"><h2>Barcha amallar</h2></div>
 
-      <!-- 6 ta amallar to'ri -->
       <div class="tools-grid">
         <div class="card-tool" onclick="triggerDocToPdfPicker()">
           <div class="tool-icon-badge bg-blue">W</div>
-          <div class="tool-texts">
-            <b>Hujjatni PDF qilish</b>
-            <span>Word, PowerPoint, Excel</span>
-          </div>
+          <div class="tool-texts"><b>Hujjatni PDF qilish</b><span>Word, PowerPoint, Excel</span></div>
         </div>
-
         <div class="card-tool" onclick="openToolSubview('images_to_pdf')">
           <div class="tool-icon-badge bg-purple">JPG</div>
-          <div class="tool-texts">
-            <b>Rasmlardan PDF</b>
-            <span>Bitta yoki ko'p rasm ➔ 1 fayl</span>
-          </div>
+          <div class="tool-texts"><b>Rasmlardan PDF</b><span>Bitta yoki ko'p rasm ➔ 1 fayl</span></div>
         </div>
-
         <div class="card-tool" onclick="triggerPdfToImagesPicker()">
           <div class="tool-icon-badge bg-red">PDF</div>
-          <div class="tool-texts">
-            <b>PDF ➔ rasm</b>
-            <span>Har sahifa alohida JPG</span>
-          </div>
+          <div class="tool-texts"><b>PDF ➔ rasm</b><span>Har sahifa alohida JPG</span></div>
         </div>
-
         <div class="card-tool" onclick="triggerPdfToTxtPicker()">
           <div class="tool-icon-badge bg-gray">TXT</div>
-          <div class="tool-texts">
-            <b>PDF ➔ matn</b>
-            <span>Nusxa olsa bo'ladigan matn</span>
-          </div>
+          <div class="tool-texts"><b>PDF ➔ matn</b><span>Nusxa olsa bo'ladigan matn</span></div>
         </div>
-
         <div class="card-tool" onclick="triggerSplitPdfPicker()">
           <div class="tool-icon-badge bg-red">✂️</div>
-          <div class="tool-texts">
-            <b>Sahifalarni ajratish</b>
-            <span>Keraklisini tanlab oling</span>
-          </div>
+          <div class="tool-texts"><b>Sahifalarni ajratish</b><span>Keraklisini tanlab oling</span></div>
         </div>
-
         <div class="card-tool" onclick="triggerOcrPicker()">
           <div class="tool-icon-badge bg-purple">OCR</div>
-          <div class="tool-texts">
-            <b>Rasmdan matn</b>
-            <span>Suratdagi yozuvni o'qish</span>
-          </div>
+          <div class="tool-texts"><b>Rasmdan matn</b><span>Suratdagi yozuvni o'qish</span></div>
         </div>
       </div>
 
-      <!-- Oxirgi fayllar tarixi -->
       <div class="history-header">
         <b>Oxirgi fayllar</b>
         <button class="btn-clear" onclick="clearHistory()">Tozalash</button>
@@ -1059,7 +625,7 @@
       <p class="history-note">Fayllar 3 soatdan keyin serverdan butunlay o'chiriladi · 50 MB gacha</p>
     </section>
 
-    <!-- ===== 3. RASMLARDAN PDF (Ilova Ichida) ===== -->
+    <!-- ===== 3. RASMLARDAN PDF ===== -->
     <section class="panel" id="panel-images-pdf">
       <div class="subview-top">
         <button class="btn-back-round" onclick="backToHub()">‹</button>
@@ -1071,8 +637,7 @@
 
       <div class="img-grid-container" id="pdf-thumbs-grid">
         <div class="btn-add-slot" onclick="document.getElementById('file-picker-imgs').click()">
-          <span class="plus">+</span>
-          <span>Qo'shish</span>
+          <span class="plus">+</span><span>Qo'shish</span>
         </div>
       </div>
 
@@ -1091,7 +656,7 @@
       </button>
     </section>
 
-    <!-- ===== 4. PROGRESS VA SKANER ANIMATSIYASI EKRANI ===== -->
+    <!-- ===== 4. PROGRESS VA SKANER ANIMATSIYASI ===== -->
     <section class="panel" id="panel-progress">
       <div class="subview-top">
         <button class="btn-back-round" onclick="backToHub()">‹</button>
@@ -1105,20 +670,10 @@
         </div>
 
         <div class="status-step-list" id="status-step-list">
-          <div class="status-step-item" id="step-1">
-            <span class="step-dot">1</span>
-            <span id="step-1-label">Fayl o'qildi</span>
-          </div>
-          <div class="status-step-item" id="step-2">
-            <span class="step-dot">2</span>
-            <span id="step-2-label">Yozuv o'qilmoqda</span>
-          </div>
-          <div class="status-step-item" id="step-3">
-            <span class="step-dot">3</span>
-            <span id="step-3-label">Chatga yuborilmoqda</span>
-          </div>
+          <div class="status-step-item" id="step-1"><span class="step-dot">1</span><span id="step-1-label">Fayl o'qildi</span></div>
+          <div class="status-step-item" id="step-2"><span class="step-dot">2</span><span id="step-2-label">Yozuv o'qilmoqda</span></div>
+          <div class="status-step-item" id="step-3"><span class="step-dot">3</span><span id="step-3-label">Chatga yuborilmoqda</span></div>
         </div>
-
         <div style="font-size: 12px; color: var(--hint);">Ilovani yopsangiz ham — tayyor fayl chatga keladi</div>
       </div>
     </section>
@@ -1131,7 +686,6 @@
       </div>
 
       <h1 class="h-title" style="margin-bottom: 8px;">Matn tayyor</h1>
-
       <div class="ocr-result-card" id="ocr-extracted-text"></div>
 
       <div class="metric-badges">
@@ -1139,22 +693,14 @@
         <div class="metric-pill" id="ocr-duration">3 soniya</div>
       </div>
 
-      <div class="sent-notice">
-        <span>✓</span><span>Chatga yuborildi</span>
-      </div>
+      <div class="sent-notice"><span>✓</span><span>Chatga yuborildi</span></div>
 
       <div class="action-row-double">
-        <button class="btn-secondary" onclick="copyOcrText()">
-          <span>📋</span><span>Nusxa olish</span>
-        </button>
-        <button class="btn-secondary" onclick="downloadOcrDocx()">
-          <span>📄</span><span>Word qilib olish</span>
-        </button>
+        <button class="btn-secondary" onclick="copyOcrText()"><span>📋</span><span>Nusxa olish</span></button>
+        <button class="btn-secondary" onclick="downloadOcrDocx()"><span>📄</span><span>Word qilib olish</span></button>
       </div>
 
-      <button class="submit" onclick="closeMiniApp()" style="margin-top:14px;">
-        <span>✈️ Chatga o'tish</span>
-      </button>
+      <button class="submit" onclick="closeMiniApp()" style="margin-top:14px;"><span>✈️ Chatga o'tish</span></button>
     </section>
 
     <!-- ===== 6. TAYYOR PDF VA QIZIL SHTAMP (Ziyoqulov AI) ===== -->
@@ -1166,7 +712,6 @@
 
       <div class="stamp-container">
         <img id="stamp-file-preview" class="stamp-preview-img" src="" alt="doc">
-        <!-- Qizil aylana shtamp: Ziyoqulov AI -->
         <div class="red-stamp-badge">
           <span class="st-name">ZIYOQULOV</span>
           <span class="st-main">TAYYOR</span>
@@ -1176,17 +721,11 @@
 
       <h2 id="stamp-file-name" style="text-align: center; font-size: 20px; font-weight: 800; margin: 0 0 16px;">hujjat.pdf</h2>
 
-      <button class="submit" style="margin-bottom: 12px; margin-top:0;" onclick="closeMiniApp()">
-        <span>✈️ Chatga o'tish</span>
-      </button>
+      <button class="submit" style="margin-bottom: 12px; margin-top:0;" onclick="closeMiniApp()"><span>✈️ Chatga o'tish</span></button>
 
       <div class="action-row-double">
-        <button class="btn-secondary" onclick="triggerTranslatePicker()">
-          <span>🌐 Tarjima</span>
-        </button>
-        <button class="btn-secondary" onclick="triggerPdfToImagesPicker()">
-          <span>🖼 PDF ➔ rasm</span>
-        </button>
+        <button class="btn-secondary" onclick="translateCurrentPdfResult()"><span>🌐 Tarjima</span></button>
+        <button class="btn-secondary" onclick="triggerPdfToImagesPicker()"><span>🖼 PDF ➔ rasm</span></button>
       </div>
     </section>
 
@@ -1204,9 +743,7 @@
           <span style="font-size: 11px; color: var(--hint); display: block;">Fayl tili · aniqlandi</span>
           <b id="lbl-source-lang" style="font-size: 15px;">🇷🇺 Rus</b>
         </div>
-
         <button type="button" style="width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line); background: rgba(255,255,255,0.08); color:#fff; cursor: pointer;" onclick="swapTranslateLangs()">⇆</button>
-
         <div style="flex:1; background: rgba(255,255,255,0.06); padding: 12px; border-radius: 16px; border: 1.5px solid var(--cyan);">
           <span style="font-size: 11px; color: var(--hint); display: block;">Tarjima tili</span>
           <b id="lbl-target-lang" style="font-size: 15px; color: var(--cyan);">🇺🇿 O'zbek</b>
@@ -1256,13 +793,12 @@
     </section>
   </main>
 
-  <!-- Yashirin fayl tanlagichlar -->
   <input type="file" id="picker-universal" style="display:none">
   <input type="file" id="picker-doc" accept=".docx,.doc,.pptx,.ppt,.xlsx,.xls" style="display:none">
   <input type="file" id="picker-pdf" accept="application/pdf" style="display:none">
   <input type="file" id="picker-image" accept="image/*" style="display:none">
 
-  <!-- ===== To'lov Modali ===== -->
+  <!-- To'lov Modali -->
   <div class="modal-overlay" id="pay-modal">
     <div class="modal-card">
       <div class="modal-header">
@@ -1281,9 +817,7 @@
         <button class="btn-topup" type="button" data-amount="50000">50 000 so'm</button>
       </div>
 
-      <button class="btn-sub-promo" id="btn-open-subs" type="button">
-        💎 Chegirmali Obuna Paketlari
-      </button>
+      <button class="btn-sub-promo" id="btn-open-subs" type="button">💎 Chegirmali Obuna Paketlari</button>
     </div>
   </div>
 
@@ -1301,43 +835,42 @@
       var MIN_LEN = 3;
       var REQUEST_TIMEOUT_MS = 150000;
 
-      // 15 XIL SHABLON (backend bilan 100% bir xil)
       var STYLES = [
-        { id: "classic",        layout: "two_cols",   name: "Klassik",     desc: "2 ustun, indigo",      bg: "#ffffff", accent: "#4f46e5", card: "#f3f4f6" },
-        { id: "business",       layout: "process",    name: "Biznes",      desc: "Gorizontal 3 bosqich", bg: "#f0f4f8", accent: "#0284c7", card: "#ffffff" },
-        { id: "dark",           layout: "hero",       name: "Qorong'i",    desc: "Katta asosiy g'oya",   bg: "#111827", accent: "#a855f7", card: "#1f2937" },
-        { id: "minimal",        layout: "minimal",    name: "Minimal",     desc: "Chiziqli, eko yashil", bg: "#f0fdf4", accent: "#22c55e", card: "#ffffff" },
-        { id: "swiss_clean",    layout: "split",      name: "Shveysariya", desc: "Chap dominant blok",   bg: "#ffffff", accent: "#e11d48", card: "#f5f5f5" },
-        { id: "cyber_tech",     layout: "square",     name: "Cyber Tech",  desc: "Neon kvadrat nishon",  bg: "#0a0f1e", accent: "#06b6d4", card: "#131d38" },
-        { id: "warm_editorial", layout: "two_cols",   name: "Editorial",   desc: "2 ustun, qahva",       bg: "#fefcf7", accent: "#d97706", card: "#fff7ed" },
-        { id: "sunset_punch",   layout: "process",    name: "Sunset",      desc: "Olovrang bosqichlar",  bg: "#fffaf5", accent: "#f97316", card: "#ffedd5" },
-        { id: "ocean_breeze",   layout: "split",      name: "Ocean",       desc: "Moviy asimmetriya",    bg: "#f0f9ff", accent: "#0ea5e9", card: "#ffffff" },
-        { id: "monochrome",     layout: "minimal",    name: "Monoxrom",    desc: "Qora-oq minimalizm",   bg: "#f5f5f5", accent: "#000000", card: "#ffffff" },
-        { id: "emerald_wealth", layout: "two_cols",   name: "Zumrad",      desc: "2 ustun, moliya",      bg: "#f0fdfa", accent: "#0d9488", card: "#ffffff" },
-        { id: "berry_creative", layout: "hero",       name: "Berry",       desc: "Magenta iqtibos",      bg: "#fdf2f8", accent: "#db2777", card: "#ffffff" },
-        { id: "titanium_slate", layout: "process",    name: "Titanium",    desc: "Muhandislik 3 karta",  bg: "#f1f5f9", accent: "#64748b", card: "#ffffff" },
-        { id: "midnight_gold",  layout: "split",      name: "Tungi Oltin", desc: "Premium asimmetrik",   bg: "#0f172a", accent: "#eab308", card: "#1e293b" },
-        { id: "nordic_frost",   layout: "round",      name: "Nordic",      desc: "Aylana ro'yxat",       bg: "#f8fafc", accent: "#38bdf8", card: "#ffffff" }
+        { id: "classic", layout: "two_cols", name: "Klassik", desc: "2 ustun, indigo", bg: "#ffffff", accent: "#4f46e5", card: "#f3f4f6" },
+        { id: "business", layout: "process", name: "Biznes", desc: "Gorizontal 3 bosqich", bg: "#f0f4f8", accent: "#0284c7", card: "#ffffff" },
+        { id: "dark", layout: "hero", name: "Qorong'i", desc: "Katta asosiy g'oya", bg: "#111827", accent: "#a855f7", card: "#1f2937" },
+        { id: "minimal", layout: "minimal", name: "Minimal", desc: "Chiziqli, eko yashil", bg: "#f0fdf4", accent: "#22c55e", card: "#ffffff" },
+        { id: "swiss_clean", layout: "split", name: "Shveysariya", desc: "Chap dominant blok", bg: "#ffffff", accent: "#e11d48", card: "#f5f5f5" },
+        { id: "cyber_tech", layout: "square", name: "Cyber Tech", desc: "Neon kvadrat nishon", bg: "#0a0f1e", accent: "#06b6d4", card: "#131d38" },
+        { id: "warm_editorial", layout: "two_cols", name: "Editorial", desc: "2 ustun, qahva", bg: "#fefcf7", accent: "#d97706", card: "#fff7ed" },
+        { id: "sunset_punch", layout: "process", name: "Sunset", desc: "Olovrang bosqichlar", bg: "#fffaf5", accent: "#f97316", card: "#ffedd5" },
+        { id: "ocean_breeze", layout: "split", name: "Ocean", desc: "Moviy asimmetriya", bg: "#f0f9ff", accent: "#0ea5e9", card: "#ffffff" },
+        { id: "monochrome", layout: "minimal", name: "Monoxrom", desc: "Qora-oq minimalizm", bg: "#f5f5f5", accent: "#000000", card: "#ffffff" },
+        { id: "emerald_wealth", layout: "two_cols", name: "Zumrad", desc: "2 ustun, moliya", bg: "#f0fdfa", accent: "#0d9488", card: "#ffffff" },
+        { id: "berry_creative", layout: "hero", name: "Berry", desc: "Magenta iqtibos", bg: "#fdf2f8", accent: "#db2777", card: "#ffffff" },
+        { id: "titanium_slate", layout: "process", name: "Titanium", desc: "Muhandislik 3 karta", bg: "#f1f5f9", accent: "#64748b", card: "#ffffff" },
+        { id: "midnight_gold", layout: "split", name: "Tungi Oltin", desc: "Premium asimmetrik", bg: "#0f172a", accent: "#eab308", card: "#1e293b" },
+        { id: "nordic_frost", layout: "round", name: "Nordic", desc: "Aylana ro'yxat", bg: "#f8fafc", accent: "#38bdf8", card: "#ffffff" }
       ];
 
       var CATS = ["Hammasi", "Ta'lim", "Texnologiya", "Biznes", "Sog'liq", "Tabiat"];
 
       var TOPICS = [
-        { cat: "Texnologiya", top: true, title: "Sun'iy intellekt kelajagi",   emoji: "🤖", g: ["#7f00ff", "#e100ff"] },
-        { cat: "Biznes",      top: true, title: "Startap qanday boshlanadi",   emoji: "🚀", g: ["#ff512f", "#dd2476"] },
-        { cat: "Sog'liq",     top: true, title: "Sog'lom turmush tarzi",       emoji: "🥗", g: ["#56ab2f", "#a8e063"] },
-        { cat: "Tabiat",      top: true, title: "Iqlim o'zgarishi",            emoji: "🌍", g: ["#00b09b", "#96c93d"] },
-        { cat: "Ta'lim",      top: true, title: "Zamonaviy ta'lim usullari",   emoji: "🎓", g: ["#6a11cb", "#2575fc"] },
-        { cat: "Tabiat",      top: true, title: "O'zbekiston turizmi",         emoji: "🕌", g: ["#2193b0", "#6dd5ed"] },
-        { cat: "Ta'lim",      title: "Xorijiy tillarni tez o'rganish",        emoji: "🗣️", g: ["#f7971e", "#e8a600"] },
-        { cat: "Ta'lim",      title: "Kitob o'qishning foydasi",              emoji: "📚", g: ["#11998e", "#38b86d"] },
-        { cat: "Texnologiya", title: "Kiberxavfsizlik asoslari",              emoji: "🛡️", g: ["#0f2027", "#2c5364"] },
-        { cat: "Texnologiya", title: "Blokcheyn va kriptovalyuta",            emoji: "⛓️", g: ["#f12711", "#f5af19"] },
-        { cat: "Biznes",      title: "Marketing asoslari",                    emoji: "📈", g: ["#1d976c", "#3fc38a"] },
-        { cat: "Biznes",      title: "Vaqtni to'g'ri boshqarish",             emoji: "⏰", g: ["#396afc", "#2948ff"] },
-        { cat: "Sog'liq",     title: "Uyqu va salomatlik",                    emoji: "😴", g: ["#4b6cb7", "#182848"] },
-        { cat: "Sog'liq",     title: "Stressni yengish usullari",             emoji: "🧘", g: ["#c471f5", "#fa71cd"] },
-        { cat: "Tabiat",      title: "Qayta tiklanuvchi energiya",            emoji: "☀️", g: ["#f2994a", "#f2c94c"] }
+        { cat: "Texnologiya", top: true, title: "Sun'iy intellekt kelajagi", emoji: "🤖", g: ["#7f00ff", "#e100ff"] },
+        { cat: "Biznes", top: true, title: "Startap qanday boshlanadi", emoji: "🚀", g: ["#ff512f", "#dd2476"] },
+        { cat: "Sog'liq", top: true, title: "Sog'lom turmush tarzi", emoji: "🥗", g: ["#56ab2f", "#a8e063"] },
+        { cat: "Tabiat", top: true, title: "Iqlim o'zgarishi", emoji: "🌍", g: ["#00b09b", "#96c93d"] },
+        { cat: "Ta'lim", top: true, title: "Zamonaviy ta'lim usullari", emoji: "🎓", g: ["#6a11cb", "#2575fc"] },
+        { cat: "Tabiat", top: true, title: "O'zbekiston turizmi", emoji: "🕌", g: ["#2193b0", "#6dd5ed"] },
+        { cat: "Ta'lim", title: "Xorijiy tillarni tez o'rganish", emoji: "🗣️", g: ["#f7971e", "#e8a600"] },
+        { cat: "Ta'lim", title: "Kitob o'qishning foydasi", emoji: "📚", g: ["#11998e", "#38b86d"] },
+        { cat: "Texnologiya", title: "Kiberxavfsizlik asoslari", emoji: "🛡️", g: ["#0f2027", "#2c5364"] },
+        { cat: "Texnologiya", title: "Blokcheyn va kriptovalyuta", emoji: "⛓️", g: ["#f12711", "#f5af19"] },
+        { cat: "Biznes", title: "Marketing asoslari", emoji: "📈", g: ["#1d976c", "#3fc38a"] },
+        { cat: "Biznes", title: "Vaqtni to'g'ri boshqarish", emoji: "⏰", g: ["#396afc", "#2948ff"] },
+        { cat: "Sog'liq", title: "Uyqu va salomatlik", emoji: "😴", g: ["#4b6cb7", "#182848"] },
+        { cat: "Sog'liq", title: "Stressni yengish usullari", emoji: "🧘", g: ["#c471f5", "#fa71cd"] },
+        { cat: "Tabiat", title: "Qayta tiklanuvchi energiya", emoji: "☀️", g: ["#f2994a", "#f2c94c"] }
       ];
 
       var topicEl = document.getElementById("topic");
@@ -1364,8 +897,8 @@
       var freeUsed = 0;
       var isSubscriber = false;
 
-      // Hujjatlar holat o'zgaruvchilari
       var selectedPdfFiles = [];
+      var lastGeneratedPdfFile = null;
       var selectedPdfSize = "a4";
       var currentTranslateTarget = "uz_lat";
       var currentTranslateSource = "ru";
@@ -1419,19 +952,16 @@
 
       function extractError(data, status) {
         if (data && typeof data.detail === "string") return data.detail;
-        if (data && Array.isArray(data.detail)) return "Kiritilgan ma'lumot noto'g'ri. Mavzuni tekshirib ko'ring.";
-        return "Xatolik yuz berdi (" + status + "). Qayta urinib ko'ring.";
+        if (data && Array.isArray(data.detail)) return "Kiritilgan ma'lumot noto'g'ri.";
+        return "Xatolik yuz berdi (" + status + ").";
       }
 
-      // ---------- Balans va Limitni Yangilash ----------
       function applyUserData(data) {
         if (!data) return;
         if (data.alphabet) setAlphabet(data.alphabet);
-        
         currentBalance = data.balance || 0;
         freeUsed = data.free_used || 0;
         isSubscriber = !!data.is_subscriber;
-
         modalBalance.textContent = currentBalance.toLocaleString() + " so'm";
 
         if (freeUsed === 0) {
@@ -1461,27 +991,18 @@
         } catch (e) { }
       }
 
-      // ---------- Modal Dialog (To'lov) ----------
-      function openModal() {
-        payModal.classList.add("open");
-        haptic("select");
-      }
-      function closeModal() {
-        payModal.classList.remove("open");
-      }
-
+      function openModal() { payModal.classList.add("open"); haptic("select"); }
+      function closeModal() { payModal.classList.remove("open"); }
       limitBtnEl.addEventListener("click", openModal);
       modalClose.addEventListener("click", closeModal);
-      payModal.addEventListener("click", function (e) {
-        if (e.target === payModal) closeModal();
-      });
+      payModal.addEventListener("click", function (e) { if (e.target === payModal) closeModal(); });
 
       document.querySelectorAll(".btn-topup").forEach(function (btn) {
         btn.addEventListener("click", function () {
           var amt = btn.getAttribute("data-amount");
           haptic("select");
           closeModal();
-          showMessage("info", "To'lov cheki Telegram chatingizga yuborilmoqda...");
+          showMessage("info", "To'lov cheki yuborilmoqda...");
           if (tg) {
             tg.sendData("topup_" + amt);
             setTimeout(function () { tg.close(); }, 300);
@@ -1498,22 +1019,16 @@
         }
       });
 
-      // ---------- Tablar boshqaruvi ----------
       function switchTab(name) {
         var tabs = document.querySelectorAll(".tab");
         for (var i = 0; i < tabs.length; i++) {
           var isThis = tabs[i].getAttribute("data-tab") === name;
           tabs[i].classList.toggle("active", isThis);
-          if (name === "docs" && isThis) {
-            tabs[i].classList.add("cyan-active");
-          } else {
-            tabs[i].classList.remove("cyan-active");
-          }
+          if (name === "docs" && isThis) tabs[i].classList.add("cyan-active");
+          else tabs[i].classList.remove("cyan-active");
         }
         var panels = document.querySelectorAll(".panel");
-        for (var j = 0; j < panels.length; j++) {
-          panels[j].classList.toggle("active", panels[j].id === "panel-" + name);
-        }
+        for (var j = 0; j < panels.length; j++) panels[j].classList.toggle("active", panels[j].id === "panel-" + name);
         countEl.style.display = (name === "help" || name === "docs") ? "none" : "";
         window.scrollTo(0, 0);
         haptic("select");
@@ -1524,11 +1039,8 @@
         if (btn) switchTab(btn.getAttribute("data-tab"));
       });
 
-      window.backToHub = function() {
-        switchTab("docs");
-      };
+      window.backToHub = function() { switchTab("docs"); };
 
-      // ---------- Poster kartalari ----------
       function makePoster(topic, rank) {
         var btn = el("button", "poster");
         btn.type = "button";
@@ -1550,9 +1062,7 @@
       }
 
       var topRail = document.getElementById("top-rail");
-      TOPICS.forEach(function (topic, index) {
-        if (topic.top) topRail.appendChild(makePoster(topic, index + 1));
-      });
+      TOPICS.forEach(function (topic, index) { if (topic.top) topRail.appendChild(makePoster(topic, index + 1)); });
 
       var gridEl = document.getElementById("grid");
       var catsEl = document.getElementById("cats");
@@ -1561,9 +1071,7 @@
       function renderGrid() {
         gridEl.textContent = "";
         TOPICS.forEach(function (topic, index) {
-          if (activeCat === "Hammasi" || topic.cat === activeCat) {
-            gridEl.appendChild(makePoster(topic, index + 1));
-          }
+          if (activeCat === "Hammasi" || topic.cat === activeCat) gridEl.appendChild(makePoster(topic, index + 1));
         });
       }
 
@@ -1583,7 +1091,6 @@
 
       countEl.textContent = TOPICS.length + " ta tayyor mavzu · posterini bosing";
 
-      // ---------- 15 xil Uslublar ----------
       var stylesEl = document.getElementById("styles");
       STYLES.forEach(function (st) {
         var btn = el("button", "sty" + (st.id === selectedStyle ? " sel" : ""));
@@ -1635,26 +1142,17 @@
           pv.appendChild(wrap);
         } else if (st.layout === "square") {
           [36, 64].forEach(function (top) {
-            var row = el("div", "pv-sq-row");
-            row.style.top = top + "px";
-            row.style.background = st.card;
-            var sq = el("div", "pv-sq-badge");
-            row.appendChild(sq);
-            pv.appendChild(row);
+            var row = el("div", "pv-sq-row"); row.style.top = top + "px"; row.style.background = st.card;
+            var sq = el("div", "pv-sq-badge"); row.appendChild(sq); pv.appendChild(row);
           });
         } else {
           [36, 64].forEach(function (top) {
-            var row = el("div", "pv-rd-row");
-            row.style.top = top + "px";
-            row.style.background = st.card;
-            var dot = el("div", "pv-rd-badge");
-            row.appendChild(dot);
-            pv.appendChild(row);
+            var row = el("div", "pv-rd-row"); row.style.top = top + "px"; row.style.background = st.card;
+            var dot = el("div", "pv-rd-badge"); row.appendChild(dot); pv.appendChild(row);
           });
         }
 
         pv.appendChild(el("div", "check", "✓"));
-
         btn.appendChild(pv);
         btn.appendChild(el("div", "sname", st.name));
         btn.appendChild(el("div", "sdesc", st.desc));
@@ -1668,14 +1166,11 @@
         stylesEl.appendChild(btn);
       });
 
-      // ---------- Alifbo ----------
       var alphaEl = document.getElementById("alpha");
       function setAlphabet(code) {
         selectedAlphabet = code === "kirill" ? "kirill" : "latin";
         var buttons = alphaEl.querySelectorAll("button");
-        for (var i = 0; i < buttons.length; i++) {
-          buttons[i].classList.toggle("on", buttons[i].getAttribute("data-alpha") === selectedAlphabet);
-        }
+        for (var i = 0; i < buttons.length; i++) buttons[i].classList.toggle("on", buttons[i].getAttribute("data-alpha") === selectedAlphabet);
       }
       alphaEl.addEventListener("click", function (event) {
         var btn = event.target.closest("button");
@@ -1684,28 +1179,17 @@
         haptic("select");
       });
 
-      // ---------- Slayd yaratish ----------
       async function generate() {
         if (busy) return;
         hideMessage();
         closeEl.classList.remove("show");
-
         var topic = topicEl.value.trim();
 
-        if (!initData) {
-          showMessage("error", "Bu sahifani Telegram ichidagi bot orqali oching (botda /start bosing).");
-          haptic("error");
-          return;
-        }
-        if (topic.length < MIN_LEN) {
-          showMessage("error", "Mavzu kamida " + MIN_LEN + " ta belgidan iborat bo'lsin.");
-          haptic("error");
-          topicEl.focus();
-          return;
-        }
+        if (!initData) { showMessage("error", "Telegram bot orqali oching."); haptic("error"); return; }
+        if (topic.length < MIN_LEN) { showMessage("error", "Mavzu kamida 3 ta belgi bo'lsin."); haptic("error"); return; }
 
         setBusy(true);
-        showMessage("info", "Slayd tayyorlanmoqda, bu 20-60 soniya olishi mumkin. Sahifani yopmang.");
+        showMessage("info", "Slayd tayyorlanmoqda, bu 20-60 soniya olishi mumkin...");
 
         var controller = new AbortController();
         var timer = setTimeout(function () { controller.abort(); }, REQUEST_TIMEOUT_MS);
@@ -1717,17 +1201,12 @@
             body: JSON.stringify({ init_data: initData, topic: topic, template: selectedStyle, alphabet: selectedAlphabet }),
             signal: controller.signal
           });
-
           var data = null;
           try { data = await response.json(); } catch (e) { }
 
           if (!response.ok) {
-            if (response.status === 402) {
-              openModal();
-              showMessage("error", extractError(data, response.status));
-            } else {
-              showMessage("error", extractError(data, response.status));
-            }
+            if (response.status === 402) openModal();
+            showMessage("error", extractError(data, response.status));
             haptic("error");
             return;
           }
@@ -1737,11 +1216,7 @@
           closeEl.classList.add("show");
           haptic("success");
         } catch (err) {
-          if (err && err.name === "AbortError") {
-            showMessage("error", "Kutish vaqti tugadi. Telegram chatini tekshiring, kerak bo'lsa qayta urinib ko'ring.");
-          } else {
-            showMessage("error", "Serverga ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring.");
-          }
+          showMessage("error", "Serverga ulanib bo'lmadi.");
           haptic("error");
         } finally {
           clearTimeout(timer);
@@ -1750,9 +1225,6 @@
         }
       }
 
-      // ========================================================
-      // HUJJATLAR BO'LIMI MANTIQI VA BOSQICHLARI
-      // ========================================================
       function loadHistory() {
         var list = JSON.parse(localStorage.getItem("recent_files") || "[]");
         var container = document.getElementById("history-list");
@@ -1762,10 +1234,7 @@
           container.innerHTML = `
             <div class="history-card">
               <div class="history-badge">PDF</div>
-              <div class="history-info">
-                <b>17875.pdf</b>
-                <span>1 ta rasm ➔ PDF</span>
-              </div>
+              <div class="history-info"><b>17875.pdf</b><span>1 ta rasm ➔ PDF</span></div>
               <span class="history-time">hozir</span>
             </div>
           `;
@@ -1776,10 +1245,7 @@
           var card = el("div", "history-card");
           card.innerHTML = `
             <div class="history-badge">${item.ext.toUpperCase()}</div>
-            <div class="history-info">
-              <b>${item.name}</b>
-              <span>${item.desc}</span>
-            </div>
+            <div class="history-info"><b>${item.name}</b><span>${item.desc}</span></div>
             <span class="history-time">${item.time}</span>
           `;
           container.appendChild(card);
@@ -1806,7 +1272,6 @@
 
         document.getElementById("progress-top-label").textContent = title;
         document.getElementById("progress-preview-img").src = imgSrc;
-
         document.getElementById("step-1-label").textContent = s1;
         document.getElementById("step-2-label").textContent = s2;
         document.getElementById("step-3-label").textContent = s3;
@@ -1814,7 +1279,6 @@
         var step1 = document.getElementById("step-1");
         var step2 = document.getElementById("step-2");
         var step3 = document.getElementById("step-3");
-
         step1.className = "status-step-item active";
         step2.className = "status-step-item";
         step3.className = "status-step-item";
@@ -1832,38 +1296,20 @@
         }, 2500);
       }
 
-      // 1. Universal fayl tanlash
-      window.triggerUniversalPicker = function() {
-        document.getElementById("picker-universal").click();
-      };
-
+      window.triggerUniversalPicker = function() { document.getElementById("picker-universal").click(); };
       document.getElementById("picker-universal").addEventListener("change", function(e) {
         if (!e.target.files.length) return;
         var file = e.target.files[0];
         var name = file.name.toLowerCase();
-
-        if (file.type.startsWith("image/")) {
-          handleOcrFile(file);
-        } else if (name.endsWith(".docx") || name.endsWith(".doc")) {
-          selectedTranslateFile = file;
-          openTranslateView(file);
-        } else if (name.endsWith(".pdf")) {
-          handlePdfToTxt(file);
-        } else {
-          alert("Fayl turi aniqlandi: " + file.name);
-        }
+        if (file.type.startsWith("image/")) handleOcrFile(file);
+        else if (name.endsWith(".docx") || name.endsWith(".doc")) { selectedTranslateFile = file; openTranslateView(file); }
+        else if (name.endsWith(".pdf")) handlePdfToTxt(file);
         this.value = "";
       });
 
-      // 2. OCR (Rasmdan matn)
-      window.triggerOcrPicker = function() {
-        document.getElementById("picker-image").click();
-      };
-
+      window.triggerOcrPicker = function() { document.getElementById("picker-image").click(); };
       document.getElementById("picker-image").addEventListener("change", function(e) {
-        if (e.target.files.length) {
-          handleOcrFile(e.target.files[0]);
-        }
+        if (e.target.files.length) handleOcrFile(e.target.files[0]);
         this.value = "";
       });
 
@@ -1878,12 +1324,10 @@
         try {
           var res = await fetch("/api/ocr", { method: "POST", body: formData });
           var data = await res.json();
-
           if (res.ok) {
             lastExtractedOcrText = data.text;
             addHistoryItem(file.name, "Rasmdan matn", "txt");
             haptic("success");
-
             setTimeout(function() {
               var panels = document.querySelectorAll(".panel");
               for (var j = 0; j < panels.length; j++) panels[j].classList.remove("active");
@@ -1897,7 +1341,7 @@
             backToHub();
           }
         } catch (err) {
-          alert("Serverga ulanishda xato yuz berdi");
+          alert("Serverga ulanishda xato!");
           backToHub();
         }
       }
@@ -1921,16 +1365,10 @@
             alert("✅ Word (.docx) faylingiz Telegram chatga yuborildi!");
             haptic("success");
           }
-        } catch (e) {
-          alert("Serverga ulanib bo'lmadi");
-        }
+        } catch (e) { alert("Serverga ulanib bo'lmadi"); }
       };
 
-      // 3. Tarjima va Kirill-Lotin
-      window.triggerTranslatePicker = function() {
-        document.getElementById("picker-doc").click();
-      };
-
+      window.triggerTranslatePicker = function() { document.getElementById("picker-doc").click(); };
       document.getElementById("picker-doc").addEventListener("change", function(e) {
         if (e.target.files.length) {
           selectedTranslateFile = e.target.files[0];
@@ -1946,6 +1384,20 @@
         document.getElementById("btn-translate-caption").textContent = "Tarjima qilish · " + file.name;
         haptic("select");
       }
+
+      window.translateCurrentPdfResult = function() {
+        if (lastGeneratedPdfFile) selectedTranslateFile = lastGeneratedPdfFile;
+        else if (selectedPdfFiles && selectedPdfFiles.length > 0) selectedTranslateFile = selectedPdfFiles[0];
+
+        var docName = document.getElementById("stamp-file-name").textContent || "hujjat.pdf";
+        if (!selectedTranslateFile) selectedTranslateFile = new File(["dummy content"], docName, { type: "application/pdf" });
+
+        var panels = document.querySelectorAll(".panel");
+        for (var j = 0; j < panels.length; j++) panels[j].classList.remove("active");
+        document.getElementById("panel-translate").classList.add("active");
+        document.getElementById("btn-translate-caption").textContent = "Tarjima qilish · " + docName;
+        haptic("select");
+      };
 
       window.selectTargetLang = function(code, label) {
         currentTranslateTarget = code;
@@ -1980,7 +1432,6 @@
         if (!selectedTranslateFile) return;
         var btn = document.getElementById("btn-submit-translate");
         var txt = document.getElementById("btn-translate-caption");
-
         btn.disabled = true;
         txt.textContent = "Tarjima qilinmoqda...";
 
@@ -2009,13 +1460,10 @@
         }
       };
 
-      // 4. Rasmlardan PDF (17893 & 17895)
       window.openToolSubview = function(kind) {
         var panels = document.querySelectorAll(".panel");
         for (var j = 0; j < panels.length; j++) panels[j].classList.remove("active");
-        if (kind === "images_to_pdf") {
-          document.getElementById("panel-images-pdf").classList.add("active");
-        }
+        if (kind === "images_to_pdf") document.getElementById("panel-images-pdf").classList.add("active");
         haptic("select");
       };
 
@@ -2043,7 +1491,6 @@
           var box = el("div", "img-box");
           var img = el("img");
           img.src = URL.createObjectURL(file);
-
           var num = el("div", "img-num", (index + 1).toString());
           var del = el("button", "img-del", "✕");
           del.onclick = function(e) {
@@ -2051,7 +1498,6 @@
             selectedPdfFiles.splice(index, 1);
             renderThumbs();
           };
-
           box.appendChild(img);
           box.appendChild(num);
           box.appendChild(del);
@@ -2065,16 +1511,13 @@
 
         var btn = document.getElementById("btn-convert-pdf");
         btn.disabled = selectedPdfFiles.length === 0;
-        document.getElementById("btn-convert-text").textContent = selectedPdfFiles.length > 0 
-          ? "PDF yaratish (" + selectedPdfFiles.length + " ta)" 
-          : "PDF yaratish";
+        document.getElementById("btn-convert-text").textContent = selectedPdfFiles.length > 0 ? "PDF yaratish (" + selectedPdfFiles.length + " ta)" : "PDF yaratish";
       }
 
       window.submitImagesToPdf = async function() {
         if (!selectedPdfFiles.length) return;
         var btn = document.getElementById("btn-convert-pdf");
         var txt = document.getElementById("btn-convert-text");
-
         btn.disabled = true;
         txt.textContent = "Rasmlar yuklanmoqda...";
 
@@ -2097,6 +1540,7 @@
             document.getElementById("panel-pdf-result").classList.add("active");
             document.getElementById("stamp-file-preview").src = firstImgUrl;
             document.getElementById("stamp-file-name").textContent = docName;
+            lastGeneratedPdfFile = selectedPdfFiles[0];
 
             selectedPdfFiles = [];
             renderThumbs();
@@ -2111,35 +1555,18 @@
         }
       };
 
-      // 5. PDF amallari (PDF -> Matn, Sahifalar ajratish)
-      window.triggerPdfToTxtPicker = function() {
-        activePdfOperation = "txt";
-        document.getElementById("picker-pdf").click();
-      };
-
-      window.triggerSplitPdfPicker = function() {
-        activePdfOperation = "split";
-        document.getElementById("picker-pdf").click();
-      };
-
-      window.triggerPdfToImagesPicker = function() {
-        activePdfOperation = "imgs";
-        document.getElementById("picker-pdf").click();
-      };
-
-      window.triggerDocToPdfPicker = function() {
-        document.getElementById("picker-doc").click();
-      };
+      window.triggerPdfToTxtPicker = function() { activePdfOperation = "txt"; document.getElementById("picker-pdf").click(); };
+      window.triggerSplitPdfPicker = function() { activePdfOperation = "split"; document.getElementById("picker-pdf").click(); };
+      window.triggerPdfToImagesPicker = function() { activePdfOperation = "imgs"; document.getElementById("picker-pdf").click(); };
+      window.triggerDocToPdfPicker = function() { document.getElementById("picker-doc").click(); };
 
       document.getElementById("picker-pdf").addEventListener("change", function(e) {
         if (e.target.files.length) {
           var file = e.target.files[0];
-          if (activePdfOperation === "txt") {
-            handlePdfToTxt(file);
-          } else if (activePdfOperation === "split") {
-            handleSplitPdf(file);
-          } else {
-            alert("✅ PDF qabul qilindi. Tez orada sahifalar rasm qilib botga yuboriladi!");
+          if (activePdfOperation === "txt") handlePdfToTxt(file);
+          else if (activePdfOperation === "split") handleSplitPdf(file);
+          else {
+            alert("✅ PDF qabul qilindi. Sahifalar rasm qilib botga yuboriladi!");
             addHistoryItem(file.name, "PDF ➔ rasm", "pdf");
           }
         }
@@ -2150,27 +1577,21 @@
         var formData = new FormData();
         formData.append("init_data", initData);
         formData.append("file", file);
-
         try {
           var res = await fetch("/api/pdf-to-txt", { method: "POST", body: formData });
           var data = await res.json();
           if (res.ok) {
             addHistoryItem(file.name, "PDF ➔ matn", "txt");
-            alert("✅ PDF ichidagi barcha matnlar ajratilib, Telegram chatga yuborildi!");
+            alert("✅ PDF matnlari ajratilib, Telegram chatga yuborildi!");
             haptic("success");
-          } else {
-            alert(data.detail || "PDF o'qishda xatolik");
           }
-        } catch (e) {
-          alert("Serverga ulanishda xato!");
-        }
+        } catch (e) { alert("Serverga ulanishda xato!"); }
       }
 
       async function handleSplitPdf(file) {
         var formData = new FormData();
         formData.append("init_data", initData);
         formData.append("file", file);
-
         try {
           var res = await fetch("/api/split-pdf", { method: "POST", body: formData });
           var data = await res.json();
@@ -2178,19 +1599,12 @@
             addHistoryItem(file.name, "Sahifalar ajratildi", "pdf");
             alert("✅ PDF sahifalari alohida qilib Telegram chatga yuborildi!");
             haptic("success");
-          } else {
-            alert(data.detail || "Sahifalarni ajratishda xato");
           }
-        } catch (e) {
-          alert("Serverga ulanishda xato!");
-        }
+        } catch (e) { alert("Serverga ulanishda xato!"); }
       }
 
-      // ---------- Hodisalar ----------
       topicEl.addEventListener("input", updateCounter);
-      topicEl.addEventListener("keydown", function (event) {
-        if (event.key === "Enter") { event.preventDefault(); topicEl.blur(); generate(); }
-      });
+      topicEl.addEventListener("keydown", function (event) { if (event.key === "Enter") { event.preventDefault(); topicEl.blur(); generate(); } });
       submitEl.addEventListener("click", generate);
       goEl.addEventListener("click", generate);
       closeEl.addEventListener("click", function () { if (tg) tg.close(); });
