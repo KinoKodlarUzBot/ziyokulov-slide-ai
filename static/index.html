@@ -1688,10 +1688,7 @@
           var file = e.target.files[0];
           if (activePdfOperation === "txt") handlePdfToTxt(file);
           else if (activePdfOperation === "split") handleSplitPdf(file);
-          else {
-            alert("✅ PDF qabul qilindi. Sahifalar rasm qilib botga yuboriladi!");
-            addHistoryItem(file.name, "PDF ➔ rasm", "pdf");
-          }
+          else handlePdfToImages(file);
         }
         this.value = "";
       });
@@ -1707,6 +1704,8 @@
             addHistoryItem(file.name, "PDF ➔ matn", "txt");
             alert("✅ PDF matnlari ajratilib, Telegram chatga yuborildi!");
             haptic("success");
+          } else {
+            alert("❌ " + (data.detail || "Xatolik yuz berdi."));
           }
         } catch (e) { alert("Serverga ulanishda xato!"); }
       }
@@ -1722,6 +1721,25 @@
             addHistoryItem(file.name, "Sahifalar ajratildi", "pdf");
             alert("✅ PDF sahifalari alohida qilib Telegram chatga yuborildi!");
             haptic("success");
+          } else {
+            alert("❌ " + (data.detail || "Xatolik yuz berdi."));
+          }
+        } catch (e) { alert("Serverga ulanishda xato!"); }
+      }
+
+      async function handlePdfToImages(file) {
+        var formData = new FormData();
+        formData.append("init_data", initData);
+        formData.append("file", file);
+        try {
+          var res = await fetch("/api/pdf-to-images", { method: "POST", body: formData });
+          var data = await res.json();
+          if (res.ok) {
+            addHistoryItem(file.name, "PDF ➔ rasm", "pdf");
+            alert("✅ PDF sahifalari rasm qilib Telegram chatga yuborildi!");
+            haptic("success");
+          } else {
+            alert("❌ " + (data.detail || "Xatolik yuz berdi."));
           }
         } catch (e) { alert("Serverga ulanishda xato!"); }
       }
