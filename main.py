@@ -3740,6 +3740,39 @@ async def api_pdf_to_txt(
         raise HTTPException(status_code=500, detail="PDF matnini ajratishda xatolik yuz berdi.")
 
 
+# 6. PDF -> RASM (PNG) VA CHATGA YUBORISH
+@app.post("/api/pdf-to-images")
+async def api_pdf_to_images(
+    init_data: str = Form(...),
+    file: UploadFile = File(...)
+):
+    auth = verify_telegram_init_data(init_data)
+    user_id = auth["user_id"]
+
+    content = await file.read()
+    try:
+        import fitz  # PyMuPDF
+        doc = fitz.open(stream=content, filetype="pdf")
+        total = len(doc)
+        limit = min(total, 10)
+        for i in range(limit):
+            pix = doc[i].get_pixmap(dpi=130)
+            p = os.path.join(tempfile.gettempdir(), f"p_{i+1}_{uuid.uuid4().hex[:4]}.png")
+            pix.save(p)
+            await bot.send_document(
+                chat_id=user_id,
+                document=types.FSInputFile(p, filename=f"sahifa_{i+1}.png"),
+                caption=f"🖼 {i+1}-sahifa (jami {total} tadan)"
+            )
+            if os.path.exists(p):
+                os.remove(p)
+        doc.close()
+        return {"success": True, "pages": limit}
+    except Exception:
+        logger.exception("PDF -> rasm xato")
+        raise HTTPException(status_code=500, detail="PDFni rasmga aylantirib bo'lmadi.")
+
+
 # 5. SAHIFALARNI AJRATISH (SPLIT PDF)
 @app.post("/api/split-pdf")
 async def api_split_pdf(
