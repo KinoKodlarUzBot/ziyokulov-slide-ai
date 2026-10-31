@@ -509,6 +509,16 @@
     .btn-topup:active { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
 
     .btn-sub-promo { width: 100%; padding: 14px; border-radius: 16px; border: none; background: linear-gradient(135deg, #7928ca, #ff0080); color: #fff; font: inherit; font-weight: 800; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 18px rgba(255, 0, 128, .25); }
+
+    .tr-prev{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:16px}
+    .tr-lbl{font-size:11px;font-weight:800;letter-spacing:.5px;color:var(--hint);margin-bottom:4px}
+    .tr-txt{font-size:13px;line-height:1.5;margin-bottom:10px;max-height:96px;overflow:hidden;word-break:break-word}
+    .trs{display:flex;align-items:center;gap:12px;padding:12px 0;font-size:16px;font-weight:700;color:var(--hint)}
+    .trs b{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid var(--line);font-size:14px}
+    .trs.run{color:#fff}.trs.run b{border-color:var(--cyan);color:var(--cyan)}
+    .trs.ok{color:#fff}.trs.ok b{background:#34d399;border-color:#34d399;color:#04140d}
+    .tr-barwrap{height:6px;background:var(--line);border-radius:6px;overflow:hidden;margin:18px 0 10px}
+    #tr-bar{height:100%;width:0;background:var(--cyan);transition:width .6s}
   </style>
 </head>
 <body>
@@ -759,9 +769,15 @@
 
       <div style="font-size: 12px; color: var(--hint); margin-bottom: 6px;">Fayl tili noto'g'ri aniqlangan bo'lsa:</div>
       <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-        <button class="chip" type="button" onclick="setSourceLang('uz', '🇺🇿 O\'zbek')">🇺🇿 O'zbek</button>
-        <button class="chip active" type="button" onclick="setSourceLang('ru', '🇷🇺 Rus')">🇷🇺 Rus</button>
-        <button class="chip" type="button" onclick="setSourceLang('en', '🇬🇧 Ingliz')">🇬🇧 Ingliz</button>
+        <button class="chip" type="button" id="src-uz" onclick="setSourceLang('uz', '🇺🇿 O\'zbek')">🇺🇿 O'zbek</button>
+        <button class="chip" type="button" id="src-ru" onclick="setSourceLang('ru', '🇷🇺 Rus')">🇷🇺 Rus</button>
+        <button class="chip" type="button" id="src-en" onclick="setSourceLang('en', '🇬🇧 Ingliz')">🇬🇧 Ingliz</button>
+      </div>
+
+      <div style="font-size:15px;font-weight:800;margin-bottom:8px;">Oldindan ko'ring</div>
+      <div class="tr-prev">
+        <div class="tr-lbl">ASL MATN</div><div class="tr-txt" id="tr-orig">—</div>
+        <div class="tr-lbl" style="color:#34d399;">TARJIMA</div><div class="tr-txt" id="tr-new" style="margin-bottom:0;">—</div>
       </div>
 
       <div style="background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.25); border-radius: 14px; padding: 12px; font-size: 13px; color: #34d399; font-weight: 700; margin-bottom: 22px;">
@@ -772,6 +788,42 @@
         <span id="btn-translate-caption">Tarjima qilish · 1 sahifa</span>
       </button>
       <div style="text-align: center; color: var(--hint); font-size: 12px; margin-top: 8px;">Eng aniq natija Word (.docx) faylda bo'ladi · tayyor fayl chatga keladi</div>
+    </section>
+
+    <!-- ===== 7b. TARJIMA JARAYONI ===== -->
+    <section class="panel" id="panel-tr-progress">
+      <div class="subview-top">
+        <button class="btn-back-round" onclick="backToHub()">✕</button>
+        <span style="font-size:14px; font-weight:700; color:var(--hint);">Tarjima qilinmoqda</span>
+      </div>
+      <div class="trs" id="trs1"><b>○</b>Fayl o'qildi</div>
+      <div class="trs" id="trs2"><b>○</b>Tarjima qilinmoqda</div>
+      <div class="trs" id="trs3"><b>○</b>Fayl yig'ilmoqda</div>
+      <div class="trs" id="trs4"><b>○</b>Chatga yuborilmoqda</div>
+      <div class="tr-barwrap"><div id="tr-bar"></div></div>
+      <div style="text-align:center;color:var(--hint);font-size:12px;">Ilovani yopsangiz ham — tayyor fayl chatga keladi</div>
+    </section>
+
+    <!-- ===== 7c. TARJIMA TAYYOR (Ziyoqulov shtamp) ===== -->
+    <section class="panel" id="panel-tr-done">
+      <div class="subview-top">
+        <button class="btn-back-round" onclick="backToHub()">‹</button>
+        <span style="font-size:14px; font-weight:700; color:var(--hint);">Tayyor fayl</span>
+      </div>
+      <div class="stamp-container">
+        <img class="stamp-preview-img" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 250'><rect width='200' height='250' fill='white'/><rect x='24' y='28' width='80' height='12' fill='%23f2ead8'/><rect x='24' y='60' width='152' height='8' rx='2' fill='%23c4c6d4'/><rect x='24' y='82' width='152' height='8' rx='2' fill='%23c4c6d4'/><rect x='24' y='104' width='152' height='8' rx='2' fill='%23c4c6d4'/><rect x='24' y='126' width='152' height='8' rx='2' fill='%23c4c6d4'/><rect x='24' y='148' width='152' height='8' rx='2' fill='%23c4c6d4'/></svg>" alt="doc">
+        <div class="red-stamp-badge">
+          <span class="st-name">ZIYOQULOV</span>
+          <span class="st-main">TAYYOR</span>
+          <span class="st-sub">✓ WORD</span>
+        </div>
+      </div>
+      <h2 id="tr-done-name" style="text-align:center;font-size:18px;font-weight:800;margin:0 0 16px;word-break:break-all;">tarjima.docx</h2>
+      <button class="submit" style="margin-bottom:12px;margin-top:0;" onclick="closeMiniApp()"><span>✈️ Chatga o'tish</span></button>
+      <div class="action-row-double">
+        <button class="btn-secondary" id="btn-to-latin" onclick="convertToLatin()"><span>Lotinga o'girish</span></button>
+        <button class="btn-secondary" onclick="showPanel('panel-translate')"><span>🌐 Tarjima</span></button>
+      </div>
     </section>
 
     <!-- ===== 8. Mavzular ===== -->
@@ -1377,12 +1429,67 @@
         this.value = "";
       });
 
+      var LANGS = {uz: "🇺🇿 O'zbek", uz_lat: "🇺🇿 O'zbek (lotin)", uz_cyr: "🇺🇿 Ўзбек (кирилл)", ru: "🇷🇺 Rus", en: "🇬🇧 English"};
+      var manualSource = false, manualTarget = false, previewToken = 0, trPages = 1;
+      function showPanel(id) {
+        document.querySelectorAll(".panel").forEach(function(p) { p.classList.remove("active"); });
+        document.getElementById(id).classList.add("active");
+      }
+      window.showPanel = showPanel;
+      function baseLang(c) { return (c === "uz_lat" || c === "uz_cyr") ? "uz" : c; }
+      function applyLangs() {
+        document.getElementById("lbl-source-lang").textContent = LANGS[currentTranslateSource];
+        document.getElementById("lbl-target-lang").textContent = LANGS[currentTranslateTarget];
+        ["uz_lat", "uz_cyr", "en", "ru"].forEach(function(c) {
+          document.getElementById("opt-" + c.replace("_", "-")).classList.toggle("active", c === currentTranslateTarget);
+        });
+        ["uz", "ru", "en"].forEach(function(c) {
+          var e = document.getElementById("src-" + c);
+          if (e) e.classList.toggle("active", c === currentTranslateSource);
+        });
+      }
+      function setCaption() {
+        document.getElementById("btn-translate-caption").textContent = "Tarjima qilish · " + trPages + " sahifa";
+      }
+
       function openTranslateView(file) {
-        var panels = document.querySelectorAll(".panel");
-        for (var j = 0; j < panels.length; j++) panels[j].classList.remove("active");
-        document.getElementById("panel-translate").classList.add("active");
+        manualSource = false;
+        showPanel("panel-translate");
         document.getElementById("btn-translate-caption").textContent = "Tarjima qilish · " + file.name;
+        loadTranslatePreview();
         haptic("select");
+      }
+
+      async function loadTranslatePreview() {
+        if (!selectedTranslateFile) return;
+        var tok = ++previewToken;
+        document.getElementById("tr-orig").textContent = "Yuklanmoqda...";
+        document.getElementById("tr-new").textContent = "—";
+        var fd = new FormData();
+        fd.append("init_data", initData);
+        fd.append("source_lang", manualSource ? currentTranslateSource : "auto");
+        fd.append("target_lang", currentTranslateTarget);
+        fd.append("file", selectedTranslateFile);
+        try {
+          var res = await fetch("/api/preview-doc", { method: "POST", body: fd });
+          var d = await res.json();
+          if (tok !== previewToken) return;
+          if (!res.ok) { document.getElementById("tr-orig").textContent = d.detail || "Ko'rib bo'lmadi"; return; }
+          if (!manualSource) {
+            var before = currentTranslateTarget;
+            currentTranslateSource = d.source_lang;
+            if (!manualTarget) currentTranslateTarget = d.source_lang === "uz" ? "ru" : "uz_lat";
+            else if (currentTranslateTarget === d.source_lang) currentTranslateTarget = d.source_lang === "uz" ? "ru" : "uz_lat";
+            applyLangs();
+            if (before !== currentTranslateTarget) return loadTranslatePreview();
+          }
+          trPages = d.estimated_pages || 1;
+          setCaption();
+          document.getElementById("tr-orig").textContent = (d.preview_text || "").slice(0, 320);
+          document.getElementById("tr-new").textContent = (d.translated_preview || "").slice(0, 320) || "—";
+        } catch (e) {
+          if (tok === previewToken) document.getElementById("tr-orig").textContent = "Ko'rib bo'lmadi";
+        }
       }
 
       window.translateCurrentPdfResult = function() {
@@ -1395,69 +1502,85 @@
         var panels = document.querySelectorAll(".panel");
         for (var j = 0; j < panels.length; j++) panels[j].classList.remove("active");
         document.getElementById("panel-translate").classList.add("active");
-        document.getElementById("btn-translate-caption").textContent = "Tarjima qilish · " + docName;
+        document.getElementById("btn-translate-caption").textContent = "Tarjima qilish · " + docName; manualSource = false; loadTranslatePreview();
         haptic("select");
       };
 
-      window.selectTargetLang = function(code, label) {
-        currentTranslateTarget = code;
-        document.getElementById("lbl-target-lang").textContent = label;
-        ["opt-uz-lat", "opt-uz-cyr", "opt-en", "opt-ru"].forEach(function(id) {
-          document.getElementById(id).classList.remove("active");
-        });
-        if (code === "uz_lat") document.getElementById("opt-uz-lat").classList.add("active");
-        if (code === "uz_cyr") document.getElementById("opt-uz-cyr").classList.add("active");
-        if (code === "en") document.getElementById("opt-en").classList.add("active");
-        if (code === "ru") document.getElementById("opt-ru").classList.add("active");
-        haptic("select");
+      window.selectTargetLang = function(code) {
+        currentTranslateTarget = code; manualTarget = true;
+        applyLangs(); haptic("select"); loadTranslatePreview();
       };
-
-      window.setSourceLang = function(code, label) {
-        currentTranslateSource = code;
-        document.getElementById("lbl-source-lang").textContent = label;
-        haptic("select");
+      window.setSourceLang = function(code) {
+        currentTranslateSource = code; manualSource = true;
+        applyLangs(); haptic("select"); loadTranslatePreview();
       };
-
       window.swapTranslateLangs = function() {
-        var s = currentTranslateSource;
-        var t = currentTranslateTarget;
-        currentTranslateSource = t === "uz_lat" || t === "uz_cyr" ? "uz" : t;
+        var s = currentTranslateSource, t = currentTranslateTarget;
+        currentTranslateSource = baseLang(t);
         currentTranslateTarget = s === "uz" ? "uz_lat" : s;
-        document.getElementById("lbl-source-lang").textContent = currentTranslateSource.toUpperCase();
-        document.getElementById("lbl-target-lang").textContent = currentTranslateTarget.toUpperCase();
-        haptic("select");
+        manualSource = true; manualTarget = true;
+        applyLangs(); haptic("select"); loadTranslatePreview();
       };
+
+      function setTrStep(step, pct) {
+        for (var i = 1; i <= 4; i++) {
+          var e = document.getElementById("trs" + i);
+          e.className = "trs " + (i < step ? "ok" : i === step ? "run" : "");
+          e.firstElementChild.textContent = i < step ? "✓" : i === step ? "…" : "○";
+        }
+        document.getElementById("tr-bar").style.width = pct + "%";
+      }
+
+      async function pollTranslate(jobId) {
+        while (document.getElementById("panel-tr-progress").classList.contains("active")) {
+          await new Promise(function(r) { setTimeout(r, 1500); });
+          var fd = new FormData();
+          fd.append("init_data", initData);
+          fd.append("job_id", jobId);
+          var d;
+          try {
+            var res = await fetch("/api/translate-status", { method: "POST", body: fd });
+            d = await res.json();
+            if (!res.ok) { alert(d.detail || "Xatolik yuz berdi"); showPanel("panel-translate"); return; }
+          } catch (e) { continue; }
+          setTrStep(d.step, d.percent);
+          if (d.done) {
+            if (d.error) { alert(d.error); showPanel("panel-translate"); return; }
+            setTrStep(5, 100);
+            var stem = selectedTranslateFile.name.replace(/\.[^.]+$/, "").replace(/^tarjima_/i, "");
+            document.getElementById("tr-done-name").textContent = "tarjima_" + stem + "_" + currentTranslateTarget.toUpperCase() + ".docx";
+            document.getElementById("btn-to-latin").style.display = currentTranslateSource === "uz" ? "" : "none";
+            addHistoryItem(selectedTranslateFile.name, "Tarjima qilindi", "docx");
+            haptic("success");
+            showPanel("panel-tr-done");
+            return;
+          }
+        }
+      }
 
       window.runDocumentTranslation = async function() {
         if (!selectedTranslateFile) return;
-        var btn = document.getElementById("btn-submit-translate");
-        var txt = document.getElementById("btn-translate-caption");
-        btn.disabled = true;
-        txt.textContent = "Tarjima qilinmoqda...";
-
-        var formData = new FormData();
-        formData.append("init_data", initData);
-        formData.append("target_lang", currentTranslateTarget);
-        formData.append("source_lang", currentTranslateSource);
-        formData.append("file", selectedTranslateFile);
-
+        var fd = new FormData();
+        fd.append("init_data", initData);
+        fd.append("target_lang", currentTranslateTarget);
+        fd.append("source_lang", currentTranslateSource);
+        fd.append("background", "1");
+        fd.append("file", selectedTranslateFile);
         try {
-          var res = await fetch("/api/translate-doc", { method: "POST", body: formData });
-          var data = await res.json();
-          if (res.ok) {
-            addHistoryItem(selectedTranslateFile.name, "Tarjima qilindi", "docx");
-            haptic("success");
-            alert("✅ Tarjima tayyor! Fayl Telegram chatingizga yuborildi.");
-            backToHub();
-          } else {
-            alert(data.detail || "Tarjima qilishda xatolik yuz berdi");
-          }
-        } catch (e) {
-          alert("Serverga ulanishda xato!");
-        } finally {
-          btn.disabled = false;
-          txt.textContent = "Tarjima qilish · 1 sahifa";
-        }
+          var res = await fetch("/api/translate-doc", { method: "POST", body: fd });
+          var d = await res.json();
+          if (!res.ok) { alert(d.detail || "Tarjima qilishda xatolik yuz berdi"); return; }
+          setTrStep(1, 0);
+          showPanel("panel-tr-progress");
+          pollTranslate(d.job_id);
+        } catch (e) { alert("Serverga ulanishda xato!"); }
+      };
+
+      window.convertToLatin = function() {
+        currentTranslateSource = "uz"; currentTranslateTarget = "uz_lat";
+        manualSource = true; manualTarget = true;
+        applyLangs();
+        window.runDocumentTranslation();
       };
 
       window.openToolSubview = function(kind) {
