@@ -87,10 +87,9 @@ WEBAPP_URL = os.getenv(
 ).strip().rstrip("/")
 PORT = int(os.getenv("PORT", "8080"))
 
-PAYMENT_PROVIDER_TOKEN = os.getenv(
-    "PAYMENT_PROVIDER_TOKEN",
-    "398062629:TEST:999999999_F91D8F69C042267444B74CC0B3C747757EB0E065",
-).strip()
+PAYMENT_PROVIDER_TOKEN = os.getenv("PAYMENT_PROVIDER_TOKEN", "").strip()
+PDF_MAX_BYTES = 15 * 1024 * 1024  # PDF/rasm yuklash chegarasi: 15 MB
+MAX_IMAGES_PER_PDF = 20
 
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite").strip()
 GEMINI_FALLBACK_MODELS = [
@@ -138,7 +137,7 @@ PAGE_TIERS = {
 # NARXLAR VA OBUNALAR
 # =========================================================
 PRICING = {
-    "slayd": {3: 3000, 4: 3000, 5: 5000},
+    "slayd": {3: 3000, 4: 4000, 5: 5000},
     "referat": {3: 4000, 4: 5000, 5: 6000},
     "mustaqil": {3: 4000, 4: 5000, 5: 6000},
     "kurs": 10000,
@@ -182,8 +181,9 @@ PRICING_INFO_TEXT = """
 Taqdimot yaratish narxlari quyidagicha:
 
 🟠 <b>Standart: 3, 4, 5 reja asosida</b>
-• <b>3 000 so'm</b> - 10-15 slayd (3-4 reja)
-• <b>5 000 so'm</b> - 20-25 slayd (5 reja)
+• <b>3 000 so'm</b> - 10 slayd (3 reja)
+• <b>4 000 so'm</b> - 15 slayd (4 reja)
+• <b>5 000 so'm</b> - 20 slayd (5 reja)
 
 --------------------------------------
 
@@ -2466,7 +2466,17 @@ async def subscriptions_cmd(event: types.Message | types.CallbackQuery):
 
 @dp.callback_query(F.data.startswith("topup_"))
 async def topup_payment_handler(callback: types.CallbackQuery):
-    amount = int(callback.data.split("_")[1])
+    if not PAYMENT_PROVIDER_TOKEN:
+        await callback.answer("To'lov tizimi hali sozlanmagan.", show_alert=True)
+        return
+    try:
+        amount = int(callback.data.split("_")[1])
+    except (ValueError, IndexError):
+        await callback.answer("Noto'g'ri summa.", show_alert=True)
+        return
+    if amount < 1000 or amount > 1000000:
+        await callback.answer("Noto'g'ri summa.", show_alert=True)
+        return
     prices = [LabeledPrice(label="Balans to'ldirish", amount=amount * 100)]
     
     await bot.send_invoice(
@@ -2484,6 +2494,9 @@ async def topup_payment_handler(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data.startswith("buy_sub_"))
 async def buy_sub_handler(callback: types.CallbackQuery):
+    if not PAYMENT_PROVIDER_TOKEN:
+        await callback.answer("To'lov tizimi hali sozlanmagan.", show_alert=True)
+        return
     sub_key = callback.data.replace("buy_", "")
     sub = SUBSCRIPTIONS.get(sub_key)
     if not sub:
@@ -2512,33 +2525,51 @@ async def process_pre_checkout(pre_checkout: PreCheckoutQuery):
 @dp.message(F.content_type == ContentType.SUCCESSFUL_PAYMENT)
 async def process_successful_payment(message: types.Message):
     sp = message.successful_payment
-    payload = sp.invoice_payload
+    payload = sp.invoice_payload or ""
     user_id = message.from_user.id
+    paid_amount = sp.total_amount // 100  # so'mda
 
     if payload.startswith("topup_"):
-        parts = payload.split("_")
-        amount = int(parts[2])
-        await asyncio.to_thread(rate_limiter.update_balance, user_id, amount)
-        account = await asyncio.to_thread(rate_limiter.get_user_account, user_id)
-        
-        referrer = await asyncio.to_thread(rate_limiter.handle_payment_reward, user_id, amount, "topup")
-        if referrer:
-            try:
-                await bot.send_message(
-                    referrer,
-                    f"🎁 <b>Tabriklaymiz!</b> Siz taklif qilgan do'stingiz botda to'lov qildi.\n"
-      f"Sizning hisobingizga <b>+{REFERRAL_BONUS:,} so'm</b> bonus qo'shildi!",
-                    parse_mode="HTML"
-                )
-            except Exception:
-                pass
-
-        await message.answer(
-            f"🎉 <b>Tabriklaymiz! {sub['title']} obunasi muvaffaqiyatli yoqildi!</b>\n\n"
-            f"Endi xizmatlardan qulay va chegirmali tartibda foydalanishingiz mumkin.",
-            reply_markup=main_keyboard(),
-            parse_mode="HTML",
+        await asyncio.to_thread(rate_limiter.update_balance, user_id, paid_amount)
+        kind = "topup"
+        success_text = (
+            f"🎉 <b>To'lov qabul qilindi!</b>\n\n"
+            f"Balansingizga <b>{paid_amount:,} so'm</b> qo'shildi."
         )
+    elif payload.startswith("sub_"):
+        parts = payload.split("_", 2)  # sub_<user_id>_sub_lite
+        sub_key = parts[2] if len(parts) == 3 else ""
+        sub = SUBSCRIPTIONS.get(sub_key)
+        if not sub:
+            logger.error("Noma'lum obuna to'lovi: %s (user %s)", payload, user_id)
+            await message.answer(
+                "❗️ To'lov qabul qilindi, lekin obunani yoqishda xato bo'ldi. "
+                "Iltimos, qo'llab-quvvatlash xizmatiga yozing."
+            )
+            return
+        await asyncio.to_thread(rate_limiter.activate_subscription, user_id, sub_key)
+        kind = "subscription"
+        success_text = (
+            f"🎉 <b>Tabriklaymiz! {sub['title']} obunasi muvaffaqiyatli yoqildi!</b>\n\n"
+            f"Endi xizmatlardan qulay va chegirmali tartibda foydalanishingiz mumkin."
+        )
+    else:
+        logger.error("Noma'lum to'lov payload: %s (user %s)", payload, user_id)
+        return
+
+    referrer = await asyncio.to_thread(rate_limiter.handle_payment_reward, user_id, paid_amount, kind)
+    if referrer:
+        try:
+            await bot.send_message(
+                referrer,
+                f"🎁 <b>Tabriklaymiz!</b> Siz taklif qilgan do'stingiz botda to'lov qildi.\n"
+                f"Sizning hisobingizga <b>+{REFERRAL_BONUS:,} so'm</b> bonus qo'shildi!",
+                parse_mode="HTML",
+            )
+        except Exception:
+            pass
+
+    await message.answer(success_text, reply_markup=main_keyboard(), parse_mode="HTML")
 
 
 # =========================================================
@@ -3224,6 +3255,8 @@ async def api_images_to_pdf(
 
     if not files:
         raise HTTPException(status_code=400, detail="Hech qanday rasm yuklanmadi.")
+    if len(files) > MAX_IMAGES_PER_PDF:
+        raise HTTPException(status_code=400, detail=f"Bir martada {MAX_IMAGES_PER_PDF} tadan ortiq rasm mumkin emas.")
 
     pdf_images = []
     A4_SIZE = (2480, 3508)
@@ -3231,6 +3264,8 @@ async def api_images_to_pdf(
     for file in files:
         try:
             content = await file.read()
+            if len(content) > PDF_MAX_BYTES:
+                continue
             img = Image.open(io.BytesIO(content))
             
             if img.mode != "RGB":
@@ -3708,6 +3743,8 @@ async def api_pdf_to_txt(
     user_id = auth["user_id"]
 
     content = await file.read()
+    if len(content) > PDF_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Fayl juda katta (15 MB dan oshmasin).")
     try:
         from pypdf import PdfReader
         reader = PdfReader(io.BytesIO(content))
@@ -3750,6 +3787,8 @@ async def api_pdf_to_images(
     user_id = auth["user_id"]
 
     content = await file.read()
+    if len(content) > PDF_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Fayl juda katta (15 MB dan oshmasin).")
     try:
         import fitz  # PyMuPDF
         doc = fitz.open(stream=content, filetype="pdf")
@@ -3783,6 +3822,8 @@ async def api_split_pdf(
     user_id = auth["user_id"]
 
     content = await file.read()
+    if len(content) > PDF_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Fayl juda katta (15 MB dan oshmasin).")
     try:
         from pypdf import PdfReader, PdfWriter
         reader = PdfReader(io.BytesIO(content))
