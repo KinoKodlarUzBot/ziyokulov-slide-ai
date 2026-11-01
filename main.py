@@ -147,6 +147,15 @@ PRICING = {
     "krossvord": 3000,
 }
 
+def slide_price(slides: int) -> int:
+    """Slayd soni bo'yicha narx: 3 ta reja = 10 slayd, 4 ta = 15, 5 ta = 20."""
+    if slides <= 10:
+        return PRICING["slayd"][3]
+    if slides <= 15:
+        return PRICING["slayd"][4]
+    return PRICING["slayd"][5]
+
+
 SUBSCRIPTIONS = {
     "sub_lite": {
         "title": "🔹 Lite (3 kun)",
@@ -466,7 +475,14 @@ class RateLimiter:
             "user_id INTEGER NOT NULL, "
             "amount INTEGER NOT NULL, "
             "kind TEXT NOT NULL, "
-            "created REAL NOT NULL)"
+            "created REAL NOT NULL, "
+            "charge_id TEXT)"
+        )
+        pay_cols = {row[1] for row in self._conn.execute("PRAGMA table_info(payments)")}
+        if "charge_id" not in pay_cols:
+            self._conn.execute("ALTER TABLE payments ADD COLUMN charge_id TEXT")
+        self._conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_charge_id ON payments(charge_id)"
         )
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS orders ("
@@ -555,14 +571,28 @@ class RateLimiter:
                 return True
         return False
 
+    def claim_payment(self, user_id: int, amount: int, kind: str, charge_id: str, credit: int = 0) -> bool:
+        """To'lovni bazaga yozadi. Shu charge_id avval qayd etilgan bo'lsa False qaytaradi.
+        credit > 0 bo'lsa, balans to'lovni yozish bilan bir tranzaksiyada qo'shiladi."""
+        with self._lock:
+            try:
+                self._conn.execute(
+                    "INSERT INTO payments (user_id, amount, kind, created, charge_id) VALUES (?, ?, ?, ?, ?)",
+                    (user_id, amount, kind, time.time(), charge_id),
+                )
+            except sqlite3.IntegrityError:
+                self._conn.rollback()
+                return False
+            if credit:
+                self._conn.execute(
+                    "UPDATE users SET balance = balance + ? WHERE user_id = ?", (credit, user_id)
+                )
+            self._conn.commit()
+            return True
+
     def handle_payment_reward(self, user_id: int, amount: int, kind: str) -> int | None:
-        now = time.time()
         referrer_to_reward = None
         with self._lock:
-            self._conn.execute(
-                "INSERT INTO payments (user_id, amount, kind, created) VALUES (?, ?, ?, ?)",
-                (user_id, amount, kind, now),
-            )
             row = self._conn.execute("SELECT invited_by, referral_rewarded FROM users WHERE user_id = ?", (user_id,)).fetchone()
             if row and row[0] and row[1] == 0:
                 referrer_id = row[0]
@@ -612,6 +642,18 @@ class RateLimiter:
             )
             self._conn.commit()
             return new_until
+
+    def unmark_free_used(self, user_id: int) -> None:
+        with self._lock:
+            self._conn.execute("UPDATE users SET free_used = 0 WHERE user_id = ?", (user_id,))
+            self._conn.commit()
+
+    def dec_daily_used(self, user_id: int) -> None:
+        with self._lock:
+            self._conn.execute(
+                "UPDATE users SET daily_used = MAX(daily_used - 1, 0) WHERE user_id = ?", (user_id,)
+            )
+            self._conn.commit()
 
     def inc_daily_used(self, user_id: int) -> None:
         with self._lock:
@@ -2475,8 +2517,8 @@ async def topup_payment_handler(callback: types.CallbackQuery):
         await callback.answer("Noto'g'ri summa.", show_alert=True)
         return
     if amount < 1000 or amount > 1000000:
-        await callback.answer("Noto'g'ri summa.", show_alert=True)
-        return
+        await callback.answer("Noto'g'ri sum
+              return
     prices = [LabeledPrice(label="Balans to'ldirish", amount=amount * 100)]
     
     await bot.send_invoice(
@@ -2529,9 +2571,19 @@ async def process_successful_payment(message: types.Message):
     user_id = message.from_user.id
     paid_amount = sp.total_amount // 100  # so'mda
 
+    charge_id = sp.telegram_payment_charge_id or ""
+    if not charge_id:
+        logger.error("To'lovda charge_id yo'q: %s (user %s)", payload, user_id)
+        return
+
     if payload.startswith("topup_"):
-        await asyncio.to_thread(rate_limiter.update_balance, user_id, paid_amount)
         kind = "topup"
+        is_new = await asyncio.to_thread(
+            rate_limiter.claim_payment, user_id, paid_amount, kind, charge_id, paid_amount
+        )
+        if not is_new:
+            logger.warning("Takroriy to'lov o'tkazib yuborildi: %s (user %s)", charge_id, user_id)
+            return
         success_text = (
             f"🎉 <b>To'lov qabul qilindi!</b>\n\n"
             f"Balansingizga <b>{paid_amount:,} so'm</b> qo'shildi."
@@ -2547,8 +2599,14 @@ async def process_successful_payment(message: types.Message):
                 "Iltimos, qo'llab-quvvatlash xizmatiga yozing."
             )
             return
-        await asyncio.to_thread(rate_limiter.activate_subscription, user_id, sub_key)
         kind = "subscription"
+        is_new = await asyncio.to_thread(
+            rate_limiter.claim_payment, user_id, paid_amount, kind, charge_id
+        )
+        if not is_new:
+            logger.warning("Takroriy to'lov o'tkazib yuborildi: %s (user %s)", charge_id, user_id)
+            return
+        await asyncio.to_thread(rate_limiter.activate_subscription, user_id, sub_key)
         success_text = (
             f"🎉 <b>Tabriklaymiz! {sub['title']} obunasi muvaffaqiyatli yoqildi!</b>\n\n"
             f"Endi xizmatlardan qulay va chegirmali tartibda foydalanishingiz mumkin."
@@ -3124,6 +3182,7 @@ async def api_me(req: MeRequest):
         "limit": RATE_LIMIT_REQUESTS,
         "window_minutes": max(1, RATE_LIMIT_WINDOW_SECONDS // 60),
         "slides": {"default": SLIDE_COUNT, "min": MIN_SLIDES, "max": MAX_SLIDES},
+        "prices": {str(n): slide_price(n) for n in range(MIN_SLIDES, MAX_SLIDES + 1)},
         "available_templates": list(TEMPLATE_STYLES.keys()),
     }
 
@@ -3136,8 +3195,8 @@ async def api_generate_slide(req: SlideRequest):
     
     account = await asyncio.to_thread(rate_limiter.get_user_account, user_id)
     now = time.time()
-    price = 3000 if req.slides <= 10 else 5000
-    
+    price = slide_price(req.slides)
+
     is_free = (account["free_used"] == 0)
     is_sub_valid = False
     if not is_free and account["subscription_until"] > now:
@@ -3145,18 +3204,12 @@ async def api_generate_slide(req: SlideRequest):
         if sub and account["daily_used"] < sub["daily_limit"]:
             is_sub_valid = True
 
-    if not is_free and not is_sub_valid:
-        if account["balance"] < price:
-            raise HTTPException(
-                status_code=402,
-                detail=f"Balansingiz yetarli emas! Narxi: {price:,} so'm. Balans: {account['balance']:,} so'm.",
-            )
-        else:
-            await asyncio.to_thread(rate_limiter.update_balance, user_id, -price)
-    elif is_free:
-        await asyncio.to_thread(rate_limiter.mark_free_used, user_id)
-    elif is_sub_valid:
-        await asyncio.to_thread(rate_limiter.inc_daily_used, user_id)
+    # 1) Hech narsa yechilmasdan oldin tekshiramiz
+    if not is_free and not is_sub_valid and account["balance"] < price:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Balansingiz yetarli emas! Narxi: {price:,} so'm. Balans: {account['balance']:,} so'm.",
+        )
 
     requested = getattr(req, "alphabet", None)
     if requested in ALPHABETS:
@@ -3170,8 +3223,15 @@ async def api_generate_slide(req: SlideRequest):
             status_code=429,
             detail="Oldingi ishingiz hali tayyor bo'lmadi. U tugagach yangisini boshlang.",
         )
-    reservation_id = await reserve_rate_limit(user_id)
     _active_users.add(user_id)
+    try:
+        reservation_id = await reserve_rate_limit(user_id)
+    except Exception:
+        _active_users.discard(user_id)
+        raise
+
+    # 2) Pul faqat hamma tekshiruvdan keyin yechiladi; xato bo'lsa qaytariladi
+    charge_kind = None
     started = time.monotonic()
 
     file_path = os.path.join(tempfile.gettempdir(), f"slide_{uuid.uuid4().hex}.pptx")
@@ -3179,6 +3239,16 @@ async def api_generate_slide(req: SlideRequest):
     template_name = req.template if req.template in TEMPLATE_STYLES else "classic"
 
     try:
+        if is_free:
+            await asyncio.to_thread(rate_limiter.mark_free_used, user_id)
+            charge_kind = "free"
+        elif is_sub_valid:
+            await asyncio.to_thread(rate_limiter.inc_daily_used, user_id)
+            charge_kind = "sub"
+        else:
+            await asyncio.to_thread(rate_limiter.update_balance, user_id, -price)
+            charge_kind = "balance"
+
         slide_data = await generate_slide_content(req.topic, alphabet, req.slides)
 
         await asyncio.to_thread(
@@ -3232,6 +3302,15 @@ async def api_generate_slide(req: SlideRequest):
         _active_users.discard(user_id)
         if not success:
             await asyncio.shield(refund_rate_limit(reservation_id))
+            try:
+                if charge_kind == "balance":
+                    await asyncio.to_thread(rate_limiter.update_balance, user_id, price)
+                elif charge_kind == "free":
+                    await asyncio.to_thread(rate_limiter.unmark_free_used, user_id)
+                elif charge_kind == "sub":
+                    await asyncio.to_thread(rate_limiter.dec_daily_used, user_id)
+            except Exception:
+                logger.exception("To'lovni qaytarib bo'lmadi (user %s, %s)", user_id, charge_kind)
         await track_order(user_id, "slayd", success, time.monotonic() - started)
         try:
             if os.path.exists(file_path):
@@ -3265,7 +3344,10 @@ async def api_images_to_pdf(
         try:
             content = await file.read()
             if len(content) > PDF_MAX_BYTES:
-                continue
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"«{file.filename or 'rasm'}» rasmi juda katta (15 MB dan oshmasin). Uni kichraytirib qayta yuklang.",
+                )
             img = Image.open(io.BytesIO(content))
             
             if img.mode != "RGB":
@@ -3282,6 +3364,8 @@ async def api_images_to_pdf(
                 pdf_images.append(a4_canvas)
             else:
                 pdf_images.append(img)
+        except HTTPException:
+            raise
         except Exception as e:
             logger.warning("Rasm ochishda xatolik: %s", e)
             continue
@@ -3326,6 +3410,8 @@ async def api_ocr(
     await track_user(user_id, auth["user"].get("first_name"), auth["user"].get("username"))
 
     content = await file.read()
+    if len(content) > PDF_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Fayl juda katta (15 MB dan oshmasin).")
     started_time = time.monotonic()
     
     try:
@@ -3532,6 +3618,8 @@ async def api_preview_doc(
 ):
     verify_telegram_init_data(init_data)
     content = await file.read()
+    if len(content) > PDF_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Fayl juda katta (15 MB dan oshmasin).")
     doc = _open_docx(content)
 
     segments = collect_segments(doc, include_headers=False)
@@ -3858,3 +3946,4 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=PORT, workers=1)
+                
