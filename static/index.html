@@ -519,6 +519,42 @@
     .trs.ok{color:#fff}.trs.ok b{background:#34d399;border-color:#34d399;color:#04140d}
     .tr-barwrap{height:6px;background:var(--line);border-radius:6px;overflow:hidden;margin:18px 0 10px}
     #tr-bar{height:100%;width:0;background:var(--cyan);transition:width .6s}
+  
+    /* ===== Slayd yaratish: qadamli forma ===== */
+    .wz-progress { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 4px 0 10px; }
+    .wz-progress i { height: 5px; border-radius: 4px; background: rgba(255,255,255,.12); }
+    .wz-progress i.on { background: var(--gold); }
+    .wz-head { display: flex; justify-content: space-between; align-items: baseline; margin: 0 2px 14px; }
+    .wz-head b { font-size: 18px; font-weight: 800; }
+    .wz-head span { color: var(--hint); font-size: 13px; }
+    .wz-step { display: none; }
+    .wz-step.active { display: block; }
+    .wz-big { font-size: 26px; font-weight: 900; color: var(--gold-soft); }
+    .wz-range { padding: 6px 4px 0; }
+    .wz-range input[type=range] { width: 100%; accent-color: var(--gold); height: 28px; }
+    .wz-ticks { display: flex; justify-content: space-between; color: var(--hint); font-size: 12px; padding: 0 4px; }
+    .wz-hint { color: var(--hint); font-size: 13px; margin: 10px 2px 0; }
+    .wz-price { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding: 14px 16px; border-radius: 16px; background: rgba(245,183,61,.10); border: 1px solid rgba(245,183,61,.25); }
+    .wz-price span { color: var(--hint); font-size: 14px; }
+    .wz-price b { font-size: 20px; font-weight: 900; color: var(--gold-soft); }
+    .wz-sum { border: 1px solid var(--line); border-radius: 16px; background: var(--card); padding: 4px 16px; }
+    .wz-sum > div { display: flex; justify-content: space-between; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+    .wz-sum > div:last-child { border-bottom: none; }
+    .wz-sum span { color: var(--hint); font-size: 14px; flex-shrink: 0; }
+    .wz-sum b { font-size: 15px; text-align: right; word-break: break-word; }
+    .wz-warn { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: rgba(255,123,123,.12); border: 1px solid rgba(255,123,123,.35); color: var(--danger); font-size: 14px; line-height: 1.45; }
+    .wz-warn b { display: block; margin-top: 4px; }
+    .wz-topup { width: 100%; margin-top: 10px; padding: 15px; border: none; border-radius: 16px; font: inherit; font-weight: 800; font-size: 16px; cursor: pointer; background: linear-gradient(135deg, var(--gold-soft), var(--gold)); color: var(--gold-ink); }
+    .wz-done { text-align: center; padding: 22px 8px 6px; }
+    .wz-done-ic { font-size: 54px; }
+    .wz-done h3 { margin: 8px 0 4px; font-size: 22px; }
+    .wz-done p { margin: 0; color: var(--hint); }
+    .wz-again { width: 100%; margin-top: 10px; padding: 14px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--text); font: inherit; font-weight: 800; font-size: 15px; cursor: pointer; }
+    .wz-nav { display: flex; gap: 10px; margin-top: 18px; }
+    .wz-nav button { flex: 1; padding: 15px; border-radius: 16px; font: inherit; font-weight: 800; font-size: 16px; cursor: pointer; border: 1px solid var(--line); }
+    .wz-back { background: rgba(255,255,255,.06); color: var(--text); }
+    .wz-next { background: linear-gradient(135deg, var(--gold-soft), var(--gold)); color: var(--gold-ink); border-color: transparent !important; flex: 2 !important; }
+    .wz-nav button:disabled { opacity: .5; }
   </style>
 </head>
 <body>
@@ -539,37 +575,101 @@
 
     <!-- ===== 1. Slayd Yaratish ===== -->
     <section class="panel active" id="panel-create">
-      <div class="search">
-        <input id="topic" type="text" maxlength="200" enterkeyhint="go" autocomplete="off" placeholder="Taqdimot mavzusini yozing...">
-        <button class="gobtn" id="go" type="button" aria-label="Slayd yaratish">➜</button>
+      <div class="wz-progress" id="wz-progress">
+        <i></i><i></i><i></i><i></i><i></i><i></i>
       </div>
-      <div class="counter" id="counter">0 / 200</div>
+      <div class="wz-head"><b id="wz-name">Mavzu</b><span id="wz-count">1/6-qadam</span></div>
 
-      <div class="band">
-        <div class="sec-head"><h2>🔥 Top mavzular</h2><span>bosib tanlang</span></div>
-        <div class="rail" id="top-rail"></div>
-      </div>
+      <!-- 1-qadam: Mavzu -->
+      <div class="wz-step active" data-step="1">
+        <div class="search">
+          <input id="topic" type="text" maxlength="200" enterkeyhint="next" autocomplete="off" placeholder="Taqdimot mavzusini yozing...">
+          <button class="gobtn" id="go" type="button" aria-label="Keyingi qadam">➜</button>
+        </div>
+        <div class="counter" id="counter">0 / 200</div>
 
-      <div class="block">
-        <div class="sec-head"><h2>🎨 Uslub</h2><span>15 xil individual tuzilish</span></div>
-        <div class="rail" id="styles"></div>
-      </div>
-
-      <div class="block">
-        <div class="sec-head"><h2>🔤 Alifbo</h2><span>fayl shu yozuvda bo'ladi</span></div>
-        <div class="seg" id="alpha">
-          <button type="button" data-alpha="latin" class="on">Lotin</button>
-          <button type="button" data-alpha="kirill">Кирилл</button>
+        <div class="band">
+          <div class="sec-head"><h2>🔥 Top mavzular</h2><span>bosib tanlang</span></div>
+          <div class="rail" id="top-rail"></div>
         </div>
       </div>
 
-      <button class="submit" id="submit" type="button">
-        <span class="spinner"></span>
-        <span id="submit-text">Slayd yaratish</span>
-      </button>
+      <!-- 2-qadam: Alifbo -->
+      <div class="wz-step" data-step="2">
+        <div class="block" style="margin-top:6px">
+          <div class="sec-head"><h2>🔤 Alifbo</h2><span>fayl shu yozuvda bo'ladi</span></div>
+          <div class="seg" id="alpha">
+            <button type="button" data-alpha="latin" class="on">Lotin</button>
+            <button type="button" data-alpha="kirill">Кирилл</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3-qadam: Slayd soni va narx -->
+      <div class="wz-step" data-step="3">
+        <div class="block" style="margin-top:6px">
+          <div class="sec-head"><h2>📊 Slaydlar soni</h2><b class="wz-big" id="slides-val">5</b></div>
+          <div class="wz-range">
+            <input type="range" id="slides-range" min="5" max="20" step="1" value="5">
+            <div class="wz-ticks"><span>5</span><span>10</span><span>15</span><span>20</span></div>
+          </div>
+          <p class="wz-hint" id="slides-hint"></p>
+        </div>
+        <div class="wz-price">
+          <span>Narxi</span><b id="price-val">—</b>
+        </div>
+      </div>
+
+      <!-- 4-qadam: Uslub -->
+      <div class="wz-step" data-step="4">
+        <div class="block" style="margin-top:6px">
+          <div class="sec-head"><h2>🎨 Uslub</h2><span>15 xil individual tuzilish</span></div>
+          <div class="rail" id="styles"></div>
+        </div>
+      </div>
+
+      <!-- 5-qadam: Tasdiqlash -->
+      <div class="wz-step" data-step="5">
+        <div class="wz-sum">
+          <div><span>Mavzu</span><b id="sum-topic">—</b></div>
+          <div><span>Alifbo</span><b id="sum-alpha">—</b></div>
+          <div><span>Slaydlar</span><b id="sum-slides">—</b></div>
+          <div><span>Uslub</span><b id="sum-style">—</b></div>
+        </div>
+        <div class="wz-price">
+          <span>Narxi</span><b id="sum-price">—</b>
+        </div>
+        <div class="wz-price" style="margin-top:8px">
+          <span>Balansingiz</span><b id="sum-balance">—</b>
+        </div>
+        <div class="wz-warn" id="wz-warn" style="display:none">
+          Balansingizda mablag' yetarli emas. Iltimos, avval balansingizni to'ldiring.
+          <b id="wz-missing"></b>
+        </div>
+        <button class="wz-topup" id="wz-topup" type="button" style="display:none">💳 Balans to'ldirish</button>
+        <button class="submit" id="submit" type="button">
+          <span class="spinner"></span>
+          <span id="submit-text">Slayd yaratish</span>
+        </button>
+      </div>
+
+      <!-- 6-qadam: Tayyor -->
+      <div class="wz-step" data-step="6">
+        <div class="wz-done">
+          <div class="wz-done-ic">✅</div>
+          <h3>Slayd tayyor!</h3>
+          <p>Fayl Telegram chatingizga yuborildi.</p>
+        </div>
+        <button class="close-btn" id="close" type="button">Mini App'ni yopish</button>
+        <button class="wz-again" id="wz-again" type="button">➕ Yangi taqdimot</button>
+      </div>
+
       <div class="message" id="message" role="status" aria-live="polite"></div>
-      <button class="close-btn" id="close" type="button">Mini App'ni yopish</button>
-      <p class="note">Taqdimot 6 ta slayddan iborat: muqova va 5 ta mazmunli slayd.</p>
+
+      <div class="wz-nav" id="wz-nav">
+        <button class="wz-back" id="wz-back" type="button">‹ Orqaga</button>
+        <button class="wz-next" id="wz-next" type="button">Keyingi qadam</button>
+      </div>
     </section>
 
     <!-- ===== 2. HUJJATLAR ASOSIY MENYUSI ===== -->
@@ -994,6 +1094,11 @@
         topicEl.disabled = value;
         submitEl.classList.toggle("loading", value);
         submitTextEl.textContent = value ? "Tayyorlanmoqda..." : "Slayd yaratish";
+        var nb = document.getElementById("wz-back"), nn = document.getElementById("wz-next"), rg = document.getElementById("slides-range");
+        if (nb) nb.disabled = value;
+        if (nn) nn.disabled = value;
+        if (rg) rg.disabled = value;
+        if (!value) updateWizard();
       }
 
       function updateCounter() {
@@ -1015,6 +1120,17 @@
         freeUsed = data.free_used || 0;
         isSubscriber = !!data.is_subscriber;
         modalBalance.textContent = currentBalance.toLocaleString() + " so'm";
+        if (data.prices) slidePrices = data.prices;
+        if (data.slides) {
+          var rg = document.getElementById("slides-range");
+          if (rg) {
+            rg.min = data.slides.min; rg.max = data.slides.max;
+            if (!slidesTouched) { rg.value = data.slides.default; slidesCount = parseInt(rg.value, 10); }
+            var tk = document.querySelector(".wz-ticks");
+            if (tk) tk.innerHTML = "<span>" + data.slides.min + "</span><span>" + Math.round((data.slides.min + data.slides.max) / 2) + "</span><span>" + data.slides.max + "</span>";
+          }
+        }
+        updateWizard();
 
         if (freeUsed === 0) {
           limitIconEl.textContent = "🎁";
@@ -1109,6 +1225,7 @@
           updateCounter();
           hideMessage();
           switchTab("create");
+          goStep(1);
         });
         return btn;
       }
@@ -1211,6 +1328,7 @@
         btn.addEventListener("click", function () {
           if (busy) return;
           selectedStyle = st.id;
+          updateWizard();
           var all = stylesEl.children;
           for (var i = 0; i < all.length; i++) all[i].classList.toggle("sel", all[i] === btn);
           haptic("select");
@@ -1221,6 +1339,7 @@
       var alphaEl = document.getElementById("alpha");
       function setAlphabet(code) {
         selectedAlphabet = code === "kirill" ? "kirill" : "latin";
+        if (typeof updateWizard === "function" && document.getElementById("sum-alpha")) updateWizard();
         var buttons = alphaEl.querySelectorAll("button");
         for (var i = 0; i < buttons.length; i++) buttons[i].classList.toggle("on", buttons[i].getAttribute("data-alpha") === selectedAlphabet);
       }
@@ -1231,6 +1350,98 @@
         haptic("select");
       });
 
+
+      // ===== Qadamli forma =====
+      var WZ_NAMES = ["Mavzu", "Alifbo", "Slaydlar soni", "Uslub", "Tasdiqlash", "Tayyor"];
+      var wzStep = 1;
+      var slidesCount = 5;
+      var slidesTouched = false;
+      var slidePrices = null;
+
+      function priceFor(n) {
+        if (slidePrices && slidePrices[String(n)] != null) return slidePrices[String(n)];
+        return n <= 10 ? 3000 : (n <= 15 ? 4000 : 5000);
+      }
+      function fmt(n) { return n.toLocaleString("ru-RU").replace(/[\u00a0\u202f]/g, " ") + " so'm"; }
+
+      function payNeeded() {
+        if (freeUsed === 0) return 0;
+        if (isSubscriber) return 0;
+        return priceFor(slidesCount);
+      }
+      function priceLabel() {
+        if (freeUsed === 0) return "Bepul (1-marta)";
+        if (isSubscriber) return "Obuna ichida";
+        return fmt(priceFor(slidesCount));
+      }
+      function styleName() {
+        for (var i = 0; i < STYLES.length; i++) if (STYLES[i].id === selectedStyle) return STYLES[i].name;
+        return selectedStyle;
+      }
+
+      function updateWizard() {
+        var rg = document.getElementById("slides-range");
+        if (rg) slidesCount = parseInt(rg.value, 10) || slidesCount;
+        var sv = document.getElementById("slides-val");
+        if (sv) sv.textContent = slidesCount;
+        var hint = document.getElementById("slides-hint");
+        if (hint) hint.textContent = "Jami " + (slidesCount + 1) + " ta slayd (muqova bilan)";
+        document.getElementById("price-val").textContent = priceLabel();
+
+        document.getElementById("sum-topic").textContent = topicEl.value.trim() || "—";
+        document.getElementById("sum-alpha").textContent = selectedAlphabet === "kirill" ? "Кирилл" : "Lotin";
+        document.getElementById("sum-slides").textContent = (slidesCount + 1) + " ta (muqova bilan)";
+        document.getElementById("sum-style").textContent = styleName();
+        document.getElementById("sum-price").textContent = priceLabel();
+        document.getElementById("sum-balance").textContent = fmt(currentBalance);
+
+        var need = payNeeded();
+        var lack = need - currentBalance;
+        var warn = document.getElementById("wz-warn");
+        var top = document.getElementById("wz-topup");
+        var notEnough = need > 0 && lack > 0;
+        warn.style.display = notEnough ? "" : "none";
+        top.style.display = notEnough ? "" : "none";
+        document.getElementById("wz-missing").textContent = notEnough ? "Yetishmayotgan: " + fmt(lack) : "";
+        submitEl.style.display = notEnough ? "none" : "";
+      }
+
+      function goStep(n) {
+        wzStep = Math.max(1, Math.min(6, n));
+        var steps = document.querySelectorAll(".wz-step");
+        for (var i = 0; i < steps.length; i++) steps[i].classList.toggle("active", parseInt(steps[i].getAttribute("data-step"), 10) === wzStep);
+        var bars = document.querySelectorAll("#wz-progress i");
+        for (var j = 0; j < bars.length; j++) bars[j].classList.toggle("on", j < wzStep);
+        document.getElementById("wz-name").textContent = WZ_NAMES[wzStep - 1];
+        document.getElementById("wz-count").textContent = wzStep + "/6-qadam";
+        document.getElementById("wz-back").style.visibility = (wzStep === 1 || wzStep === 6) ? "hidden" : "visible";
+        document.getElementById("wz-next").style.display = (wzStep >= 5) ? "none" : "";
+        document.getElementById("wz-nav").style.display = (wzStep === 6) ? "none" : "";
+        if (wzStep !== 6) hideMessage();
+        updateWizard();
+        window.scrollTo(0, 0);
+      }
+
+      function nextStep() {
+        if (busy) return;
+        if (wzStep === 1) {
+          var t = topicEl.value.trim();
+          if (t.length < MIN_LEN) { showMessage("error", "Mavzu kamida 3 ta belgi bo'lsin."); haptic("error"); return; }
+          topicEl.blur();
+        }
+        haptic("select");
+        goStep(wzStep + 1);
+      }
+      function prevStep() { if (!busy) { haptic("select"); goStep(wzStep - 1); } }
+
+      document.getElementById("slides-range").addEventListener("input", function () { slidesTouched = true; updateWizard(); });
+      document.getElementById("wz-next").addEventListener("click", nextStep);
+      document.getElementById("wz-back").addEventListener("click", prevStep);
+      document.getElementById("wz-topup").addEventListener("click", openModal);
+      document.getElementById("wz-again").addEventListener("click", function () {
+        topicEl.value = ""; updateCounter(); closeEl.classList.remove("show"); goStep(1);
+      });
+
       async function generate() {
         if (busy) return;
         hideMessage();
@@ -1238,7 +1449,7 @@
         var topic = topicEl.value.trim();
 
         if (!initData) { showMessage("error", "Telegram bot orqali oching."); haptic("error"); return; }
-        if (topic.length < MIN_LEN) { showMessage("error", "Mavzu kamida 3 ta belgi bo'lsin."); haptic("error"); return; }
+        if (topic.length < MIN_LEN) { goStep(1); showMessage("error", "Mavzu kamida 3 ta belgi bo'lsin."); haptic("error"); return; }
 
         setBusy(true);
         showMessage("info", "Slayd tayyorlanmoqda, bu 20-60 soniya olishi mumkin...");
@@ -1250,7 +1461,7 @@
           var response = await fetch("/api/generate-slide", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ init_data: initData, topic: topic, template: selectedStyle, alphabet: selectedAlphabet }),
+            body: JSON.stringify({ init_data: initData, topic: topic, template: selectedStyle, alphabet: selectedAlphabet, slides: slidesCount }),
             signal: controller.signal
           });
           var data = null;
@@ -1263,9 +1474,10 @@
             return;
           }
 
-          showMessage("success", "✅ Slayd tayyor! Telegram chatingizga fayl yuborildi.");
+          hideMessage();
           addHistoryItem("taqdimot.pptx", topic.substring(0, 20) + "... · Slayd", "pptx");
           closeEl.classList.add("show");
+          goStep(6);
           haptic("success");
         } catch (err) {
           showMessage("error", "Serverga ulanib bo'lmadi.");
@@ -1744,10 +1956,11 @@
         } catch (e) { alert("Serverga ulanishda xato!"); }
       }
 
-      topicEl.addEventListener("input", updateCounter);
-      topicEl.addEventListener("keydown", function (event) { if (event.key === "Enter") { event.preventDefault(); topicEl.blur(); generate(); } });
+      topicEl.addEventListener("input", function () { updateCounter(); updateWizard(); });
+      goStep(1);
+      topicEl.addEventListener("keydown", function (event) { if (event.key === "Enter") { event.preventDefault(); nextStep(); } });
       submitEl.addEventListener("click", generate);
-      goEl.addEventListener("click", generate);
+      goEl.addEventListener("click", nextStep);
       closeEl.addEventListener("click", function () { if (tg) tg.close(); });
 
       updateCounter();
