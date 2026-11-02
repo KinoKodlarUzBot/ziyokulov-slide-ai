@@ -60,14 +60,63 @@ from pydantic import BaseModel, ConfigDict, Field
 from crossword import build_crossword
 from doc_translate import apply_translation, collect_segments, detect_lang
 from translit import (
-    ALPHABETS,
+    ALPHABETS as _BASE_ALPHABETS,
     KIRILL,
     LATIN,
-    alphabet_rule,
-    fix_text,
-    normalize_alphabet,
-    ui,
+    alphabet_rule as _alphabet_rule,
+    fix_text as _fix_text,
+    normalize_alphabet as _normalize_alphabet,
+    ui as _ui,
 )
+
+# ---------------------------------------------------------
+# YANGI LOTIN ALIFBOSI (2026-yil 21-oktabrdagi qonun):
+# O' -> Ö, G' -> Ğ, Sh -> Ş, Ch -> Ç. Tutuq belgisi saqlanadi.
+# Matn avval joriy lotinda tayyorlanadi, so'ng shu qatlam o'giradi.
+# ---------------------------------------------------------
+NEW_LATIN = "yangi"
+ALPHABETS = tuple(_BASE_ALPHABETS) + (NEW_LATIN,)
+
+_APOSTROPHES = "'\u2018\u2019\u02bb\u02bc`\u00b4"
+_NEW_LATIN_RE_OG = re.compile("([OoGg])[" + _APOSTROPHES + "]")
+_NEW_LATIN_RE_SH = re.compile(r"[Ss][Hh]")
+_NEW_LATIN_RE_CH = re.compile(r"[Cc][Hh]")
+_NEW_LATIN_OG = {"O": "\u00d6", "o": "\u00f6", "G": "\u011e", "g": "\u011f"}
+
+
+def to_new_latin(text):
+    """Joriy lotin matnini yangi lotin alifbosiga o'giradi (O'->Ö, G'->Ğ, Sh->Ş, Ch->Ç)."""
+    if not text or not isinstance(text, str):
+        return text
+    text = _NEW_LATIN_RE_OG.sub(lambda m: _NEW_LATIN_OG[m.group(1)], text)
+    text = _NEW_LATIN_RE_SH.sub(lambda m: "\u015e" if m.group(0)[0] == "S" else "\u015f", text)
+    text = _NEW_LATIN_RE_CH.sub(lambda m: "\u00c7" if m.group(0)[0] == "C" else "\u00e7", text)
+    return text
+
+
+def _base_alphabet(alphabet):
+    return LATIN if alphabet == NEW_LATIN else alphabet
+
+
+def normalize_alphabet(value):
+    if str(value or "").strip().lower() in ("yangi", "new", "yangi_lotin"):
+        return NEW_LATIN
+    return _normalize_alphabet(value)
+
+
+def alphabet_rule(alphabet):
+    # AI joriy lotinda yozadi, keyin to'liq o'giriladi
+    return _alphabet_rule(_base_alphabet(alphabet))
+
+
+def fix_text(text, alphabet):
+    result = _fix_text(text, _base_alphabet(alphabet))
+    return to_new_latin(result) if alphabet == NEW_LATIN else result
+
+
+def ui(label, alphabet):
+    result = _ui(label, _base_alphabet(alphabet))
+    return to_new_latin(result) if alphabet == NEW_LATIN else result
 
 
 # =========================================================
@@ -380,7 +429,7 @@ class SlideRequest(BaseModel):
     init_data: str = Field(min_length=1, max_length=10_000)
     topic: str = Field(min_length=3, max_length=MAX_TOPIC_LENGTH)
     template: str = "classic"
-    alphabet: Literal["latin", "kirill"] | None = None
+    alphabet: Literal["latin", "kirill", "yangi"] | None = None
     slides: int = Field(default=SLIDE_COUNT, ge=MIN_SLIDES, le=MAX_SLIDES)
 
 
@@ -2249,7 +2298,6 @@ BTN_ALPHABET = "🔤 Alifbo"
 BTN_LIMIT = "📊 Limitim"
 BTN_HELP = "❓ Yordam"
 BTN_CANCEL = "❌ Bekor qilish"
-
 KIND_BY_BUTTON = {
     BTN_REFERAT: "referat",
     BTN_SELF: "mustaqil",
@@ -2269,7 +2317,7 @@ TOPIC_HINTS = {
     "tezis": "Tezis mavzusini yozing",
     "krossvord": "Krossvord mavzusini yozing",
 }
-ALPHABET_NAMES = {LATIN: "Lotin", KIRILL: "Кирилл"}
+ALPHABET_NAMES = {LATIN: "Lotin", NEW_LATIN: "Yangi lotin (Ö, Ğ, Ş, Ç)", KIRILL: "Кирилл"}
 
 
 class DocOrder(StatesGroup):
@@ -2753,20 +2801,21 @@ async def check_and_run_order(message: types.Message, kind: str, topic: str,
         if sub and account["daily_used"] < sub["daily_limit"]:
             is_sub_valid = True
 
-    if not is_free and not is_sub_valid:
-        if account["balance"] < price:
-            await message.answer(
-                "❗️ <b>Balansingizda yetarli mablag' mavjud emas!</b>",
-                reply_markup=insufficient_balance_kb(),
-                parse_mode="HTML"
-            )
-            return
-        else:
-            await asyncio.to_thread(rate_limiter.update_balance, user_id, -price)
-    elif is_free:
-        await asyncio.to_thread(rate_limiter.mark_free_used, user_id)
+    # Pul bu yerda yechilmaydi: ish haqiqatan boshlanganda (run_* ichida) yechiladi,
+    # xato bo'lsa qaytariladi.
+    if is_free:
+        charge_kind = "free"
     elif is_sub_valid:
-        await asyncio.to_thread(rate_limiter.inc_daily_used, user_id)
+        charge_kind = "sub"
+    elif account["balance"] >= price:
+        charge_kind = "balance"
+    else:
+        await message.answer(
+            "❗️ <b>Balansingizda yetarli mablag' mavjud emas!</b>",
+            reply_markup=insufficient_balance_kb(),
+            parse_mode="HTML"
+        )
+        return
 
     pages = None
     if reja_count == 3:
@@ -2778,12 +2827,36 @@ async def check_and_run_order(message: types.Message, kind: str, topic: str,
 
     if kind == "slayd":
         slides_count = 10 if reja_count == 3 else 15 if reja_count == 4 else 20
-        await run_slide_generation(message, topic, slides_count, target_user=user)
+        await run_slide_generation(message, topic, slides_count, target_user=user,
+                                   charge_kind=charge_kind, price=price)
     else:
-        await run_document(message, kind, topic, pages=pages, target_user=user)
+        await run_document(message, kind, topic, pages=pages, target_user=user,
+                           charge_kind=charge_kind, price=price)
 
 
-async def run_slide_generation(message: types.Message, topic: str, count: int, target_user: types.User = None):
+async def apply_charge(user_id: int, charge_kind: str | None, price: int) -> None:
+    if charge_kind == "free":
+        await asyncio.to_thread(rate_limiter.mark_free_used, user_id)
+    elif charge_kind == "sub":
+        await asyncio.to_thread(rate_limiter.inc_daily_used, user_id)
+    elif charge_kind == "balance":
+        await asyncio.to_thread(rate_limiter.update_balance, user_id, -price)
+
+
+async def refund_charge(user_id: int, charge_kind: str | None, price: int) -> None:
+    try:
+        if charge_kind == "free":
+            await asyncio.to_thread(rate_limiter.unmark_free_used, user_id)
+        elif charge_kind == "sub":
+            await asyncio.to_thread(rate_limiter.dec_daily_used, user_id)
+        elif charge_kind == "balance":
+            await asyncio.to_thread(rate_limiter.update_balance, user_id, price)
+    except Exception:
+        logger.exception("To'lovni qaytarib bo'lmadi (user %s, %s)", user_id, charge_kind)
+
+
+async def run_slide_generation(message: types.Message, topic: str, count: int, target_user: types.User = None,
+                               charge_kind: str | None = None, price: int = 0):
     user = target_user or message.from_user
     user_id = user.id
     await track_user(user_id, user.first_name, user.username)
@@ -2807,8 +2880,11 @@ async def run_slide_generation(message: types.Message, topic: str, count: int, t
     status = await message.answer(f"⏳ Taqdimot tayyorlanmoqda ({count} ta slayd), biroz kuting...", reply_markup=main_keyboard())
     file_path = os.path.join(tempfile.gettempdir(), f"slide_{uuid.uuid4().hex}.pptx")
     success = False
+    charged = None
 
     try:
+        await apply_charge(user_id, charge_kind, price)
+        charged = charge_kind
         slide_data = await generate_slide_content(topic, alphabet, count)
         await asyncio.to_thread(generate_pptx, topic, slide_data, "classic", file_path, alphabet)
         doc = types.FSInputFile(file_path, filename=f"taqdimot_{uuid.uuid4().hex[:6]}.pptx")
@@ -2824,6 +2900,7 @@ async def run_slide_generation(message: types.Message, topic: str, count: int, t
         _active_users.discard(user_id)
         if not success:
             await asyncio.shield(refund_rate_limit(reservation_id))
+            await refund_charge(user_id, charged, price)
         await track_order(user_id, "slayd", success, time.monotonic() - started)
         try:
             await status.delete()
@@ -2844,7 +2921,8 @@ def eta_text(kind: str, pages) -> str:
     return "6-10 daqiqa"
 
 
-async def run_document(message: types.Message, kind: str, topic: str, pages=None, target_user: types.User = None) -> None:
+async def run_document(message: types.Message, kind: str, topic: str, pages=None, target_user: types.User = None,
+                       charge_kind: str | None = None, price: int = 0) -> None:
     user = target_user or message.from_user
     user_id = user.id
     meta = DOC_KINDS[kind]
@@ -2882,7 +2960,10 @@ async def run_document(message: types.Message, kind: str, topic: str, pages=None
             last_progress_edit = now
             await safe_edit(status, f"⏳ {meta['label']} yozilmoqda{size_label}: {done}/{total} qism tayyor...")
 
+    charged = None
     try:
+        await apply_charge(user_id, charge_kind, price)
+        charged = charge_kind
         await bot.send_chat_action(message.chat.id, "upload_document")
         data = await generate_document_content(
             kind, topic, alphabet, progress=progress if use_progress else None, pages=pages
@@ -2914,6 +2995,7 @@ async def run_document(message: types.Message, kind: str, topic: str, pages=None
         _active_users.discard(user_id)
         if not success:
             await asyncio.shield(refund_rate_limit(reservation_id))
+            await refund_charge(user_id, charged, price)
         await track_order(user_id, kind, success, time.monotonic() - started)
         try:
             await status.delete()
@@ -2934,10 +3016,11 @@ def alphabet_keyboard(current: str) -> InlineKeyboardMarkup:
         return ("✅ " if current == code else "") + ALPHABET_NAMES[code]
 
     return InlineKeyboardMarkup(
-        inline_keyboard=[[
-            InlineKeyboardButton(text=mark(LATIN), callback_data="alpha:latin"),
-            InlineKeyboardButton(text=mark(KIRILL), callback_data="alpha:kirill"),
-        ]]
+        inline_keyboard=[
+            [InlineKeyboardButton(text=mark(LATIN), callback_data="alpha:latin")],
+            [InlineKeyboardButton(text=mark(NEW_LATIN), callback_data="alpha:yangi")],
+            [InlineKeyboardButton(text=mark(KIRILL), callback_data="alpha:kirill")],
+        ]
     )
 
 
@@ -2961,7 +3044,7 @@ async def alphabet_btn(message: types.Message, state: FSMContext):
     )
 
 
-@dp.callback_query(F.data.in_({"alpha:latin", "alpha:kirill"}))
+@dp.callback_query(F.data.in_({"alpha:latin", "alpha:kirill", "alpha:yangi"}))
 async def alphabet_choice(callback: types.CallbackQuery):
     code = normalize_alphabet((callback.data or "").split(":", 1)[-1])
     user = callback.from_user
@@ -3107,7 +3190,7 @@ async def lifespan(app: FastAPI):
             await bot.set_my_commands([
                 BotCommand(command="start", description="Botni boshlash va menyu"),
                 BotCommand(command="help", description="Yordam"),
-                BotCommand(command="alifbo", description="Alifbo: lotin yoki kirill"),
+                BotCommand(command="alifbo", description="Alifbo: lotin, yangi lotin yoki kirill"),
                 BotCommand(command="cancel", description="Bekor qilish"),
             ])
             await bot.set_my_short_description(
@@ -3946,5 +4029,3 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=PORT, workers=1)
-
-    
