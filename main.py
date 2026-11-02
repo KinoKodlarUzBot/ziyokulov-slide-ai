@@ -2517,8 +2517,8 @@ async def topup_payment_handler(callback: types.CallbackQuery):
         await callback.answer("Noto'g'ri summa.", show_alert=True)
         return
     if amount < 1000 or amount > 1000000:
-        await callback.answer("Noto'g'ri sum
-              return
+        await callback.answer("Noto'g'ri summa.", show_alert=True)
+        return
     prices = [LabeledPrice(label="Balans to'ldirish", amount=amount * 100)]
     
     await bot.send_invoice(
@@ -3946,4 +3946,5 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=PORT, workers=1)
-                
+
+    
