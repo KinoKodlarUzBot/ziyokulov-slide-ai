@@ -555,6 +555,15 @@
     .wz-back { background: rgba(255,255,255,.06); color: var(--text); }
     .wz-next { background: linear-gradient(135deg, var(--gold-soft), var(--gold)); color: var(--gold-ink); border-color: transparent !important; flex: 2 !important; }
     .wz-nav button:disabled { opacity: .5; }
+  
+    .alpha-cards { display: grid; gap: 10px; }
+    .alpha-cards button { position: relative; text-align: left; padding: 14px 52px 14px 16px; border-radius: 16px; border: 1.5px solid var(--line); background: rgba(255,255,255,.05); color: var(--text); font: inherit; cursor: pointer; }
+    .alpha-cards .ac-title { display: block; font-weight: 800; font-size: 16px; }
+    .alpha-cards .ac-ex { display: block; margin-top: 3px; color: var(--hint); font-size: 14px; }
+    .alpha-cards .ac-dot { position: absolute; right: 16px; top: 50%; width: 24px; height: 24px; margin-top: -12px; border-radius: 50%; border: 2px solid var(--line); box-sizing: border-box; }
+    .alpha-cards button.on { border-color: var(--gold); background: rgba(245,183,61,.12); }
+    .alpha-cards button.on .ac-title { color: var(--gold-soft); }
+    .alpha-cards button.on .ac-dot { border-color: var(--gold); background: var(--gold); box-shadow: inset 0 0 0 5px var(--gold-ink); }
   </style>
 </head>
 <body>
@@ -598,9 +607,22 @@
       <div class="wz-step" data-step="2">
         <div class="block" style="margin-top:6px">
           <div class="sec-head"><h2>🔤 Alifbo</h2><span>fayl shu yozuvda bo'ladi</span></div>
-          <div class="seg" id="alpha">
-            <button type="button" data-alpha="latin" class="on">Lotin</button>
-            <button type="button" data-alpha="kirill">Кирилл</button>
+          <div class="alpha-cards" id="alpha">
+            <button type="button" data-alpha="latin" class="on">
+              <span class="ac-title">Joriy alifbo</span>
+              <span class="ac-ex">O‘zbekiston, shahar</span>
+              <span class="ac-dot"></span>
+            </button>
+            <button type="button" data-alpha="yangi">
+              <span class="ac-title">Yangi alifbo</span>
+              <span class="ac-ex">Özbekiston, şahar</span>
+              <span class="ac-dot"></span>
+            </button>
+            <button type="button" data-alpha="kirill">
+              <span class="ac-title">Кирилл</span>
+              <span class="ac-ex">Ўзбекистон, шаҳар</span>
+              <span class="ac-dot"></span>
+            </button>
           </div>
         </div>
       </div>
@@ -1338,7 +1360,7 @@
 
       var alphaEl = document.getElementById("alpha");
       function setAlphabet(code) {
-        selectedAlphabet = code === "kirill" ? "kirill" : "latin";
+        selectedAlphabet = (code === "kirill" || code === "yangi") ? code : "latin";
         if (typeof updateWizard === "function" && document.getElementById("sum-alpha")) updateWizard();
         var buttons = alphaEl.querySelectorAll("button");
         for (var i = 0; i < buttons.length; i++) buttons[i].classList.toggle("on", buttons[i].getAttribute("data-alpha") === selectedAlphabet);
@@ -1389,7 +1411,7 @@
         document.getElementById("price-val").textContent = priceLabel();
 
         document.getElementById("sum-topic").textContent = topicEl.value.trim() || "—";
-        document.getElementById("sum-alpha").textContent = selectedAlphabet === "kirill" ? "Кирилл" : "Lotin";
+        document.getElementById("sum-alpha").textContent = selectedAlphabet === "kirill" ? "Кирилл" : (selectedAlphabet === "yangi" ? "Yangi alifbo (Ö, Ğ, Ş, Ç)" : "Joriy alifbo (lotin)");
         document.getElementById("sum-slides").textContent = (slidesCount + 1) + " ta (muqova bilan)";
         document.getElementById("sum-style").textContent = styleName();
         document.getElementById("sum-price").textContent = priceLabel();
