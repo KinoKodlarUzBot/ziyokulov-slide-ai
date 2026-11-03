@@ -7,6 +7,7 @@ import json
 import logging
 import math
 import os
+import random
 import re
 import sqlite3
 import tempfile
@@ -20,7 +21,7 @@ from typing import Literal
 from urllib.parse import parse_qsl
 
 from deep_translator import GoogleTranslator
-from aiogram import Bot, Dispatcher, F, types
+from aiogram import BaseMiddleware, Bot, Dispatcher, F, types
 from aiogram.exceptions import TelegramForbiddenError
 from aiogram.filters import Command, CommandStart, CommandObject
 from aiogram.fsm.context import FSMContext
@@ -162,6 +163,23 @@ ADMIN_IDS = {
     int(x) for x in os.getenv("ADMIN_IDS", "").replace(" ", "").split(",") if x.isdigit()
 }
 SUPPORT_CONTACT = os.getenv("SUPPORT_CONTACT", "").strip()
+
+# --- Mini App vositalari: narxlar va limitlar (hammasi Railway Variables orqali o'zgaradi) ---
+TOOL_PRICES = {"ocr": int(os.getenv("PRICE_OCR", "500"))}
+TRANSLATE_PRICE_TIERS = [
+    (10, int(os.getenv("PRICE_TRANSLATE_10", "2000"))),
+    (30, int(os.getenv("PRICE_TRANSLATE_30", "4000"))),
+    (60, int(os.getenv("PRICE_TRANSLATE_60", "6000"))),
+]
+MAX_TRANSLATE_PAGES = TRANSLATE_PRICE_TIERS[-1][0]
+TRANSLATE_ALPHABET_PRICE = int(os.getenv("PRICE_ALPHABET", "500"))
+TOOL_RATE_LIMIT = int(os.getenv("TOOL_RATE_LIMIT", "30"))
+TOOL_RATE_WINDOW = 3600
+PENDING_TTL_SECONDS = int(os.getenv("PENDING_TTL_SECONDS", "1800"))
+BACKUP_EVERY_HOURS = float(os.getenv("BACKUP_EVERY_HOURS", "24"))
+GEMINI_PRICE_IN_PER_M = float(os.getenv("GEMINI_PRICE_IN_PER_M", "0"))
+GEMINI_PRICE_OUT_PER_M = float(os.getenv("GEMINI_PRICE_OUT_PER_M", "0"))
+USD_UZS = float(os.getenv("USD_UZS", "12500"))
 
 MAX_TOPIC_LENGTH = 200
 MAX_BULLETS = 5
@@ -479,6 +497,13 @@ def verify_telegram_init_data(init_data: str) -> dict:
     except (ValueError, TypeError, KeyError, json.JSONDecodeError):
         raise HTTPException(status_code=401, detail="Telegram foydalanuvchisi aniqlanmadi.")
 
+    try:
+        banned = rate_limiter.is_banned(user_id)
+    except Exception:
+        banned = False
+    if banned:
+        raise HTTPException(status_code=403, detail="Sizning hisobingiz bloklangan.")
+
     return {"user_id": user_id, "user": user}
 
 
@@ -543,6 +568,45 @@ class RateLimiter:
             "duration REAL NOT NULL DEFAULT 0)"
         )
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created)")
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS pending_jobs ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "user_id INTEGER NOT NULL, "
+            "charge_kind TEXT NOT NULL, "
+            "price INTEGER NOT NULL DEFAULT 0, "
+            "created REAL NOT NULL)"
+        )
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS works ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "user_id INTEGER NOT NULL, "
+            "kind TEXT NOT NULL, "
+            "title TEXT NOT NULL, "
+            "file_id TEXT NOT NULL, "
+            "created REAL NOT NULL)"
+        )
+        self._conn.execute("CREATE INDEX IF NOT EXISTS idx_works_user ON works(user_id, id)")
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS promos ("
+            "code TEXT PRIMARY KEY, "
+            "amount INTEGER NOT NULL, "
+            "max_uses INTEGER NOT NULL, "
+            "used INTEGER NOT NULL DEFAULT 0, "
+            "created REAL NOT NULL)"
+        )
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS promo_uses ("
+            "code TEXT NOT NULL, "
+            "user_id INTEGER NOT NULL, "
+            "PRIMARY KEY (code, user_id))"
+        )
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS gemini_usage ("
+            "day TEXT PRIMARY KEY, "
+            "tokens_in INTEGER NOT NULL DEFAULT 0, "
+            "tokens_out INTEGER NOT NULL DEFAULT 0, "
+            "calls INTEGER NOT NULL DEFAULT 0)"
+        )
         
         columns = {row[1] for row in self._conn.execute("PRAGMA table_info(users)")}
         if "balance" not in columns:
@@ -561,6 +625,8 @@ class RateLimiter:
             self._conn.execute("ALTER TABLE users ADD COLUMN invited_by INTEGER DEFAULT NULL")
         if "referral_rewarded" not in columns:
             self._conn.execute("ALTER TABLE users ADD COLUMN referral_rewarded INTEGER NOT NULL DEFAULT 0")
+        if "banned" not in columns:
+            self._conn.execute("ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0")
         self._conn.commit()
 
     def get_user_account(self, user_id: int) -> dict:
@@ -808,12 +874,232 @@ class RateLimiter:
             self._conn.execute("DELETE FROM requests WHERE id = ?", (reservation_id,))
             self._conn.commit()
 
+    # ---------- atomik to'lov: bepul / obuna / balans bitta tranzaksiyada ----------
+    def charge(self, user_id: int, price: int) -> tuple[str | None, int | None]:
+        """Xizmat uchun to'lovni atomik yechadi. (kind, pending_id) yoki (None, None)."""
+        self.get_user_account(user_id)
+        now = time.time()
+        today = datetime.now().strftime("%Y-%m-%d")
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT free_used, balance, subscription_until, sub_tier, daily_used, last_used_date "
+                "FROM users WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+            if not row:
+                return None, None
+            free_used, balance, sub_until, sub_tier, daily_used, last_date = row
+            if last_date != today:
+                daily_used = 0
+                self._conn.execute(
+                    "UPDATE users SET daily_used = 0, last_used_date = ? WHERE user_id = ?",
+                    (today, user_id),
+                )
+            kind = None
+            if free_used == 0:
+                cur = self._conn.execute(
+                    "UPDATE users SET free_used = 1 WHERE user_id = ? AND free_used = 0", (user_id,)
+                )
+                if cur.rowcount == 1:
+                    kind = "free"
+            if kind is None:
+                sub = SUBSCRIPTIONS.get(sub_tier)
+                if sub_until > now and sub and daily_used < sub["daily_limit"]:
+                    self._conn.execute(
+                        "UPDATE users SET daily_used = daily_used + 1 WHERE user_id = ?", (user_id,)
+                    )
+                    kind = "sub"
+            if kind is None and price > 0 and balance >= price:
+                cur = self._conn.execute(
+                    "UPDATE users SET balance = balance - ? WHERE user_id = ? AND balance >= ?",
+                    (price, user_id, price),
+                )
+                if cur.rowcount == 1:
+                    kind = "balance"
+            if kind is None:
+                self._conn.commit()
+                return None, None
+            cur = self._conn.execute(
+                "INSERT INTO pending_jobs (user_id, charge_kind, price, created) VALUES (?, ?, ?, ?)",
+                (user_id, kind, price, now),
+            )
+            self._conn.commit()
+            return kind, cur.lastrowid
+
+    def try_deduct(self, user_id: int, price: int) -> bool:
+        with self._lock:
+            cur = self._conn.execute(
+                "UPDATE users SET balance = balance - ? WHERE user_id = ? AND balance >= ?",
+                (price, user_id, price),
+            )
+            self._conn.commit()
+            return cur.rowcount == 1
+
+    def add_pending(self, user_id: int, charge_kind: str, price: int) -> int:
+        with self._lock:
+            cur = self._conn.execute(
+                "INSERT INTO pending_jobs (user_id, charge_kind, price, created) VALUES (?, ?, ?, ?)",
+                (user_id, charge_kind, price, time.time()),
+            )
+            self._conn.commit()
+            return cur.lastrowid
+
+    def clear_pending(self, pending_id: int) -> bool:
+        with self._lock:
+            cur = self._conn.execute("DELETE FROM pending_jobs WHERE id = ?", (pending_id,))
+            self._conn.commit()
+            return cur.rowcount == 1
+
+    def pop_stale_pending(self, older_than: float) -> list[tuple]:
+        """Server qayta ishga tushishi tufayli yarim qolgan ishlar (to'lov qaytarilishi kerak)."""
+        cutoff = time.time() - older_than
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT id, user_id, charge_kind, price FROM pending_jobs WHERE created < ?", (cutoff,)
+            ).fetchall()
+            self._conn.execute("DELETE FROM pending_jobs WHERE created < ?", (cutoff,))
+            self._conn.commit()
+        return rows
+
+    # ---------- Mening ishlarim ----------
+    def add_work(self, user_id: int, kind: str, title: str, file_id: str) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO works (user_id, kind, title, file_id, created) VALUES (?, ?, ?, ?, ?)",
+                (user_id, kind, title, file_id, time.time()),
+            )
+            self._conn.execute(
+                "DELETE FROM works WHERE user_id = ? AND id NOT IN "
+                "(SELECT id FROM works WHERE user_id = ? ORDER BY id DESC LIMIT 20)",
+                (user_id, user_id),
+            )
+            self._conn.commit()
+
+    def list_works(self, user_id: int, limit: int = 10) -> list[tuple]:
+        with self._lock:
+            return self._conn.execute(
+                "SELECT id, kind, title, created FROM works WHERE user_id = ? ORDER BY id DESC LIMIT ?",
+                (user_id, limit),
+            ).fetchall()
+
+    def get_work(self, user_id: int, work_id: int):
+        with self._lock:
+            return self._conn.execute(
+                "SELECT kind, title, file_id FROM works WHERE id = ? AND user_id = ?",
+                (work_id, user_id),
+            ).fetchone()
+
+    # ---------- promokodlar ----------
+    def create_promo(self, code: str, amount: int, max_uses: int) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO promos (code, amount, max_uses, used, created) VALUES (?, ?, ?, 0, ?) "
+                "ON CONFLICT(code) DO UPDATE SET amount = excluded.amount, max_uses = excluded.max_uses",
+                (code.upper(), amount, max_uses, time.time()),
+            )
+            self._conn.commit()
+
+    def redeem_promo(self, code: str, user_id: int) -> tuple[str, int]:
+        code = code.upper()
+        self.get_user_account(user_id)
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT amount, max_uses, used FROM promos WHERE code = ?", (code,)
+            ).fetchone()
+            if not row:
+                return "not_found", 0
+            amount, max_uses, used = row
+            if used >= max_uses:
+                return "used_up", 0
+            try:
+                self._conn.execute(
+                    "INSERT INTO promo_uses (code, user_id) VALUES (?, ?)", (code, user_id)
+                )
+            except sqlite3.IntegrityError:
+                self._conn.rollback()
+                return "already", 0
+            self._conn.execute("UPDATE promos SET used = used + 1 WHERE code = ?", (code,))
+            self._conn.execute(
+                "UPDATE users SET balance = balance + ? WHERE user_id = ?", (amount, user_id)
+            )
+            self._conn.commit()
+            return "ok", amount
+
+    # ---------- bloklash ----------
+    def is_banned(self, user_id: int) -> bool:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT banned FROM users WHERE user_id = ?", (user_id,)
+            ).fetchone()
+        return bool(row and row[0])
+
+    def set_banned(self, user_id: int, flag: bool) -> bool:
+        with self._lock:
+            cur = self._conn.execute(
+                "UPDATE users SET banned = ? WHERE user_id = ?", (1 if flag else 0, user_id)
+            )
+            self._conn.commit()
+            return cur.rowcount == 1
+
+    # ---------- Gemini sarfi ----------
+    def add_usage(self, tokens_in: int, tokens_out: int) -> None:
+        day = datetime.now().strftime("%Y-%m-%d")
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO gemini_usage (day, tokens_in, tokens_out, calls) VALUES (?, ?, ?, 1) "
+                "ON CONFLICT(day) DO UPDATE SET tokens_in = tokens_in + excluded.tokens_in, "
+                "tokens_out = tokens_out + excluded.tokens_out, calls = calls + 1",
+                (day, tokens_in, tokens_out),
+            )
+            self._conn.commit()
+
+    def usage_stats(self) -> dict:
+        day = datetime.now().strftime("%Y-%m-%d")
+        with self._lock:
+            today = self._conn.execute(
+                "SELECT tokens_in, tokens_out, calls FROM gemini_usage WHERE day = ?", (day,)
+            ).fetchone() or (0, 0, 0)
+            total = self._conn.execute(
+                "SELECT COALESCE(SUM(tokens_in), 0), COALESCE(SUM(tokens_out), 0) FROM gemini_usage"
+            ).fetchone()
+        return {
+            "today_in": today[0], "today_out": today[1], "today_calls": today[2],
+            "total_in": total[0], "total_out": total[1],
+        }
+
+    # ---------- zaxira nusxa ----------
+    def backup_to(self, path: str) -> None:
+        with self._lock:
+            dest = sqlite3.connect(path)
+            try:
+                self._conn.backup(dest)
+            finally:
+                dest.close()
+
     def close(self) -> None:
         with self._lock:
             self._conn.close()
 
 
 rate_limiter = RateLimiter(RATE_LIMIT_DB, RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW_SECONDS)
+
+
+class BanMiddleware(BaseMiddleware):
+    """Bloklangan foydalanuvchilarning botdagi barcha harakatlarini jim to'xtatadi."""
+
+    async def __call__(self, handler, event, data):
+        user = data.get("event_from_user")
+        if user and user.id not in ADMIN_IDS:
+            try:
+                banned = await asyncio.to_thread(rate_limiter.is_banned, user.id)
+            except Exception:
+                banned = False
+            if banned:
+                return None
+        return await handler(event, data)
+
+
+dp.update.outer_middleware(BanMiddleware())
 
 
 async def reserve_rate_limit(user_id: int) -> int:
@@ -831,6 +1117,77 @@ async def refund_rate_limit(reservation_id: int) -> None:
         await asyncio.to_thread(rate_limiter.refund, reservation_id)
     except Exception:
         logger.exception("Limitni qaytarib bo'lmadi")
+
+
+# =========================================================
+# UMUMIY YORDAMCHILAR: vosita limiti, to'lov yechish, ishlar tarixi
+# =========================================================
+_tool_hits: dict[tuple[str, int], list[float]] = {}
+_active_gemini_tools: set[int] = set()
+
+
+def check_tool_rate(user_id: int, bucket: str = "tool", limit: int | None = None) -> None:
+    """Pullik bo'lmagan vositalar (PDF, rasm) uchun soatlik cheklov."""
+    limit = limit or TOOL_RATE_LIMIT
+    now = time.time()
+    key = (bucket, user_id)
+    hits = [t for t in _tool_hits.get(key, []) if t > now - TOOL_RATE_WINDOW]
+    if len(hits) >= limit:
+        _tool_hits[key] = hits
+        raise HTTPException(
+            status_code=429,
+            detail="Bu bo'lim uchun soatlik limit tugadi. Keyinroq qayta urinib ko'ring.",
+        )
+    hits.append(now)
+    _tool_hits[key] = hits
+    if len(_tool_hits) > 5000:
+        for stale in [k for k, v in _tool_hits.items() if not v or v[-1] < now - TOOL_RATE_WINDOW]:
+            _tool_hits.pop(stale, None)
+
+
+async def charge_or_402(user_id: int, price: int) -> tuple[str, int | None]:
+    """Bepul/obuna/balansdan atomik yechadi. Yetmasa 402 qaytaradi."""
+    if price <= 0:
+        return "none", None
+    kind, pending_id = await asyncio.to_thread(rate_limiter.charge, user_id, price)
+    if kind is None:
+        account = await asyncio.to_thread(rate_limiter.get_user_account, user_id)
+        raise HTTPException(
+            status_code=402,
+            detail=f"Balansingiz yetarli emas! Narxi: {price:,} so'm. Balans: {account['balance']:,} so'm.",
+        )
+    return kind, pending_id
+
+
+async def settle_charge(ok: bool, user_id: int, kind: str | None, price: int, pending_id: int | None) -> None:
+    if ok:
+        await settle_pending(pending_id)
+    else:
+        await refund_charge(user_id, kind, price, pending_id)
+
+
+async def save_work(user_id: int, label: str, title: str, sent) -> None:
+    """Yuborilgan faylning file_id sini 'Mening ishlarim' uchun saqlaydi."""
+    try:
+        doc = getattr(sent, "document", None)
+        if doc and doc.file_id:
+            await asyncio.to_thread(rate_limiter.add_work, user_id, label, (title or label)[:80], doc.file_id)
+    except Exception:
+        logger.warning("Ishni tarixga saqlab bo'lmadi", exc_info=True)
+
+
+async def record_gemini_usage(response) -> None:
+    try:
+        meta = getattr(response, "usage_metadata", None)
+        if not meta:
+            return
+        tokens_in = int(getattr(meta, "prompt_token_count", 0) or 0)
+        tokens_out = int(getattr(meta, "candidates_token_count", 0) or 0) + int(
+            getattr(meta, "thoughts_token_count", 0) or 0
+        )
+        await asyncio.to_thread(rate_limiter.add_usage, tokens_in, tokens_out)
+    except Exception:
+        logger.debug("Gemini sarfini yozib bo'lmadi", exc_info=True)
 
 
 async def track_user(user_id: int, first_name: str | None, username: str | None) -> None:
@@ -996,6 +1353,7 @@ async def call_gemini(prompt: str, timeout: float | None = None) -> str:
     finally:
         generation_semaphore.release()
 
+    await record_gemini_usage(response)
     raw_text = getattr(response, "text", None)
     if not raw_text:
         raise ValueError("Bo'sh javob")
@@ -2297,6 +2655,7 @@ BTN_REFERRAL = "🎁 Do'stni taklif qilish"
 BTN_ALPHABET = "🔤 Alifbo"
 BTN_LIMIT = "📊 Limitim"
 BTN_HELP = "❓ Yordam"
+BTN_WORKS = "📂 Mening ishlarim"
 BTN_CANCEL = "❌ Bekor qilish"
 KIND_BY_BUTTON = {
     BTN_REFERAT: "referat",
@@ -2323,6 +2682,7 @@ ALPHABET_NAMES = {LATIN: "Lotin", NEW_LATIN: "Yangi lotin (Ö, Ğ, Ş, Ç)", KIR
 class DocOrder(StatesGroup):
     waiting_topic = State()
     waiting_outline = State()
+    waiting_template = State()
 
 
 def main_keyboard() -> ReplyKeyboardMarkup:
@@ -2335,7 +2695,7 @@ def main_keyboard() -> ReplyKeyboardMarkup:
             [KeyboardButton(text=BTN_CROSSWORD), KeyboardButton(text=BTN_ALPHABET)],
             [KeyboardButton(text=BTN_BALANCE), KeyboardButton(text=BTN_SUBS)],
             [KeyboardButton(text=BTN_REFERRAL), KeyboardButton(text=BTN_LIMIT)],
-            [KeyboardButton(text=BTN_HELP)],
+            [KeyboardButton(text=BTN_HELP), KeyboardButton(text=BTN_WORKS)],
         ],
         resize_keyboard=True,
         input_field_placeholder="Pastdagi tugmalardan birini tanlang",
@@ -2681,6 +3041,157 @@ async def process_successful_payment(message: types.Message):
 # =========================================================
 # XIZMAT TUGMALARI BOSILGANDA BIRINCHI BO'LIB BALANS TEKSHIRUVI
 # =========================================================
+OFERTA_TEXT = (
+    "📄 <b>Foydalanish shartlari (oferta)</b>\n\n"
+    "1. <b>Xizmat:</b> bot sun'iy intellekt yordamida taqdimot, referat, mustaqil ish, kurs ishi, "
+    "maqola, tezis, test va krossvord fayllarini tayyorlaydi, shuningdek hujjat vositalarini beradi.\n\n"
+    "2. <b>Natija sifati:</b> fayllar AI tomonidan yaratiladi. Faktlar, raqamlar va manbalar xato bo'lishi mumkin — "
+    "topshirishdan oldin o'zingiz tekshirib chiqing. Tayyor ish uchun javobgarlik foydalanuvchida.\n\n"
+    "3. <b>Narxlar:</b> narxlar bot ichida ko'rsatilgan va oldindan o'zgartirilishi mumkin. "
+    "To'lov Telegram orqali amalga oshiriladi.\n\n"
+    "4. <b>Qaytarish:</b> xato tufayli fayl tayyor bo'lmasa, yechilgan summa yoki limit avtomatik qaytariladi. "
+    "Fayl yetkazib berilgandan keyin pul qaytarilmaydi. Balans — oldindan to'lov; foydalanilmagan balans "
+    "bo'yicha qo'llab-quvvatlashga murojaat qiling.\n\n"
+    "5. <b>Ma'lumotlar:</b> Telegram ID, ism, username, buyurtmalar tarixi va tayyor fayllar havolasi "
+    "xizmatni ko'rsatish uchun saqlanadi va uchinchi shaxslarga berilmaydi.\n\n"
+    "6. <b>Cheklovlar:</b> qonunga zid, haqoratli yoki firibgarlik maqsadidagi so'rovlar rad etiladi; "
+    "qoidabuzarlik bo'lsa hisob bloklanishi mumkin.\n\n"
+    "Botdan foydalanishda davom etish bilan siz shu shartlarga rozilik bildirasiz."
+)
+
+
+@dp.message(Command("oferta"))
+@dp.message(Command("terms"))
+async def oferta_cmd(message: types.Message, state: FSMContext):
+    await state.clear()
+    extra = f"\n\n📩 Aloqa: {html.escape(SUPPORT_CONTACT)}" if SUPPORT_CONTACT else ""
+    await message.answer(OFERTA_TEXT + extra, parse_mode="HTML", reply_markup=main_keyboard())
+
+
+@dp.message(Command("support"))
+async def support_cmd(message: types.Message, state: FSMContext):
+    await state.clear()
+    if SUPPORT_CONTACT:
+        await message.answer(f"📩 Savol va takliflar uchun: {html.escape(SUPPORT_CONTACT)}", parse_mode="HTML",
+                             reply_markup=main_keyboard())
+    else:
+        await message.answer("📩 Aloqa ma'lumoti hali kiritilmagan.", reply_markup=main_keyboard())
+
+
+@dp.message(F.text == BTN_WORKS)
+@dp.message(Command("works"))
+async def works_cmd(message: types.Message, state: FSMContext):
+    await state.clear()
+    works = await asyncio.to_thread(rate_limiter.list_works, message.from_user.id, 10)
+    if not works:
+        await message.answer("📂 Hali tayyor ishlaringiz yo'q.", reply_markup=main_keyboard())
+        return
+    rows = [
+        [InlineKeyboardButton(text=f"{kind}: {title[:40]}", callback_data=f"work_{work_id}")]
+        for work_id, kind, title, _created in works
+    ]
+    await message.answer(
+        "📂 <b>Oxirgi ishlaringiz</b>\nKerakli faylni qayta olish uchun tanlang:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
+        parse_mode="HTML",
+    )
+
+
+@dp.callback_query(F.data.startswith("work_"))
+async def work_resend(call: types.CallbackQuery):
+    try:
+        work_id = int(call.data[len("work_"):])
+    except ValueError:
+        await call.answer()
+        return
+    row = await asyncio.to_thread(rate_limiter.get_work, call.from_user.id, work_id)
+    if not row:
+        await call.answer("Fayl topilmadi", show_alert=True)
+        return
+    kind, title, file_id = row
+    try:
+        await call.message.answer_document(file_id, caption=f"📂 {kind}: {title[:150]}")
+    except Exception:
+        logger.warning("Faylni qayta yuborib bo'lmadi (work %s)", work_id, exc_info=True)
+        await call.answer("Faylni qayta yuborib bo'lmadi", show_alert=True)
+        return
+    await call.answer()
+
+
+@dp.message(Command("promo"))
+async def promo_cmd(message: types.Message, command: CommandObject, state: FSMContext):
+    await state.clear()
+    code = (command.args or "").strip().upper()
+    if not code:
+        await message.answer("🎟 Promokodni shunday yuboring: <code>/promo KOD</code>", parse_mode="HTML",
+                             reply_markup=main_keyboard())
+        return
+    status, amount = await asyncio.to_thread(rate_limiter.redeem_promo, code, message.from_user.id)
+    texts = {
+        "ok": f"🎉 Promokod qabul qilindi! Balansingizga <b>{amount:,} so'm</b> qo'shildi.",
+        "not_found": "❌ Bunday promokod topilmadi.",
+        "used_up": "😔 Bu promokodning foydalanish soni tugagan.",
+        "already": "ℹ️ Siz bu promokodni allaqachon ishlatgansiz.",
+    }
+    await message.answer(texts.get(status, "Xatolik."), parse_mode="HTML", reply_markup=main_keyboard())
+
+
+@dp.message(Command("newpromo"))
+async def newpromo_cmd(message: types.Message, command: CommandObject):
+    if not message.from_user or message.from_user.id not in ADMIN_IDS:
+        return
+    parts = (command.args or "").split()
+    if len(parts) != 3 or not parts[1].isdigit() or not parts[2].isdigit():
+        await message.answer("Format: <code>/newpromo KOD SUMMA SONI</code>\nMasalan: <code>/newpromo YANGI 3000 50</code>",
+                             parse_mode="HTML")
+        return
+    code, amount, uses = parts[0].upper(), int(parts[1]), int(parts[2])
+    await asyncio.to_thread(rate_limiter.create_promo, code, amount, uses)
+    await message.answer(f"✅ Promokod <code>{html.escape(code)}</code>: {amount:,} so'm, {uses} marta.", parse_mode="HTML")
+
+
+@dp.message(Command("ban"))
+@dp.message(Command("unban"))
+async def ban_cmd(message: types.Message, command: CommandObject):
+    if not message.from_user or message.from_user.id not in ADMIN_IDS:
+        return
+    arg = (command.args or "").strip()
+    if not arg.isdigit():
+        await message.answer("Format: <code>/ban ID</code> yoki <code>/unban ID</code>", parse_mode="HTML")
+        return
+    flag = (command.command or "").lower() == "ban"
+    target = int(arg)
+    if target in ADMIN_IDS:
+        await message.answer("Adminni bloklab bo'lmaydi.")
+        return
+    found = await asyncio.to_thread(rate_limiter.set_banned, target, flag)
+    if not found:
+        await message.answer("Bunday foydalanuvchi bazada yo'q.")
+        return
+    await message.answer(f"{'🚫 Bloklandi' if flag else '✅ Blokdan chiqarildi'}: <code>{target}</code>", parse_mode="HTML")
+
+
+@dp.message(Command("backup"))
+async def backup_cmd(message: types.Message):
+    if not message.from_user or message.from_user.id not in ADMIN_IDS:
+        return
+    try:
+        await send_backup(message.chat.id)
+    except Exception:
+        logger.exception("Zaxira nusxani yuborib bo'lmadi")
+        await message.answer("❗ Zaxira nusxa tayyorlanmadi. Railway loglarini tekshiring.")
+
+
+async def send_backup(chat_id: int) -> None:
+    path = os.path.join(tempfile.gettempdir(), f"backup_{datetime.now():%Y%m%d_%H%M}.db")
+    try:
+        await asyncio.to_thread(rate_limiter.backup_to, path)
+        await bot.send_document(chat_id, types.FSInputFile(path), caption="💾 Baza zaxira nusxasi (maxfiy saqlang!)")
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
 @dp.message(F.text == BTN_SLIDE)
 async def slide_btn_handler(message: types.Message, state: FSMContext):
     await state.clear()
@@ -2695,7 +3206,7 @@ async def slide_btn_handler(message: types.Message, state: FSMContext):
         if sub and account["daily_used"] < sub["daily_limit"]:
             is_sub_valid = True
 
-    if not is_free and not is_sub_valid and account["balance"] < 3000:
+    if not is_free and not is_sub_valid and account["balance"] < PRICING["slayd"][3]:
         await message.answer(
             "❗️ <b>Balansingizda yetarli mablag' mavjud emas!</b>",
             reply_markup=insufficient_balance_kb(),
@@ -2773,21 +3284,78 @@ async def receive_topic(message: types.Message, state: FSMContext):
     await check_and_run_order(message, kind, topic, reja_count=None, price=price)
 
 
+TEMPLATE_NAMES = {
+    "classic": "Klassik", "business": "Biznes", "dark": "Qorong'i", "minimal": "Minimal",
+    "swiss_clean": "Shveysariya", "cyber_tech": "Cyber Tech", "warm_editorial": "Editorial",
+    "sunset_punch": "Sunset", "ocean_breeze": "Ocean", "monochrome": "Monoxrom",
+    "emerald_wealth": "Zumrad", "berry_creative": "Berry", "titanium_slate": "Titanium",
+    "midnight_gold": "Tungi Oltin", "nordic_frost": "Nordic",
+}
+
+
+def template_keyboard() -> InlineKeyboardMarkup:
+    keys = list(TEMPLATE_STYLES.keys())
+    rows = []
+    for i in range(0, len(keys), 2):
+        rows.append([
+            InlineKeyboardButton(text=TEMPLATE_NAMES.get(k, k), callback_data=f"tpl_{k}")
+            for k in keys[i:i + 2]
+        ])
+    rows.append([InlineKeyboardButton(text="🎲 Tasodifiy dizayn", callback_data="tpl_random")])
+    rows.append([InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel_order")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 @dp.callback_query(DocOrder.waiting_outline, F.data.startswith("reja_"))
 async def receive_outline_choice(call: types.CallbackQuery, state: FSMContext):
     reja_count = int(call.data.split("_")[1])
     data = await state.get_data()
     kind = data.get("kind")
     topic = data.get("topic")
+
+    if kind == "slayd":
+        await state.update_data(reja=reja_count)
+        await state.set_state(DocOrder.waiting_template)
+        try:
+            await call.message.edit_text("🎨 Taqdimot dizaynini tanlang:", reply_markup=template_keyboard())
+        except Exception:
+            await call.message.answer("🎨 Taqdimot dizaynini tanlang:", reply_markup=template_keyboard())
+        await call.answer()
+        return
+
     await state.clear()
-    
     price = PRICING[kind][reja_count]
     await check_and_run_order(call.message, kind, topic, reja_count=reja_count, price=price, target_user=call.from_user)
     await call.answer()
 
 
+@dp.callback_query(DocOrder.waiting_template, F.data.startswith("tpl_"))
+async def receive_template_choice(call: types.CallbackQuery, state: FSMContext):
+    template_id = call.data[len("tpl_"):]
+    if template_id == "random":
+        template_id = random.choice(list(TEMPLATE_STYLES.keys()))
+    if template_id not in TEMPLATE_STYLES:
+        await call.answer("Noto'g'ri dizayn", show_alert=True)
+        return
+    data = await state.get_data()
+    reja_count = data.get("reja")
+    topic = data.get("topic")
+    await state.clear()
+    if not topic or reja_count not in (3, 4, 5):
+        await call.message.answer("Seans eskirdi. Iltimos, qaytadan boshlang 👇", reply_markup=main_keyboard())
+        await call.answer()
+        return
+    await call.answer()
+    price = PRICING["slayd"][reja_count]
+    await check_and_run_order(
+        call.message, "slayd", topic, reja_count=reja_count, price=price,
+        target_user=call.from_user, template=template_id,
+    )
+
+
 async def check_and_run_order(message: types.Message, kind: str, topic: str,
-                              reja_count: int | None, price: int, target_user: types.User | None = None):
+                              reja_count: int | None, price: int, target_user: types.User | None = None,
+                              template: str = "classic"):
     user = target_user or message.from_user
     user_id = user.id
     account = await asyncio.to_thread(rate_limiter.get_user_account, user_id)
@@ -2801,7 +3369,7 @@ async def check_and_run_order(message: types.Message, kind: str, topic: str,
         if sub and account["daily_used"] < sub["daily_limit"]:
             is_sub_valid = True
 
-    # Pul bu yerda yechilmaydi: ish haqiqatan boshlanganda (run_* ichida) yechiladi,
+    # Pul bu yerda yechilmaydi: ish haqiqatan boshlanganda (run_* ichida) atomik yechiladi,
     # xato bo'lsa qaytariladi.
     if is_free:
         charge_kind = "free"
@@ -2828,23 +3396,46 @@ async def check_and_run_order(message: types.Message, kind: str, topic: str,
     if kind == "slayd":
         slides_count = 10 if reja_count == 3 else 15 if reja_count == 4 else 20
         await run_slide_generation(message, topic, slides_count, target_user=user,
-                                   charge_kind=charge_kind, price=price)
+                                   charge_kind=charge_kind, price=price, template=template)
     else:
         await run_document(message, kind, topic, pages=pages, target_user=user,
                            charge_kind=charge_kind, price=price)
 
 
-async def apply_charge(user_id: int, charge_kind: str | None, price: int) -> None:
+class InsufficientBalance(Exception):
+    pass
+
+
+async def apply_charge(user_id: int, charge_kind: str | None, price: int) -> int | None:
+    """To'lovni yechadi va 'yarim qolgan ish' yozuvini qaytaradi (server o'chib qolsa pul qaytariladi)."""
     if charge_kind == "free":
         await asyncio.to_thread(rate_limiter.mark_free_used, user_id)
     elif charge_kind == "sub":
         await asyncio.to_thread(rate_limiter.inc_daily_used, user_id)
     elif charge_kind == "balance":
-        await asyncio.to_thread(rate_limiter.update_balance, user_id, -price)
+        ok = await asyncio.to_thread(rate_limiter.try_deduct, user_id, price)
+        if not ok:
+            raise InsufficientBalance()
+    else:
+        return None
+    return await asyncio.to_thread(rate_limiter.add_pending, user_id, charge_kind, price)
 
 
-async def refund_charge(user_id: int, charge_kind: str | None, price: int) -> None:
+async def settle_pending(pending_id: int | None) -> None:
+    if pending_id is None:
+        return
     try:
+        await asyncio.to_thread(rate_limiter.clear_pending, pending_id)
+    except Exception:
+        logger.exception("Pending yozuvni o'chirib bo'lmadi (%s)", pending_id)
+
+
+async def refund_charge(user_id: int, charge_kind: str | None, price: int, pending_id: int | None = None) -> None:
+    try:
+        if pending_id is not None:
+            existed = await asyncio.to_thread(rate_limiter.clear_pending, pending_id)
+            if not existed:
+                return  # allaqachon qaytarilgan
         if charge_kind == "free":
             await asyncio.to_thread(rate_limiter.unmark_free_used, user_id)
         elif charge_kind == "sub":
@@ -2856,7 +3447,7 @@ async def refund_charge(user_id: int, charge_kind: str | None, price: int) -> No
 
 
 async def run_slide_generation(message: types.Message, topic: str, count: int, target_user: types.User = None,
-                               charge_kind: str | None = None, price: int = 0):
+                               charge_kind: str | None = None, price: int = 0, template: str = "classic"):
     user = target_user or message.from_user
     user_id = user.id
     await track_user(user_id, user.first_name, user.username)
@@ -2881,18 +3472,31 @@ async def run_slide_generation(message: types.Message, topic: str, count: int, t
     file_path = os.path.join(tempfile.gettempdir(), f"slide_{uuid.uuid4().hex}.pptx")
     success = False
     charged = None
+    pending_id = None
+    template_name = template if template in TEMPLATE_STYLES else "classic"
 
     try:
-        await apply_charge(user_id, charge_kind, price)
+        pending_id = await apply_charge(user_id, charge_kind, price)
         charged = charge_kind
         slide_data = await generate_slide_content(topic, alphabet, count)
-        await asyncio.to_thread(generate_pptx, topic, slide_data, "classic", file_path, alphabet)
+        await asyncio.to_thread(generate_pptx, topic, slide_data, template_name, file_path, alphabet)
         doc = types.FSInputFile(file_path, filename=f"taqdimot_{uuid.uuid4().hex[:6]}.pptx")
-        await message.answer_document(
+        sent = await message.answer_document(
             doc,
-            caption=f"🎉 Taqdimotingiz tayyor!\n📌 Mavzu: {topic}\n📊 Slaydlar: {count + 1} ta",
+            caption=(
+                f"🎉 Taqdimotingiz tayyor!\n📌 Mavzu: {topic}\n"
+                f"🎨 Dizayn: {TEMPLATE_NAMES.get(template_name, template_name)}\n"
+                f"📊 Slaydlar: {count + 1} ta"
+            ),
         )
+        await save_work(user_id, "Taqdimot", topic, sent)
         success = True
+    except InsufficientBalance:
+        await message.answer(
+            "❗️ <b>Balansingizda yetarli mablag' mavjud emas!</b>",
+            reply_markup=insufficient_balance_kb(),
+            parse_mode="HTML",
+        )
     except Exception:
         logger.exception("Slayd yaratishda xato")
         await message.answer("❗ Slayd tayyorlashda xatolik yuz berdi. Qayta urinib ko'ring.", reply_markup=main_keyboard())
@@ -2900,7 +3504,9 @@ async def run_slide_generation(message: types.Message, topic: str, count: int, t
         _active_users.discard(user_id)
         if not success:
             await asyncio.shield(refund_rate_limit(reservation_id))
-            await refund_charge(user_id, charged, price)
+            await refund_charge(user_id, charged, price, pending_id)
+        else:
+            await settle_pending(pending_id)
         await track_order(user_id, "slayd", success, time.monotonic() - started)
         try:
             await status.delete()
@@ -2961,8 +3567,9 @@ async def run_document(message: types.Message, kind: str, topic: str, pages=None
             await safe_edit(status, f"⏳ {meta['label']} yozilmoqda{size_label}: {done}/{total} qism tayyor...")
 
     charged = None
+    pending_id = None
     try:
-        await apply_charge(user_id, charge_kind, price)
+        pending_id = await apply_charge(user_id, charge_kind, price)
         charged = charge_kind
         await bot.send_chat_action(message.chat.id, "upload_document")
         data = await generate_document_content(
@@ -2975,11 +3582,18 @@ async def run_document(message: types.Message, kind: str, topic: str, pages=None
             caption += f"\n📏 Hajm: {pages[0]}–{pages[1]} bet"
         if meta.get("note"):
             caption += f"\n\n{meta['note']}"
-        await message.answer_document(
+        sent = await message.answer_document(
             types.FSInputFile(file_path, filename=f"{meta['file']}_{uuid.uuid4().hex[:6]}.docx"),
             caption=caption,
         )
+        await save_work(user_id, meta["label"], topic, sent)
         success = True
+    except InsufficientBalance:
+        await message.answer(
+            "❗️ <b>Balansingizda yetarli mablag' mavjud emas!</b>",
+            reply_markup=insufficient_balance_kb(),
+            parse_mode="HTML",
+        )
     except HTTPException as exc:
         await message.answer(f"❗ {exc.detail}", reply_markup=main_keyboard())
         if exc.status_code in (502, 503, 504):
@@ -2995,7 +3609,9 @@ async def run_document(message: types.Message, kind: str, topic: str, pages=None
         _active_users.discard(user_id)
         if not success:
             await asyncio.shield(refund_rate_limit(reservation_id))
-            await refund_charge(user_id, charged, price)
+            await refund_charge(user_id, charged, price, pending_id)
+        else:
+            await settle_pending(pending_id)
         await track_order(user_id, kind, success, time.monotonic() - started)
         try:
             await status.delete()
@@ -3088,7 +3704,10 @@ async def help_btn(message: types.Message, state: FSMContext):
         "3. Birinchi buyurtmangiz 100% BEPUL tayyorlanadi.\n"
         "4. Keyingi buyurtmalarni Click orqali xarid qilasiz.\n\n"
         "📱 <b>Slayd:</b> PowerPoint, WPS Office yoki Google Slides bilan ochiladi.\n"
-        "📄 <b>Word fayllar:</b> Word, WPS Office yoki Google Docs bilan ochiladi."
+        "📄 <b>Word fayllar:</b> Word, WPS Office yoki Google Docs bilan ochiladi.\n\n"
+        "📂 /works — oxirgi tayyor ishlaringiz\n"
+        "🎟 /promo KOD — promokod kiritish\n"
+        "📄 /oferta — foydalanish shartlari"
         + (f"\n\n📩 Aloqa: {html.escape(SUPPORT_CONTACT)}" if SUPPORT_CONTACT else ""),
         parse_mode="HTML",
         reply_markup=main_keyboard(),
@@ -3100,7 +3719,24 @@ async def stats_cmd(message: types.Message):
     if not message.from_user or message.from_user.id not in ADMIN_IDS:
         return
     stats = await asyncio.to_thread(rate_limiter.stats)
-    labels = {"slayd": "Taqdimot"}
+    usage = await asyncio.to_thread(rate_limiter.usage_stats)
+    usage_lines = [
+        f"🤖 Gemini bugun: {usage['today_in']:,} kirish / {usage['today_out']:,} chiqish token "
+        f"({usage['today_calls']} chaqiruv)"
+    ]
+    if GEMINI_PRICE_IN_PER_M or GEMINI_PRICE_OUT_PER_M:
+        total_cost = (
+            usage["total_in"] / 1e6 * GEMINI_PRICE_IN_PER_M
+            + usage["total_out"] / 1e6 * GEMINI_PRICE_OUT_PER_M
+        ) * USD_UZS
+        usage_lines.append(f"💸 Gemini xarajati (jami, taxminiy): <b>{int(total_cost):,} so'm</b>")
+        usage_lines.append(f"📊 Tushum − xarajat (taxminiy): <b>{int(stats['total_revenue'] - total_cost):,} so'm</b>")
+    else:
+        usage_lines.append(
+            "ℹ️ Xarajatni so'mda ko'rish uchun Railway'da GEMINI_PRICE_IN_PER_M va GEMINI_PRICE_OUT_PER_M "
+            "(USD / 1 mln token) o'zgaruvchilarini kiriting."
+        )
+    labels = {"slayd": "Taqdimot", "ocr": "Rasmdan matn", "translate": "Tarjima"}
     labels.update({key: meta["label"] for key, meta in DOC_KINDS.items()})
     lines = [
         "📈 <b>Bot Statistikasi & Moliya</b>",
@@ -3110,6 +3746,7 @@ async def stats_cmd(message: types.Message):
         f"💎 Faol obunachilar: <b>{stats['active_subs']}</b>",
         f"💰 Jami tushum (Daromad): <b>{stats['total_revenue']:,} so'm</b>",
         f"✅ Jami tayyor ishlar: <b>{stats['total_ok']}</b>",
+        *usage_lines,
         "",
         "<b>Oxirgi 24 soatdagi buyurtmalar:</b>",
     ]
@@ -3168,6 +3805,54 @@ async def fallback_other(message: types.Message):
 # =========================================================
 # FASTAPI LIFESPAN VA API
 # =========================================================
+async def pending_sweeper() -> None:
+    """Server qayta ishga tushishi tufayli yarim qolgan ishlar uchun to'lovni qaytaradi."""
+    while True:
+        try:
+            rows = await asyncio.to_thread(rate_limiter.pop_stale_pending, PENDING_TTL_SECONDS)
+            for _pid, uid, kind, price in rows:
+                await refund_charge(uid, kind, price)
+                try:
+                    await bot.send_message(
+                        uid,
+                        "ℹ️ Server qayta ishga tushgani sababli bitta buyurtmangiz yakunlanmadi. "
+                        "To'lov/limit qaytarildi — iltimos, qayta urinib ko'ring.",
+                    )
+                except Exception:
+                    pass
+        except Exception:
+            logger.exception("Pending sweeper xatosi")
+        await asyncio.sleep(300)
+
+
+async def check_gemini_models() -> None:
+    try:
+        available = set()
+        pager = await gemini_client.aio.models.list()
+        async for model in pager:
+            available.add((getattr(model, "name", "") or "").replace("models/", ""))
+        missing = [m for m in GEMINI_MODELS if m not in available]
+        if missing:
+            logger.warning("Gemini modellari topilmadi: %s", missing)
+            await notify_admins(
+                "⚠️ Gemini modellari topilmadi: " + ", ".join(missing)
+                + ". Railway'da GEMINI_MODEL / GEMINI_FALLBACK_MODELS qiymatlarini tekshiring."
+            )
+    except Exception:
+        logger.warning("Gemini modellarini tekshirib bo'lmadi", exc_info=True)
+
+
+async def backup_loop() -> None:
+    interval = max(1.0, BACKUP_EVERY_HOURS) * 3600
+    while True:
+        await asyncio.sleep(interval)
+        for admin_id in ADMIN_IDS:
+            try:
+                await send_backup(admin_id)
+            except Exception:
+                logger.warning("Avto-zaxirani yuborib bo'lmadi (%s)", admin_id, exc_info=True)
+
+
 def _on_polling_done(task: asyncio.Task) -> None:
     if task.cancelled():
         return
@@ -3179,6 +3864,7 @@ def _on_polling_done(task: asyncio.Task) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     polling_task = None
+    background_tasks: list[asyncio.Task] = []
     try:
         try:
             await bot.set_chat_menu_button(
@@ -3192,6 +3878,9 @@ async def lifespan(app: FastAPI):
                 BotCommand(command="help", description="Yordam"),
                 BotCommand(command="alifbo", description="Alifbo: lotin, yangi lotin yoki kirill"),
                 BotCommand(command="cancel", description="Bekor qilish"),
+                BotCommand(command="works", description="Mening ishlarim"),
+                BotCommand(command="promo", description="Promokod kiritish"),
+                BotCommand(command="oferta", description="Foydalanish shartlari"),
             ])
             await bot.set_my_short_description(
                 short_description="AI yordamchi: slayd, referat, kurs ishi, test, krossvord (lotin/kirill)"
@@ -3205,6 +3894,10 @@ async def lifespan(app: FastAPI):
             )
         except Exception:
             logger.exception("Bot profilini o'rnatib bo'lmadi")
+        background_tasks.append(asyncio.create_task(pending_sweeper()))
+        background_tasks.append(asyncio.create_task(check_gemini_models()))
+        if ADMIN_IDS:
+            background_tasks.append(asyncio.create_task(backup_loop()))
         if ENABLE_BOT_POLLING:
             await bot.delete_webhook(drop_pending_updates=False)
             polling_task = asyncio.create_task(
@@ -3220,6 +3913,8 @@ async def lifespan(app: FastAPI):
             logger.info("FastAPI ishga tushdi; bot polling o'chirilgan.")
         yield
     finally:
+        for bg_task in background_tasks:
+            bg_task.cancel()
         if polling_task:
             polling_task.cancel()
             try:
@@ -3267,40 +3962,43 @@ async def api_me(req: MeRequest):
         "slides": {"default": SLIDE_COUNT, "min": MIN_SLIDES, "max": MAX_SLIDES},
         "prices": {str(n): slide_price(n) for n in range(MIN_SLIDES, MAX_SLIDES + 1)},
         "available_templates": list(TEMPLATE_STYLES.keys()),
+        "tools": {
+            "ocr": TOOL_PRICES["ocr"],
+            "translate_tiers": [{"pages": p, "price": pr} for p, pr in TRANSLATE_PRICE_TIERS],
+            "translate_alphabet": TRANSLATE_ALPHABET_PRICE,
+        },
+        "doc_prices": {
+            kind: ({str(k): v for k, v in PRICING[kind].items()} if isinstance(PRICING[kind], dict) else PRICING[kind])
+            for kind in ("referat", "mustaqil", "kurs", "maqola", "tezis", "test", "krossvord")
+        },
     }
 
 
-@app.post("/api/generate-slide")
-async def api_generate_slide(req: SlideRequest):
-    auth = verify_telegram_init_data(req.init_data)
-    user_id = auth["user_id"]
-    await track_user(user_id, auth["user"].get("first_name"), auth["user"].get("username"))
-    
-    account = await asyncio.to_thread(rate_limiter.get_user_account, user_id)
-    now = time.time()
-    price = slide_price(req.slides)
+# =========================================================
+# FON ISHLARI (JOB + POLLING): slayd va akademik ishlar
+# =========================================================
+JOBS: dict[str, dict] = {}
+_job_tasks: set = set()
 
-    is_free = (account["free_used"] == 0)
-    is_sub_valid = False
-    if not is_free and account["subscription_until"] > now:
-        sub = SUBSCRIPTIONS.get(account["sub_tier"])
-        if sub and account["daily_used"] < sub["daily_limit"]:
-            is_sub_valid = True
 
-    # 1) Hech narsa yechilmasdan oldin tekshiramiz
-    if not is_free and not is_sub_valid and account["balance"] < price:
-        raise HTTPException(
-            status_code=402,
-            detail=f"Balansingiz yetarli emas! Narxi: {price:,} so'm. Balans: {account['balance']:,} so'm.",
-        )
+def _new_job(user_id: int) -> tuple[str, dict]:
+    cutoff = time.time() - 3600
+    for old_id in [k for k, v in JOBS.items() if v["created"] < cutoff]:
+        JOBS.pop(old_id, None)
+    job_id = uuid.uuid4().hex
+    job = {"user_id": user_id, "step": 1, "percent": 0, "done": False, "error": None, "created": time.time()}
+    JOBS[job_id] = job
+    return job_id, job
 
-    requested = getattr(req, "alphabet", None)
-    if requested in ALPHABETS:
-        alphabet = requested
-        await set_user_alphabet(user_id, alphabet)
-    else:
-        alphabet = await get_user_alphabet(user_id)
 
+def _start_job(coro) -> None:
+    task = asyncio.create_task(coro)
+    _job_tasks.add(task)
+    task.add_done_callback(_job_tasks.discard)
+
+
+async def reserve_and_charge(user_id: int, price: int) -> tuple[int, str, int | None]:
+    """Parallel ishni to'sadi, soatlik limitni band qiladi va to'lovni atomik yechadi."""
     if user_id in _active_users:
         raise HTTPException(
             status_code=429,
@@ -3309,91 +4007,78 @@ async def api_generate_slide(req: SlideRequest):
     _active_users.add(user_id)
     try:
         reservation_id = await reserve_rate_limit(user_id)
+        try:
+            charge_kind, pending_id = await charge_or_402(user_id, price)
+        except Exception:
+            await asyncio.shield(refund_rate_limit(reservation_id))
+            raise
     except Exception:
         _active_users.discard(user_id)
         raise
+    return reservation_id, charge_kind, pending_id
 
-    # 2) Pul faqat hamma tekshiruvdan keyin yechiladi; xato bo'lsa qaytariladi
-    charge_kind = None
+
+async def deliver_file(user_id: int, file_path: str, filename: str, caption: str, label: str, title: str) -> None:
+    try:
+        sent = await bot.send_document(
+            chat_id=user_id,
+            document=types.FSInputFile(file_path, filename=filename),
+            caption=caption,
+        )
+    except TelegramForbiddenError as exc:
+        logger.warning("Foydalanuvchi %s botni bloklagan yoki /start bosmagan", user_id)
+        raise HTTPException(
+            status_code=409,
+            detail="Faylni yuborib bo'lmadi. Botga /start yuboring va qayta urinib ko'ring.",
+        ) from exc
+    except Exception as exc:
+        logger.exception("Tayyor faylni Telegram foydalanuvchisiga yuborib bo'lmadi")
+        raise HTTPException(
+            status_code=502,
+            detail="Faylni Telegram'ga yuborib bo'lmadi. Qayta urinib ko'ring.",
+        ) from exc
+    await save_work(user_id, label, title, sent)
+
+
+async def run_slide_job(job_id: str, user_id: int, topic: str, template_name: str, alphabet: str,
+                        slides: int, price: int, charge_kind: str, pending_id: int | None,
+                        reservation_id: int) -> None:
+    job = JOBS[job_id]
     started = time.monotonic()
-
     file_path = os.path.join(tempfile.gettempdir(), f"slide_{uuid.uuid4().hex}.pptx")
     success = False
-    template_name = req.template if req.template in TEMPLATE_STYLES else "classic"
-
     try:
-        if is_free:
-            await asyncio.to_thread(rate_limiter.mark_free_used, user_id)
-            charge_kind = "free"
-        elif is_sub_valid:
-            await asyncio.to_thread(rate_limiter.inc_daily_used, user_id)
-            charge_kind = "sub"
-        else:
-            await asyncio.to_thread(rate_limiter.update_balance, user_id, -price)
-            charge_kind = "balance"
-
-        slide_data = await generate_slide_content(req.topic, alphabet, req.slides)
-
-        await asyncio.to_thread(
-            generate_pptx,
-            req.topic,
-            slide_data,
-            template_name,
-            file_path,
-            alphabet,
+        job["step"], job["percent"] = 2, 10
+        slide_data = await generate_slide_content(topic, alphabet, slides)
+        job["step"], job["percent"] = 3, 65
+        await asyncio.to_thread(generate_pptx, topic, slide_data, template_name, file_path, alphabet)
+        job["step"], job["percent"] = 4, 85
+        await deliver_file(
+            user_id, file_path, f"taqdimot_{uuid.uuid4().hex[:8]}.pptx",
+            caption=(
+                f"🎉 Slaydingiz tayyor!\n"
+                f"📌 Mavzu: {topic}\n"
+                f"🎨 Shabloni: {TEMPLATE_NAMES.get(template_name, template_name)}\n"
+                f"📊 Slaydlar: {slides + 1} ta (titul bilan)"
+            ),
+            label="Taqdimot", title=topic,
         )
-
-        document = types.FSInputFile(file_path, filename=f"taqdimot_{uuid.uuid4().hex[:8]}.pptx")
-        try:
-            await bot.send_document(
-                chat_id=user_id,
-                document=document,
-                caption=(
-                    f"🎉 Slaydingiz tayyor!\n"
-                    f"📌 Mavzu: {req.topic}\n"
-                    f"🎨 Shabloni: {template_name.replace('_', ' ').capitalize()}\n"
-                    f"📊 Slaydlar: {req.slides + 1} ta (titul bilan)"
-                ),
-            )
-        except TelegramForbiddenError as exc:
-            logger.warning("Foydalanuvchi %s botni bloklagan yoki /start bosmagan", user_id)
-            raise HTTPException(
-                status_code=409,
-                detail="Faylni yuborib bo'lmadi. Botga /start yuboring va qayta urinib ko'ring.",
-            ) from exc
-        except Exception as exc:
-            logger.exception("Tayyor faylni Telegram foydalanuvchisiga yuborib bo'lmadi")
-            raise HTTPException(
-                status_code=502,
-                detail="Faylni Telegram'ga yuborib bo'lmadi. Qayta urinib ko'ring.",
-            ) from exc
-
         success = True
-        return {"success": True, "message": "Slayd Telegram orqali yuborildi."}
+        job["percent"] = 100
     except HTTPException as exc:
+        job["error"] = str(exc.detail)
         if exc.status_code in (502, 503, 504):
             await notify_admins(f"⚠️ Slayd xatosi (kod {exc.status_code}): {exc.detail}")
-        raise
-    except Exception as exc:
+    except Exception:
         logger.exception("Slayd yaratishda kutilmagan xatolik")
+        job["error"] = "Slayd yaratishda xatolik yuz berdi."
         await notify_admins("⚠️ Slaydda kutilmagan xatolik. Railway loglarini tekshiring.")
-        raise HTTPException(
-            status_code=500,
-            detail="Slayd yaratishda xatolik yuz berdi.",
-        ) from exc
     finally:
         _active_users.discard(user_id)
         if not success:
             await asyncio.shield(refund_rate_limit(reservation_id))
-            try:
-                if charge_kind == "balance":
-                    await asyncio.to_thread(rate_limiter.update_balance, user_id, price)
-                elif charge_kind == "free":
-                    await asyncio.to_thread(rate_limiter.unmark_free_used, user_id)
-                elif charge_kind == "sub":
-                    await asyncio.to_thread(rate_limiter.dec_daily_used, user_id)
-            except Exception:
-                logger.exception("To'lovni qaytarib bo'lmadi (user %s, %s)", user_id, charge_kind)
+        await settle_charge(success, user_id, charge_kind, price, pending_id)
+        job["done"] = True
         await track_order(user_id, "slayd", success, time.monotonic() - started)
         try:
             if os.path.exists(file_path):
@@ -3402,9 +4087,251 @@ async def api_generate_slide(req: SlideRequest):
             logger.warning("Vaqtinchalik faylni o'chirib bo'lmadi: %s", file_path)
 
 
+@app.post("/api/generate-slide")
+async def api_generate_slide(req: SlideRequest):
+    auth = verify_telegram_init_data(req.init_data)
+    user_id = auth["user_id"]
+    await track_user(user_id, auth["user"].get("first_name"), auth["user"].get("username"))
+
+    price = slide_price(req.slides)
+    requested = getattr(req, "alphabet", None)
+    if requested in ALPHABETS:
+        alphabet = requested
+        await set_user_alphabet(user_id, alphabet)
+    else:
+        alphabet = await get_user_alphabet(user_id)
+    template_name = req.template if req.template in TEMPLATE_STYLES else "classic"
+
+    reservation_id, charge_kind, pending_id = await reserve_and_charge(user_id, price)
+    job_id, _job = _new_job(user_id)
+    _start_job(run_slide_job(
+        job_id, user_id, req.topic, template_name, alphabet, req.slides,
+        price, charge_kind, pending_id, reservation_id,
+    ))
+    return {"success": True, "job_id": job_id}
+
+
+REJA_PAGES = {3: (10, 15), 4: (15, 25), 5: (20, 30)}
+
+
+class DocRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+    init_data: str = Field(min_length=1, max_length=10_000)
+    kind: Literal["referat", "mustaqil", "kurs", "maqola", "tezis", "test", "krossvord"]
+    topic: str = Field(min_length=3, max_length=MAX_TOPIC_LENGTH)
+    reja: int | None = Field(default=None, ge=3, le=5)
+    alphabet: Literal["latin", "kirill", "yangi"] | None = None
+
+
+def doc_price(kind: str, reja: int | None) -> int:
+    value = PRICING[kind]
+    if isinstance(value, dict):
+        return value[reja or 3]
+    return value
+
+
+async def run_doc_job(job_id: str, user_id: int, kind: str, topic: str, alphabet: str, pages,
+                      price: int, charge_kind: str, pending_id: int | None, reservation_id: int) -> None:
+    job = JOBS[job_id]
+    meta = DOC_KINDS[kind]
+    started = time.monotonic()
+    file_path = os.path.join(tempfile.gettempdir(), f"{meta['file']}_{uuid.uuid4().hex}.docx")
+    success = False
+
+    async def progress(done: int, total: int) -> None:
+        job["percent"] = max(job["percent"], 10 + int(done / max(total, 1) * 75))
+
+    try:
+        job["step"], job["percent"] = 2, 8
+        use_progress = kind == "kurs" or bool(pages)
+        data = await generate_document_content(
+            kind, topic, alphabet, progress=progress if use_progress else None, pages=pages
+        )
+        job["step"], job["percent"] = 3, 88
+        await asyncio.to_thread(build_docx, kind, topic, data, file_path, alphabet)
+        job["step"], job["percent"] = 4, 95
+        caption = f"🎉 {meta['label']} tayyor!\n📌 Mavzu: {topic}\n🔤 Alifbo: {ALPHABET_NAMES[alphabet]}"
+        if pages:
+            caption += f"\n📏 Hajm: {pages[0]}–{pages[1]} bet"
+        if meta.get("note"):
+            caption += f"\n\n{meta['note']}"
+        await deliver_file(
+            user_id, file_path, f"{meta['file']}_{uuid.uuid4().hex[:6]}.docx",
+            caption=caption, label=meta["label"], title=topic,
+        )
+        success = True
+        job["percent"] = 100
+    except HTTPException as exc:
+        job["error"] = str(exc.detail)
+        if exc.status_code in (502, 503, 504):
+            await notify_admins(f"⚠️ AI xatosi ({meta['label']}, kod {exc.status_code}): {exc.detail}")
+    except Exception:
+        logger.exception("Hujjat yaratishda kutilmagan xatolik (%s)", kind)
+        job["error"] = "Hujjat yaratishda xatolik yuz berdi. Qayta urinib ko'ring."
+        await notify_admins(f"⚠️ Kutilmagan xatolik ({meta['label']}). Railway loglarini tekshiring.")
+    finally:
+        _active_users.discard(user_id)
+        if not success:
+            await asyncio.shield(refund_rate_limit(reservation_id))
+        await settle_charge(success, user_id, charge_kind, price, pending_id)
+        job["done"] = True
+        await track_order(user_id, kind, success, time.monotonic() - started)
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except OSError:
+            logger.warning("Vaqtinchalik faylni o'chirib bo'lmadi: %s", file_path)
+
+
+@app.post("/api/generate-doc")
+async def api_generate_doc(req: DocRequest):
+    auth = verify_telegram_init_data(req.init_data)
+    user_id = auth["user_id"]
+    await track_user(user_id, auth["user"].get("first_name"), auth["user"].get("username"))
+
+    reja = req.reja if req.kind in ("referat", "mustaqil") else None
+    if req.kind in ("referat", "mustaqil") and reja is None:
+        reja = 3
+    pages = REJA_PAGES[reja] if reja else None
+    price = doc_price(req.kind, reja)
+
+    requested = req.alphabet
+    if requested in ALPHABETS:
+        alphabet = requested
+        await set_user_alphabet(user_id, alphabet)
+    else:
+        alphabet = await get_user_alphabet(user_id)
+
+    reservation_id, charge_kind, pending_id = await reserve_and_charge(user_id, price)
+    job_id, _job = _new_job(user_id)
+    _start_job(run_doc_job(
+        job_id, user_id, req.kind, req.topic, alphabet, pages,
+        price, charge_kind, pending_id, reservation_id,
+    ))
+    return {"success": True, "job_id": job_id}
+
+
+@app.post("/api/job-status")
+async def api_job_status(init_data: str = Form(...), job_id: str = Form(...)):
+    auth = verify_telegram_init_data(init_data)
+    job = JOBS.get(job_id)
+    if not job or job["user_id"] != auth["user_id"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Ish topilmadi (server qayta ishga tushgan bo'lishi mumkin). "
+                   "Fayl kelmasa, to'lov avtomatik qaytariladi.",
+        )
+    return {
+        "success": True,
+        "step": job["step"],
+        "percent": job["percent"],
+        "done": job["done"],
+        "error": job["error"],
+    }
+
+
+# =========================================================
+# BALANSNI TO'LDIRISH / OBUNA (Mini App ichidan, invoice havolasi orqali)
+# =========================================================
+TOPUP_AMOUNTS = (5000, 10000, 20000, 50000)
+
+SUBS_MENU_TEXT = (
+    "💎 <b>Chegirmali Obuna Paketlari:</b>\n\n"
+    "Obuna orqali har bir generatsiyani eng arzon narxda olasiz:\n\n"
+    "🔹 <b>Lite (3 kun)</b> — 14 900 so'm (Kuniga 3 tagacha bepul ish)\n"
+    "⭐ <b>Pro (10 kun)</b> — 29 900 so'm (Kuniga 5 tagacha bepul ish)\n"
+    "👑 <b>Ultra (30 kun)</b> — 59 900 so'm (Kuniga 10 tagacha bepul ish)\n\n"
+    "Kerakli obunani tanlang:"
+)
+
+
+class InvoiceRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    init_data: str = Field(min_length=1, max_length=10_000)
+    kind: str = Field(default="topup", max_length=40)
+    amount: int = 0
+
+
+@app.post("/api/create-invoice")
+async def api_create_invoice(req: InvoiceRequest):
+    auth = verify_telegram_init_data(req.init_data)
+    user_id = auth["user_id"]
+    if not PAYMENT_PROVIDER_TOKEN:
+        raise HTTPException(status_code=503, detail="To'lov tizimi hali sozlanmagan.")
+
+    if req.kind == "topup":
+        if req.amount not in TOPUP_AMOUNTS:
+            raise HTTPException(status_code=400, detail="Noto'g'ri summa.")
+        title = "Balansni to'ldirish"
+        description = f"Bot hisobingizni {req.amount:,} so'mga to'ldirish"
+        payload = f"topup_{user_id}_{req.amount}"
+        prices = [LabeledPrice(label="Balans to'ldirish", amount=req.amount * 100)]
+    elif req.kind in SUBSCRIPTIONS:
+        sub = SUBSCRIPTIONS[req.kind]
+        title = f"Obuna: {sub['title']}"
+        description = sub["desc"]
+        payload = f"sub_{user_id}_{req.kind}"
+        prices = [LabeledPrice(label=sub["title"], amount=sub["price"] * 100)]
+    else:
+        raise HTTPException(status_code=400, detail="Noto'g'ri tanlov.")
+
+    try:
+        url = await bot.create_invoice_link(
+            title=title,
+            description=description,
+            payload=payload,
+            provider_token=PAYMENT_PROVIDER_TOKEN,
+            currency="UZS",
+            prices=prices,
+        )
+    except Exception:
+        logger.exception("Invoice havolasini yaratib bo'lmadi")
+        raise HTTPException(status_code=502, detail="To'lov oynasini ochib bo'lmadi. Qayta urinib ko'ring.")
+    return {"success": True, "url": url}
+
+
+@app.post("/api/open-subs")
+async def api_open_subs(req: MeRequest):
+    auth = verify_telegram_init_data(req.init_data)
+    try:
+        await bot.send_message(
+            auth["user_id"], SUBS_MENU_TEXT, reply_markup=subscriptions_keyboard(), parse_mode="HTML"
+        )
+    except Exception:
+        raise HTTPException(status_code=409, detail="Botga /start yuboring va qayta urinib ko'ring.")
+    return {"success": True}
+
+
 # =========================================================
 # RASMLARDAN PDF YARATISH ENDPOINTI (MINI APP UCHUN)
 # =========================================================
+def _images_to_pdf_sync(blobs: list[bytes], page_size: str, file_path: str) -> int:
+    A4_SIZE = (2480, 3508)
+    pdf_images = []
+    for content in blobs:
+        try:
+            img = Image.open(io.BytesIO(content))
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            if page_size == "a4":
+                a4_canvas = Image.new("RGB", A4_SIZE, (255, 255, 255))
+                img.thumbnail(A4_SIZE, Image.Resampling.LANCZOS)
+                offset = ((A4_SIZE[0] - img.size[0]) // 2, (A4_SIZE[1] - img.size[1]) // 2)
+                a4_canvas.paste(img, offset)
+                pdf_images.append(a4_canvas)
+            else:
+                pdf_images.append(img)
+        except Exception as e:
+            logger.warning("Rasm ochishda xatolik: %s", e)
+            continue
+    if not pdf_images:
+        raise HTTPException(status_code=400, detail="Yuklangan rasmlarni qayta ishlab bo'lmadi.")
+    first_img = pdf_images[0]
+    other_imgs = pdf_images[1:]
+    first_img.save(file_path, "PDF", save_all=True, append_images=other_imgs, resolution=100.0)
+    return len(pdf_images)
+
+
 @app.post("/api/images-to-pdf")
 async def api_images_to_pdf(
     init_data: str = Form(...),
@@ -3414,62 +4341,35 @@ async def api_images_to_pdf(
     auth = verify_telegram_init_data(init_data)
     user_id = auth["user_id"]
     await track_user(user_id, auth["user"].get("first_name"), auth["user"].get("username"))
+    check_tool_rate(user_id)
 
     if not files:
         raise HTTPException(status_code=400, detail="Hech qanday rasm yuklanmadi.")
     if len(files) > MAX_IMAGES_PER_PDF:
         raise HTTPException(status_code=400, detail=f"Bir martada {MAX_IMAGES_PER_PDF} tadan ortiq rasm mumkin emas.")
 
-    pdf_images = []
-    A4_SIZE = (2480, 3508)
-
+    blobs = []
     for file in files:
-        try:
-            content = await file.read()
-            if len(content) > PDF_MAX_BYTES:
-                raise HTTPException(
-                    status_code=413,
-                    detail=f"«{file.filename or 'rasm'}» rasmi juda katta (15 MB dan oshmasin). Uni kichraytirib qayta yuklang.",
-                )
-            img = Image.open(io.BytesIO(content))
-            
-            if img.mode != "RGB":
-                img = img.convert("RGB")
-
-            if page_size == "a4":
-                a4_canvas = Image.new("RGB", A4_SIZE, (255, 255, 255))
-                img.thumbnail(A4_SIZE, Image.Resampling.LANCZOS)
-                offset = (
-                    (A4_SIZE[0] - img.size[0]) // 2,
-                    (A4_SIZE[1] - img.size[1]) // 2
-                )
-                a4_canvas.paste(img, offset)
-                pdf_images.append(a4_canvas)
-            else:
-                pdf_images.append(img)
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.warning("Rasm ochishda xatolik: %s", e)
-            continue
-
-    if not pdf_images:
-        raise HTTPException(status_code=400, detail="Yuklangan rasmlarni qayta ishlab bo'lmadi.")
+        content = await file.read()
+        if len(content) > PDF_MAX_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"«{file.filename or 'rasm'}» rasmi juda katta (15 MB dan oshmasin). Uni kichraytirib qayta yuklang.",
+            )
+        blobs.append(content)
 
     file_path = os.path.join(tempfile.gettempdir(), f"doc_{uuid.uuid4().hex[:8]}.pdf")
     try:
-        first_img = pdf_images[0]
-        other_imgs = pdf_images[1:] if len(pdf_images) > 1 else []
-        first_img.save(file_path, "PDF", save_all=True, append_images=other_imgs, resolution=100.0)
-
-        doc = types.FSInputFile(file_path, filename=f"hujjat_{uuid.uuid4().hex[:6]}.pdf")
+        pages = await asyncio.to_thread(_images_to_pdf_sync, blobs, page_size, file_path)
         await bot.send_document(
             chat_id=user_id,
-            document=doc,
-            caption=f"📄 <b>PDF faylingiz tayyorlandi!</b>\n🖼 Sahifalar soni: {len(pdf_images)} ta",
+            document=types.FSInputFile(file_path, filename=f"hujjat_{uuid.uuid4().hex[:6]}.pdf"),
+            caption=f"📄 <b>PDF faylingiz tayyorlandi!</b>\n🖼 Sahifalar soni: {pages} ta",
             parse_mode="HTML"
         )
-        return {"success": True, "pages": len(pdf_images)}
+        return {"success": True, "pages": pages}
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("PDF yaratishda xato yuz berdi")
         raise HTTPException(status_code=500, detail="PDF tayyorlashda xatolik yuz berdi.")
@@ -3482,7 +4382,7 @@ async def api_images_to_pdf(
 # HUJJATLAR BO'LIMI: REAL ISHLOVCHI API ENDPOINTLAR
 # =========================================================
 
-# 1. RASMDAN MATN (OCR) - GEMINI ORQALI
+# 1. RASMDAN MATN (OCR) - GEMINI ORQALI (pullik: bepul sinov / obuna / balans)
 @app.post("/api/ocr")
 async def api_ocr(
     init_data: str = Form(...),
@@ -3491,94 +4391,140 @@ async def api_ocr(
     auth = verify_telegram_init_data(init_data)
     user_id = auth["user_id"]
     await track_user(user_id, auth["user"].get("first_name"), auth["user"].get("username"))
+    check_tool_rate(user_id)
 
     content = await file.read()
     if len(content) > PDF_MAX_BYTES:
         raise HTTPException(status_code=413, detail="Fayl juda katta (15 MB dan oshmasin).")
-    started_time = time.monotonic()
-    
+    if user_id in _active_gemini_tools:
+        raise HTTPException(status_code=429, detail="Oldingi amal tugashini kuting.")
+
+    price = TOOL_PRICES["ocr"]
+    _active_gemini_tools.add(user_id)
     try:
-        response = await gemini_client.aio.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=[
-                genai_types.Part.from_bytes(data=content, mime_type=file.content_type or "image/jpeg"),
-                "Ushbu rasmdagi barcha yozuv va matnlarni xatosiz, to'liq ko'chirib ber. Izoh qo'shma, faqat matnning o'zini qaytar."
-            ]
+        charge_kind, pending_id = await charge_or_402(user_id, price)
+    except Exception:
+        _active_gemini_tools.discard(user_id)
+        raise
+
+    ok = False
+    started_time = time.monotonic()
+    try:
+        mime = file.content_type if (file.content_type or "").startswith("image/") else "image/jpeg"
+        response = await asyncio.wait_for(
+            gemini_client.aio.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=[
+                    genai_types.Part.from_bytes(data=content, mime_type=mime),
+                    "Ushbu rasmdagi barcha yozuv va matnlarni xatosiz, to'liq ko'chirib ber. Izoh qo'shma, faqat matnning o'zini qaytar.",
+                ],
+            ),
+            timeout=GEMINI_TIMEOUT_SECONDS,
         )
+        await record_gemini_usage(response)
         extracted_text = (response.text or "").strip()
-        if not extracted_text:
-            extracted_text = "Rasmdan hech qanday matn aniqlanmadi."
-
         duration_sec = max(1, round(time.monotonic() - started_time))
-        char_count = len(extracted_text)
 
-        if char_count > 3800:
+        if not extracted_text:
+            # matn topilmadi: pul qaytariladi (ok=False)
+            return {
+                "success": True,
+                "text": "Rasmdan hech qanday matn aniqlanmadi.",
+                "char_count": 0,
+                "duration": duration_sec,
+            }
+
+        char_count = len(extracted_text)
+        safe_text = html.escape(extracted_text)
+        if len(safe_text) > 3800:
             doc_path = os.path.join(tempfile.gettempdir(), f"matn_{uuid.uuid4().hex[:6]}.txt")
-            with open(doc_path, "w", encoding="utf-8") as f:
-                f.write(extracted_text)
-            await bot.send_document(
-                chat_id=user_id,
-                document=types.FSInputFile(doc_path, filename="ajratilgan_matn.txt"),
-                caption=f"📝 <b>Rasmdan ajratilgan matn:</b>\n📊 Hajmi: {char_count} ta belgi",
-                parse_mode="HTML"
-            )
-            if os.path.exists(doc_path):
-                os.remove(doc_path)
+            try:
+                with open(doc_path, "w", encoding="utf-8") as f:
+                    f.write(extracted_text)
+                await bot.send_document(
+                    chat_id=user_id,
+                    document=types.FSInputFile(doc_path, filename="ajratilgan_matn.txt"),
+                    caption=f"📝 <b>Rasmdan ajratilgan matn:</b>\n📊 Hajmi: {char_count} ta belgi",
+                    parse_mode="HTML"
+                )
+            finally:
+                if os.path.exists(doc_path):
+                    os.remove(doc_path)
         else:
             await bot.send_message(
                 chat_id=user_id,
-                text=f"📝 <b>Rasmdan ajratilgan matn:</b>\n\n{extracted_text}",
+                text=f"📝 <b>Rasmdan ajratilgan matn:</b>\n\n{safe_text}",
                 parse_mode="HTML"
             )
 
+        ok = True
         return {
             "success": True,
             "text": extracted_text,
             "char_count": char_count,
             "duration": duration_sec
         }
-    except Exception as exc:
+    except HTTPException:
+        raise
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="AI javob berishga ulgurmadi. Qayta urinib ko'ring.")
+    except Exception:
         logger.exception("OCR jarayonida xato")
         raise HTTPException(status_code=500, detail="Rasmni o'qishda xatolik yuz berdi.")
+    finally:
+        await settle_charge(ok, user_id, charge_kind, price, pending_id)
+        _active_gemini_tools.discard(user_id)
+        await track_order(user_id, "ocr", ok, time.monotonic() - started_time)
 
 
 # 2. OCR MATNINI WORD (.DOCX) SIFATIDA YUBORISH
 class OcrDocxRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    init_data: str
-    text: str
+    init_data: str = Field(min_length=1, max_length=10_000)
+    text: str = Field(min_length=1, max_length=200_000)
 
-@app.post("/api/ocr-to-docx")
-async def api_ocr_to_docx(req: OcrDocxRequest):
-    auth = verify_telegram_init_data(req.init_data)
-    user_id = auth["user_id"]
 
-    if not req.text.strip():
-        raise HTTPException(status_code=400, detail="Matn mavjud emas.")
-
+def _build_ocr_docx_sync(text_value: str, file_path: str) -> None:
     doc = Document()
     doc.sections[0].left_margin = Cm(3.0)
     doc.sections[0].right_margin = Cm(1.5)
     doc.sections[0].top_margin = Cm(2.0)
     doc.sections[0].bottom_margin = Cm(2.0)
 
-    for para in req.text.split("\n"):
+    for para in text_value.split("\n"):
         if para.strip():
             p = doc.add_paragraph()
             p.paragraph_format.line_spacing = 1.5
             run = p.add_run(para.strip())
             run.font.name = DOC_FONT
+    doc.save(file_path)
+
+
+@app.post("/api/ocr-to-docx")
+async def api_ocr_to_docx(req: OcrDocxRequest):
+    auth = verify_telegram_init_data(req.init_data)
+    user_id = auth["user_id"]
+    check_tool_rate(user_id)
+
+    if not req.text.strip():
+        raise HTTPException(status_code=400, detail="Matn mavjud emas.")
 
     file_path = os.path.join(tempfile.gettempdir(), f"matn_{uuid.uuid4().hex[:6]}.docx")
     try:
-        doc.save(file_path)
-        await bot.send_document(
+        await asyncio.to_thread(_build_ocr_docx_sync, req.text, file_path)
+        sent = await bot.send_document(
             chat_id=user_id,
             document=types.FSInputFile(file_path, filename="rasm_matni.docx"),
             caption="📄 <b>Rasmdagi matn Word (.docx) formatida tayyorlandi!</b>",
             parse_mode="HTML"
         )
+        await save_work(user_id, "Word", "rasm_matni.docx", sent)
         return {"success": True}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("OCR matnini Word qilishda xato")
+        raise HTTPException(status_code=500, detail="Word faylini tayyorlashda xatolik yuz berdi.")
     finally:
         if os.path.exists(file_path):
             os.remove(file_path)
@@ -3692,6 +4638,42 @@ def _open_docx(content: bytes):
         raise HTTPException(status_code=400, detail="Faqat Word (.docx) fayllari qabul qilinadi.")
 
 
+def translate_price(pages: int, alphabet_only: bool) -> int:
+    if alphabet_only:
+        return TRANSLATE_ALPHABET_PRICE
+    for max_pages, price in TRANSLATE_PRICE_TIERS:
+        if pages <= max_pages:
+            return price
+    return TRANSLATE_PRICE_TIERS[-1][1]
+
+
+def _analyze_docx_sync(content: bytes):
+    doc = _open_docx(content)
+    segments = collect_segments(doc, include_headers=False)
+    full_text = "\n\n".join(s.text.strip() for s in segments)
+    return segments, full_text
+
+
+def _translate_quote(content: bytes, source_lang: str, target_lang: str) -> tuple[int, bool]:
+    """Hujjat hajmi (sahifa) va faqat alifbo o'girilishi (Gemini'siz) ekanini aniqlaydi."""
+    _segments, full_text = _analyze_docx_sync(content)
+    words = len(full_text.split())
+    pages = max(1, math.ceil(words / WORDS_PER_PAGE))
+    src = source_lang if source_lang in TRANSLATE_LANGS else detect_lang(full_text)
+    alphabet_only = _lang_base(src) == "uz" and target_lang in ("uz_lat", "uz_cyr")
+    return pages, alphabet_only
+
+
+def _apply_translations_sync(segments, translated) -> int:
+    changed = 0
+    for seg, new_text in zip(segments, translated):
+        if new_text and new_text.strip():
+            apply_translation(seg, new_text)
+            if new_text.strip() != seg.text.strip():
+                changed += 1
+    return changed
+
+
 @app.post("/api/preview-doc")
 async def api_preview_doc(
     init_data: str = Form(...),
@@ -3699,19 +4681,19 @@ async def api_preview_doc(
     target_lang: str = Form(""),
     file: UploadFile = File(...)
 ):
-    verify_telegram_init_data(init_data)
+    auth = verify_telegram_init_data(init_data)
+    check_tool_rate(auth["user_id"], "preview", 60)
     content = await file.read()
     if len(content) > PDF_MAX_BYTES:
         raise HTTPException(status_code=413, detail="Fayl juda katta (15 MB dan oshmasin).")
-    doc = _open_docx(content)
+    segments, full_text = await asyncio.to_thread(_analyze_docx_sync, content)
 
-    segments = collect_segments(doc, include_headers=False)
-    full_text = "\n\n".join(s.text.strip() for s in segments)
     total_words = len(full_text.split())
     estimated_pages = max(1, math.ceil(total_words / WORDS_PER_PAGE))
     preview_snippet = full_text[:1200] + ("..." if len(full_text) > 1200 else "")
 
     src = source_lang if source_lang in TRANSLATE_LANGS else detect_lang(full_text)
+    alphabet_only = _lang_base(src) == "uz" and target_lang in ("uz_lat", "uz_cyr")
     translated_preview = ""
     if target_lang in TRANSLATE_LANGS and segments:
         try:
@@ -3721,7 +4703,7 @@ async def api_preview_doc(
                 used += len(pieces[-1])
                 if used >= 600:
                     break
-            if _lang_base(src) == "uz" and target_lang in ("uz_lat", "uz_cyr"):
+            if alphabet_only:
                 alphabet = LATIN if target_lang == "uz_lat" else KIRILL
                 translated_preview = "\n\n".join(fix_text(p, alphabet) for p in pieces)
             elif _lang_base(src) != _lang_base(target_lang):
@@ -3739,6 +4721,9 @@ async def api_preview_doc(
         "preview_text": preview_snippet,
         "total_words": total_words,
         "estimated_pages": estimated_pages,
+        "price": translate_price(estimated_pages, alphabet_only),
+        "too_long": estimated_pages > MAX_TRANSLATE_PAGES,
+        "max_pages": MAX_TRANSLATE_PAGES,
         "source_lang": _lang_base(src),
         "source_lang_name": TRANSLATE_LANGS.get(_lang_base(src), src),
         "translated_preview": translated_preview,
@@ -3755,8 +4740,8 @@ async def do_translate(content: bytes, filename: str, source_lang: str, target_l
 
     # 1-qadam: faylni o'qish
     set_step(1, 5)
-    doc = _open_docx(content)
-    segments = collect_segments(doc)
+    doc = await asyncio.to_thread(_open_docx, content)
+    segments = await asyncio.to_thread(collect_segments, doc)
     if not segments:
         raise HTTPException(status_code=400, detail="Hujjatda tarjima qilinadigan matn topilmadi.")
 
@@ -3782,12 +4767,7 @@ async def do_translate(content: bytes, filename: str, source_lang: str, target_l
 
     # 3-qadam: faylni yig'ish
     set_step(3, 90)
-    changed = 0
-    for seg, new_text in zip(segments, translated):
-        if new_text and new_text.strip():
-            apply_translation(seg, new_text)
-            if new_text.strip() != seg.text.strip():
-                changed += 1
+    changed = await asyncio.to_thread(_apply_translations_sync, segments, translated)
     if changed == 0:
         raise HTTPException(status_code=502, detail="Tarjima chiqmadi. Qayta urinib ko'ring.")
 
@@ -3802,7 +4782,7 @@ async def do_translate(content: bytes, filename: str, source_lang: str, target_l
 
         # 4-qadam: chatga yuborish
         set_step(4, 95)
-        await bot.send_document(
+        sent = await bot.send_document(
             chat_id=user_id,
             document=types.FSInputFile(file_path, filename=out_name),
             caption=(
@@ -3812,6 +4792,7 @@ async def do_translate(content: bytes, filename: str, source_lang: str, target_l
             ),
             parse_mode="HTML",
         )
+        await save_work(user_id, "Tarjima", out_name, sent)
         if job is not None:
             job["percent"] = 100
     finally:
@@ -3820,7 +4801,8 @@ async def do_translate(content: bytes, filename: str, source_lang: str, target_l
 
 
 async def run_translate_job(job_id: str, content: bytes, filename: str, source_lang: str,
-                            target_lang: str, user_id: int) -> None:
+                            target_lang: str, user_id: int, charge_kind: str = "none",
+                            price: int = 0, pending_id: int | None = None) -> None:
     job = TRANSLATE_JOBS[job_id]
     started = time.monotonic()
     ok = False
@@ -3833,6 +4815,8 @@ async def run_translate_job(job_id: str, content: bytes, filename: str, source_l
         logger.exception("Tarjima ishi xato bilan tugadi")
         job["error"] = "Tarjima paytida xatolik bo'ldi. Qayta urinib ko'ring."
     finally:
+        await settle_charge(ok, user_id, charge_kind, price, pending_id)
+        _active_gemini_tools.discard(user_id)
         job["done"] = True
         await track_order(user_id, "translate", ok, time.monotonic() - started)
         if job["error"]:
@@ -3860,7 +4844,24 @@ async def api_translate_doc(
     content = await file.read()
     if len(content) > TRANSLATE_MAX_BYTES:
         raise HTTPException(status_code=413, detail="Fayl juda katta (15 MB dan oshmasin).")
-    _open_docx(content)  # .docx emasligini darrov bilish uchun
+    # .docx emasligini va hajmini darrov bilish uchun (to'lovdan oldin)
+    pages, alphabet_only = await asyncio.to_thread(_translate_quote, content, source_lang, target_lang)
+    if pages > MAX_TRANSLATE_PAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Hujjat juda katta (taxminan {pages} sahifa). Eng ko'pi bilan {MAX_TRANSLATE_PAGES} sahifa.",
+        )
+    price = translate_price(pages, alphabet_only)
+
+    check_tool_rate(user_id)
+    if user_id in _active_gemini_tools:
+        raise HTTPException(status_code=429, detail="Oldingi tarjima tugashini kuting.")
+    _active_gemini_tools.add(user_id)
+    try:
+        charge_kind, pending_id = await charge_or_402(user_id, price)
+    except Exception:
+        _active_gemini_tools.discard(user_id)
+        raise
 
     if background == "1":
         cutoff = time.time() - 3600
@@ -3873,7 +4874,8 @@ async def api_translate_doc(
             "done": False, "error": None, "created": time.time(),
         }
         task = asyncio.create_task(
-            run_translate_job(job_id, content, file.filename, source_lang, target_lang, user_id)
+            run_translate_job(job_id, content, file.filename, source_lang, target_lang, user_id,
+                              charge_kind, price, pending_id)
         )
         _translate_tasks.add(task)
         task.add_done_callback(_translate_tasks.discard)
@@ -3885,6 +4887,8 @@ async def api_translate_doc(
         await do_translate(content, file.filename, source_lang, target_lang, user_id)
         ok = True
     finally:
+        await settle_charge(ok, user_id, charge_kind, price, pending_id)
+        _active_gemini_tools.discard(user_id)
         await track_order(user_id, "translate", ok, time.monotonic() - started)
     return {"success": True}
 
@@ -3905,6 +4909,17 @@ async def api_translate_status(init_data: str = Form(...), job_id: str = Form(..
 
 
 # 4. PDF -> MATN (.TXT) VA CHATGA YUBORISH
+def _pdf_to_text_sync(content: bytes) -> tuple[str, int]:
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(content))
+    parts = []
+    for i, page in enumerate(reader.pages):
+        page_text = page.extract_text()
+        if page_text:
+            parts.append(f"\n--- {i+1}-sahifa ---\n" + page_text)
+    return "".join(parts), len(reader.pages)
+
+
 @app.post("/api/pdf-to-txt")
 async def api_pdf_to_txt(
     init_data: str = Form(...),
@@ -3912,43 +4927,59 @@ async def api_pdf_to_txt(
 ):
     auth = verify_telegram_init_data(init_data)
     user_id = auth["user_id"]
+    check_tool_rate(user_id)
 
     content = await file.read()
     if len(content) > PDF_MAX_BYTES:
         raise HTTPException(status_code=413, detail="Fayl juda katta (15 MB dan oshmasin).")
+    file_path = os.path.join(tempfile.gettempdir(), f"pdf_matn_{uuid.uuid4().hex[:6]}.txt")
     try:
-        from pypdf import PdfReader
-        reader = PdfReader(io.BytesIO(content))
-        full_text = ""
-        for i, page in enumerate(reader.pages):
-            text = page.extract_text()
-            if text:
-                full_text += f"\n--- {i+1}-sahifa ---\n" + text
-
+        full_text, total_pages = await asyncio.to_thread(_pdf_to_text_sync, content)
         if not full_text.strip():
             raise HTTPException(status_code=400, detail="PDF ichida ko'chiriladigan matn topilmadi.")
 
-        file_path = os.path.join(tempfile.gettempdir(), f"pdf_matn_{uuid.uuid4().hex[:6]}.txt")
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(full_text)
 
         await bot.send_document(
             chat_id=user_id,
             document=types.FSInputFile(file_path, filename="pdf_matni.txt"),
-            caption=f"📄 <b>PDF matni ajratib olindi!</b>\nSahifalar: {len(reader.pages)} ta",
+            caption=f"📄 <b>PDF matni ajratib olindi!</b>\nSahifalar: {total_pages} ta",
             parse_mode="HTML"
         )
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        return {"success": True, "pages": len(reader.pages)}
+        return {"success": True, "pages": total_pages}
     except HTTPException:
         raise
     except Exception:
         logger.exception("PDF matnini ajratishda xato")
         raise HTTPException(status_code=500, detail="PDF matnini ajratishda xatolik yuz berdi.")
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
 
 # 6. PDF -> RASM (PNG) VA CHATGA YUBORISH
+def _render_pdf_pages_sync(content: bytes, limit: int) -> tuple[list[str], int]:
+    import fitz  # PyMuPDF
+    paths: list[str] = []
+    doc = fitz.open(stream=content, filetype="pdf")
+    try:
+        total = len(doc)
+        for i in range(min(total, limit)):
+            pix = doc[i].get_pixmap(dpi=130)
+            p = os.path.join(tempfile.gettempdir(), f"p_{i+1}_{uuid.uuid4().hex[:4]}.png")
+            pix.save(p)
+            paths.append(p)
+        return paths, total
+    except Exception:
+        for p in paths:
+            if os.path.exists(p):
+                os.remove(p)
+        raise
+    finally:
+        doc.close()
+
+
 @app.post("/api/pdf-to-images")
 async def api_pdf_to_images(
     init_data: str = Form(...),
@@ -3956,34 +4987,56 @@ async def api_pdf_to_images(
 ):
     auth = verify_telegram_init_data(init_data)
     user_id = auth["user_id"]
+    check_tool_rate(user_id)
 
     content = await file.read()
     if len(content) > PDF_MAX_BYTES:
         raise HTTPException(status_code=413, detail="Fayl juda katta (15 MB dan oshmasin).")
+    paths: list[str] = []
     try:
-        import fitz  # PyMuPDF
-        doc = fitz.open(stream=content, filetype="pdf")
-        total = len(doc)
-        limit = min(total, 10)
-        for i in range(limit):
-            pix = doc[i].get_pixmap(dpi=130)
-            p = os.path.join(tempfile.gettempdir(), f"p_{i+1}_{uuid.uuid4().hex[:4]}.png")
-            pix.save(p)
+        paths, total = await asyncio.to_thread(_render_pdf_pages_sync, content, 10)
+        for i, p in enumerate(paths):
             await bot.send_document(
                 chat_id=user_id,
                 document=types.FSInputFile(p, filename=f"sahifa_{i+1}.png"),
                 caption=f"🖼 {i+1}-sahifa (jami {total} tadan)"
             )
-            if os.path.exists(p):
-                os.remove(p)
-        doc.close()
-        return {"success": True, "pages": limit}
+        return {"success": True, "pages": len(paths)}
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("PDF -> rasm xato")
         raise HTTPException(status_code=500, detail="PDFni rasmga aylantirib bo'lmadi.")
+    finally:
+        for p in paths:
+            if os.path.exists(p):
+                os.remove(p)
 
 
 # 5. SAHIFALARNI AJRATISH (SPLIT PDF)
+def _split_pdf_sync(content: bytes, limit: int = 5) -> tuple[list[str], int]:
+    from pypdf import PdfReader, PdfWriter
+    reader = PdfReader(io.BytesIO(content))
+    total_pages = len(reader.pages)
+    if total_pages < 2:
+        raise HTTPException(status_code=400, detail="PDF kamida 2 sahifadan iborat bo'lishi kerak.")
+    paths: list[str] = []
+    try:
+        for i in range(min(limit, total_pages)):
+            writer = PdfWriter()
+            writer.add_page(reader.pages[i])
+            out_p = os.path.join(tempfile.gettempdir(), f"sahifa_{i+1}_{uuid.uuid4().hex[:4]}.pdf")
+            with open(out_p, "wb") as f_out:
+                writer.write(f_out)
+            paths.append(out_p)
+    except Exception:
+        for p in paths:
+            if os.path.exists(p):
+                os.remove(p)
+        raise
+    return paths, total_pages
+
+
 @app.post("/api/split-pdf")
 async def api_split_pdf(
     init_data: str = Form(...),
@@ -3991,38 +5044,31 @@ async def api_split_pdf(
 ):
     auth = verify_telegram_init_data(init_data)
     user_id = auth["user_id"]
+    check_tool_rate(user_id)
 
     content = await file.read()
     if len(content) > PDF_MAX_BYTES:
         raise HTTPException(status_code=413, detail="Fayl juda katta (15 MB dan oshmasin).")
+    paths: list[str] = []
     try:
-        from pypdf import PdfReader, PdfWriter
-        reader = PdfReader(io.BytesIO(content))
-        total_pages = len(reader.pages)
-        if total_pages < 2:
-            raise HTTPException(status_code=400, detail="PDF kamida 2 sahifadan iborat bo'lishi kerak.")
-
-        limit = min(5, total_pages)
-        for i in range(limit):
-            writer = PdfWriter()
-            writer.add_page(reader.pages[i])
-            out_p = os.path.join(tempfile.gettempdir(), f"sahifa_{i+1}_{uuid.uuid4().hex[:4]}.pdf")
-            with open(out_p, "wb") as f_out:
-                writer.write(f_out)
+        paths, total_pages = await asyncio.to_thread(_split_pdf_sync, content, 5)
+        for i, out_p in enumerate(paths):
             await bot.send_document(
                 chat_id=user_id,
                 document=types.FSInputFile(out_p, filename=f"sahifa_{i+1}.pdf"),
-                caption=f"📄 <b>{i+1}-sahifa</b> (jami {total_pages} tadan)"
+                caption=f"📄 <b>{i+1}-sahifa</b> (jami {total_pages} tadan)",
+                parse_mode="HTML"
             )
-            if os.path.exists(out_p):
-                os.remove(out_p)
-
-        return {"success": True, "pages": limit}
+        return {"success": True, "pages": len(paths)}
     except HTTPException:
         raise
     except Exception:
         logger.exception("PDF sahifalarini ajratishda xato")
         raise HTTPException(status_code=500, detail="PDF sahifalarini ajratishda xatolik yuz berdi.")
+    finally:
+        for p in paths:
+            if os.path.exists(p):
+                os.remove(p)
 
 
 if __name__ == "__main__":
