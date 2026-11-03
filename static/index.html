@@ -719,6 +719,15 @@
         <span class="tag-gold">UZ·RU·EN</span>
       </div>
 
+      <div class="card-action-bar" onclick="openAcademic()">
+        <div class="badge-square-orange" style="background:#4f46e5;">📘</div>
+        <div class="ac-info">
+          <b>Referat, kurs ishi, maqola, test</b>
+          <span>Mavzuni yozing, Word fayl chatga keladi</span>
+        </div>
+        <span class="tag-gold">AI</span>
+      </div>
+
       <div class="sec-head"><h2>Barcha amallar</h2></div>
 
       <div class="tools-grid">
@@ -744,7 +753,7 @@
         </div>
         <div class="card-tool" onclick="triggerOcrPicker()">
           <div class="tool-icon-badge bg-purple">OCR</div>
-          <div class="tool-texts"><b>Rasmdan matn</b><span>Suratdagi yozuvni o'qish</span></div>
+          <div class="tool-texts"><b>Rasmdan matn</b><span id="ocr-hint">Suratdagi yozuvni o'qish</span></div>
         </div>
       </div>
 
@@ -754,7 +763,7 @@
       </div>
 
       <div id="history-list"></div>
-      <p class="history-note">Fayllar 3 soatdan keyin serverdan butunlay o'chiriladi · 50 MB gacha</p>
+      <p class="history-note">Fayllar serverda saqlanmaydi, chatga yuboriladi · 15 MB gacha</p>
     </section>
 
     <!-- ===== 3. RASMLARDAN PDF ===== -->
@@ -948,6 +957,55 @@
       </div>
     </section>
 
+    <!-- ===== 7d. AKADEMIK ISHLAR ===== -->
+    <section class="panel" id="panel-academic">
+      <div class="subview-top">
+        <button class="btn-back-round" onclick="backToHub()">‹</button>
+        <span style="font-size:14px; font-weight:700; color:var(--hint);">Akademik ishlar</span>
+      </div>
+      <h1 class="h-title" style="margin-bottom:14px;">Nima<br>tayyorlaymiz?</h1>
+
+      <div class="chips" id="ac-kinds"></div>
+
+      <div class="search">
+        <input id="ac-topic" type="text" maxlength="200" autocomplete="off" placeholder="Mavzuni yozing...">
+      </div>
+
+      <div id="ac-reja-wrap" style="margin-top:14px;">
+        <div style="font-size:14px; font-weight:800; margin-bottom:8px;">Reja soni (hajm)</div>
+        <div class="chips" id="ac-reja"></div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; margin:6px 2px 0; font-size:14px;">
+        <span style="color:var(--hint);">Narxi</span><b id="ac-price">—</b>
+      </div>
+
+      <button class="submit" id="ac-submit" type="button" onclick="submitAcademic()"><span>Tayyorlash</span></button>
+      <div class="message" id="ac-msg" role="status"></div>
+      <p class="history-note">Tayyor fayl Telegram chatingizga yuboriladi. Alifbo: hozirgi tanlovingiz bo'yicha.</p>
+    </section>
+
+    <!-- ===== 7e. ISH JARAYONI ===== -->
+    <section class="panel" id="panel-job">
+      <div class="subview-top">
+        <span style="font-size:14px; font-weight:700; color:var(--hint);">Tayyorlanmoqda</span>
+      </div>
+      <h2 id="job-name" style="font-size:20px; font-weight:800; margin:10px 0 18px; word-break:break-word;">...</h2>
+      <div class="tr-barwrap"><div id="job-bar" style="height:100%; width:0; background:var(--cyan); transition:width .6s;"></div></div>
+      <div id="job-percent" style="text-align:center; font-weight:800; font-size:24px; margin:10px 0;">0%</div>
+      <div style="text-align:center; color:var(--hint); font-size:13px;">Ilovani yopsangiz ham, tayyor fayl chatga keladi</div>
+    </section>
+
+    <section class="panel" id="panel-job-done">
+      <div class="wz-done">
+        <div class="wz-done-ic">✅</div>
+        <h3>Fayl tayyor!</h3>
+        <p>Word fayl Telegram chatingizga yuborildi.</p>
+      </div>
+      <button class="submit" type="button" onclick="closeMiniApp()"><span>✈️ Chatga o'tish</span></button>
+      <button class="wz-again" type="button" onclick="openAcademic()">➕ Yangi ish</button>
+    </section>
+
     <!-- ===== 8. Mavzular ===== -->
     <section class="panel" id="panel-topics">
       <div class="chips" id="cats"></div>
@@ -991,6 +1049,7 @@
         <button class="btn-topup" type="button" data-amount="50000">50 000 so'm</button>
       </div>
 
+      <div class="message" id="modal-msg" role="status"></div>
       <button class="btn-sub-promo" id="btn-open-subs" type="button">💎 Chegirmali Obuna Paketlari</button>
     </div>
   </div>
@@ -1063,6 +1122,7 @@
       var modalClose = document.getElementById("modal-close");
       var modalBalance = document.getElementById("modal-balance");
       var btnOpenSubs = document.getElementById("btn-open-subs");
+      var modalMsgEl = document.getElementById("modal-msg");
 
       var busy = false;
       var selectedStyle = "classic";
@@ -1070,6 +1130,8 @@
       var currentBalance = 0;
       var freeUsed = 0;
       var isSubscriber = false;
+      var docPrices = {};
+      var toolInfo = null;
 
       var selectedPdfFiles = [];
       var lastGeneratedPdfFile = null;
@@ -1143,6 +1205,13 @@
         isSubscriber = !!data.is_subscriber;
         modalBalance.textContent = currentBalance.toLocaleString() + " so'm";
         if (data.prices) slidePrices = data.prices;
+        if (data.doc_prices) docPrices = data.doc_prices;
+        if (data.tools) toolInfo = data.tools;
+        var ocrHint = document.getElementById("ocr-hint");
+        if (ocrHint && toolInfo) {
+          ocrHint.textContent = "Suratdagi yozuvni o'qish · " + (freeUsed === 0 ? "bepul (1-marta)" : (isSubscriber ? "obuna ichida" : fmt(toolInfo.ocr)));
+        }
+        if (typeof acRender === "function") acRender();
         if (data.slides) {
           var rg = document.getElementById("slides-range");
           if (rg) {
@@ -1181,31 +1250,80 @@
         } catch (e) { }
       }
 
-      function openModal() { payModal.classList.add("open"); haptic("select"); }
+      function modalMsg(kind, msgText) {
+        modalMsgEl.className = "message show " + kind;
+        modalMsgEl.textContent = msgText;
+      }
+      function modalMsgHide() {
+        modalMsgEl.className = "message";
+        modalMsgEl.textContent = "";
+      }
+      function openModal() { modalMsgHide(); payModal.classList.add("open"); haptic("select"); }
       function closeModal() { payModal.classList.remove("open"); }
       limitBtnEl.addEventListener("click", openModal);
       modalClose.addEventListener("click", closeModal);
       payModal.addEventListener("click", function (e) { if (e.target === payModal) closeModal(); });
 
+      function refreshAfterPayment() {
+        [1500, 4000, 8000].forEach(function (ms) { setTimeout(loadUserData, ms); });
+      }
+
+      async function startTopup(amount) {
+        if (!initData) { modalMsg("error", "Ilovani Telegram ichida oching."); return; }
+        if (!tg || typeof tg.openInvoice !== "function") {
+          modalMsg("error", "Telegram ilovasini yangilang yoki botdagi «Balans» tugmasidan to'ldiring.");
+          return;
+        }
+        modalMsg("info", "To'lov oynasi ochilmoqda...");
+        try {
+          var res = await fetch("/api/create-invoice", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ init_data: initData, kind: "topup", amount: amount })
+          });
+          var d = null;
+          try { d = await res.json(); } catch (e) { }
+          if (!res.ok) { modalMsg("error", extractError(d, res.status)); haptic("error"); return; }
+          modalMsgHide();
+          tg.openInvoice(d.url, function (status) {
+            if (status === "paid") {
+              closeModal();
+              haptic("success");
+              refreshAfterPayment();
+            } else if (status === "failed") {
+              modalMsg("error", "To'lov amalga oshmadi. Qayta urinib ko'ring.");
+              haptic("error");
+            }
+          });
+        } catch (e) {
+          modalMsg("error", "Serverga ulanib bo'lmadi.");
+        }
+      }
+
       document.querySelectorAll(".btn-topup").forEach(function (btn) {
         btn.addEventListener("click", function () {
-          var amt = btn.getAttribute("data-amount");
           haptic("select");
-          closeModal();
-          showMessage("info", "To'lov cheki yuborilmoqda...");
-          if (tg) {
-            tg.sendData("topup_" + amt);
-            setTimeout(function () { tg.close(); }, 300);
-          }
+          startTopup(parseInt(btn.getAttribute("data-amount"), 10));
         });
       });
 
-      btnOpenSubs.addEventListener("click", function () {
+      btnOpenSubs.addEventListener("click", async function () {
         haptic("select");
-        closeModal();
-        if (tg) {
-          tg.sendData("open_subs");
-          setTimeout(function () { tg.close(); }, 300);
+        if (!initData) { modalMsg("error", "Ilovani Telegram ichida oching."); return; }
+        modalMsg("info", "Obuna menyusi chatga yuborilmoqda...");
+        try {
+          var res = await fetch("/api/open-subs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ init_data: initData })
+          });
+          var d = null;
+          try { d = await res.json(); } catch (e) { }
+          if (!res.ok) { modalMsg("error", extractError(d, res.status)); return; }
+          closeModal();
+          if (tg) tg.close();
+        } catch (e) {
+          modalMsg("error", "Serverga ulanib bo'lmadi.");
         }
       });
 
@@ -1464,6 +1582,33 @@
         topicEl.value = ""; updateCounter(); closeEl.classList.remove("show"); goStep(1);
       });
 
+      var JOB_MAX_MS = 20 * 60 * 1000;
+
+      async function pollJob(jobId, onProgress) {
+        var started = Date.now();
+        var fails = 0;
+        while (Date.now() - started < JOB_MAX_MS) {
+          await new Promise(function (r) { setTimeout(r, 2000); });
+          var fd = new FormData();
+          fd.append("init_data", initData);
+          fd.append("job_id", jobId);
+          var d = null, res = null;
+          try {
+            res = await fetch("/api/job-status", { method: "POST", body: fd });
+            d = await res.json();
+          } catch (e) {
+            fails += 1;
+            if (fails > 15) return { ok: false, error: "Serverga ulanib bo'lmadi. Fayl kelganini chatdan tekshiring." };
+            continue;
+          }
+          fails = 0;
+          if (!res.ok) return { ok: false, error: extractError(d, res.status) };
+          if (onProgress) onProgress(d);
+          if (d.done) return d.error ? { ok: false, error: d.error } : { ok: true };
+        }
+        return { ok: false, error: "Kutish vaqti tugadi. Fayl kelgan bo'lsa, chatdan tekshiring." };
+      }
+
       async function generate() {
         if (busy) return;
         hideMessage();
@@ -1474,7 +1619,7 @@
         if (topic.length < MIN_LEN) { goStep(1); showMessage("error", "Mavzu kamida 3 ta belgi bo'lsin."); haptic("error"); return; }
 
         setBusy(true);
-        showMessage("info", "Slayd tayyorlanmoqda, bu 20-60 soniya olishi mumkin...");
+        showMessage("info", "Slayd tayyorlanmoqda... 0%");
 
         var controller = new AbortController();
         var timer = setTimeout(function () { controller.abort(); }, REQUEST_TIMEOUT_MS);
@@ -1486,12 +1631,22 @@
             body: JSON.stringify({ init_data: initData, topic: topic, template: selectedStyle, alphabet: selectedAlphabet, slides: slidesCount }),
             signal: controller.signal
           });
+          clearTimeout(timer);
           var data = null;
           try { data = await response.json(); } catch (e) { }
 
           if (!response.ok) {
             if (response.status === 402) openModal();
             showMessage("error", extractError(data, response.status));
+            haptic("error");
+            return;
+          }
+
+          var result = await pollJob(data.job_id, function (s) {
+            showMessage("info", "Slayd tayyorlanmoqda... " + (s.percent || 0) + "%");
+          });
+          if (!result.ok) {
+            showMessage("error", result.error);
             haptic("error");
             return;
           }
@@ -1512,28 +1667,24 @@
       }
 
       function loadHistory() {
-        var list = JSON.parse(localStorage.getItem("recent_files") || "[]");
+        var list = [];
+        try { list = JSON.parse(localStorage.getItem("recent_files") || "[]"); } catch (e) { list = []; }
         var container = document.getElementById("history-list");
-        container.innerHTML = "";
+        container.textContent = "";
 
         if (list.length === 0) {
-          container.innerHTML = `
-            <div class="history-card">
-              <div class="history-badge">PDF</div>
-              <div class="history-info"><b>17875.pdf</b><span>1 ta rasm ➔ PDF</span></div>
-              <span class="history-time">hozir</span>
-            </div>
-          `;
+          container.appendChild(el("p", "history-note", "Hali fayllar yo'q"));
           return;
         }
 
         list.forEach(function(item) {
           var card = el("div", "history-card");
-          card.innerHTML = `
-            <div class="history-badge">${item.ext.toUpperCase()}</div>
-            <div class="history-info"><b>${item.name}</b><span>${item.desc}</span></div>
-            <span class="history-time">${item.time}</span>
-          `;
+          card.appendChild(el("div", "history-badge", String(item.ext || "").toUpperCase()));
+          var info = el("div", "history-info");
+          info.appendChild(el("b", null, String(item.name || "")));
+          info.appendChild(el("span", null, String(item.desc || "")));
+          card.appendChild(info);
+          card.appendChild(el("span", "history-time", String(item.time || "")));
           container.appendChild(card);
         });
       }
@@ -1614,6 +1765,7 @@
             lastExtractedOcrText = data.text;
             addHistoryItem(file.name, "Rasmdan matn", "txt");
             haptic("success");
+            loadUserData();
             setTimeout(function() {
               var panels = document.querySelectorAll(".panel");
               for (var j = 0; j < panels.length; j++) panels[j].classList.remove("active");
@@ -1625,6 +1777,7 @@
           } else {
             alert(data.detail || "Xatolik yuz berdi");
             backToHub();
+            if (res.status === 402) openModal();
           }
         } catch (err) {
           alert("Serverga ulanishda xato!");
@@ -1650,6 +1803,10 @@
           if (res.ok) {
             alert("✅ Word (.docx) faylingiz Telegram chatga yuborildi!");
             haptic("success");
+          } else {
+            var errData = null;
+            try { errData = await res.json(); } catch (e2) { }
+            alert(extractError(errData, res.status));
           }
         } catch (e) { alert("Serverga ulanib bo'lmadi"); }
       };
@@ -1664,7 +1821,7 @@
       });
 
       var LANGS = {uz: "🇺🇿 O'zbek", uz_lat: "🇺🇿 O'zbek (lotin)", uz_cyr: "🇺🇿 Ўзбек (кирилл)", ru: "🇷🇺 Rus", en: "🇬🇧 English"};
-      var manualSource = false, manualTarget = false, previewToken = 0, trPages = 1;
+      var manualSource = false, manualTarget = false, previewToken = 0, trPages = 1, trPrice = null;
       function showPanel(id) {
         document.querySelectorAll(".panel").forEach(function(p) { p.classList.remove("active"); });
         document.getElementById(id).classList.add("active");
@@ -1683,7 +1840,11 @@
         });
       }
       function setCaption() {
-        document.getElementById("btn-translate-caption").textContent = "Tarjima qilish · " + trPages + " sahifa";
+        var cap = "Tarjima qilish · " + trPages + " sahifa";
+        if (trPrice != null) {
+          cap += " · " + (freeUsed === 0 ? "bepul (1-marta)" : (isSubscriber ? "obuna ichida" : fmt(trPrice)));
+        }
+        document.getElementById("btn-translate-caption").textContent = cap;
       }
 
       function openTranslateView(file) {
@@ -1718,9 +1879,13 @@
             if (before !== currentTranslateTarget) return loadTranslatePreview();
           }
           trPages = d.estimated_pages || 1;
+          trPrice = (d.price != null) ? d.price : null;
           setCaption();
           document.getElementById("tr-orig").textContent = (d.preview_text || "").slice(0, 320);
           document.getElementById("tr-new").textContent = (d.translated_preview || "").slice(0, 320) || "—";
+          if (d.too_long) {
+            document.getElementById("tr-new").textContent = "⚠️ Hujjat juda katta (taxminan " + d.estimated_pages + " sahifa). Eng ko'pi bilan " + d.max_pages + " sahifa tarjima qilinadi.";
+          }
         } catch (e) {
           if (tok === previewToken) document.getElementById("tr-orig").textContent = "Ko'rib bo'lmadi";
         }
@@ -1775,7 +1940,13 @@
           try {
             var res = await fetch("/api/translate-status", { method: "POST", body: fd });
             d = await res.json();
-            if (!res.ok) { alert(d.detail || "Xatolik yuz berdi"); showPanel("panel-translate"); return; }
+            if (!res.ok) {
+              alert(res.status === 404
+                ? "Ish topilmadi (server qayta ishga tushgan bo'lishi mumkin). Fayl kelmasa, to'lov avtomatik qaytariladi."
+                : (d.detail || "Xatolik yuz berdi"));
+              showPanel("panel-translate");
+              return;
+            }
           } catch (e) { continue; }
           setTrStep(d.step, d.percent);
           if (d.done) {
@@ -1786,6 +1957,7 @@
             document.getElementById("btn-to-latin").style.display = currentTranslateSource === "uz" ? "" : "none";
             addHistoryItem(selectedTranslateFile.name, "Tarjima qilindi", "docx");
             haptic("success");
+            loadUserData();
             showPanel("panel-tr-done");
             return;
           }
@@ -1803,7 +1975,11 @@
         try {
           var res = await fetch("/api/translate-doc", { method: "POST", body: fd });
           var d = await res.json();
-          if (!res.ok) { alert(d.detail || "Tarjima qilishda xatolik yuz berdi"); return; }
+          if (!res.ok) {
+            alert(d.detail || "Tarjima qilishda xatolik yuz berdi");
+            if (res.status === 402) openModal();
+            return;
+          }
           setTrStep(1, 0);
           showPanel("panel-tr-progress");
           pollTranslate(d.job_id);
@@ -1977,6 +2153,124 @@
           }
         } catch (e) { alert("Serverga ulanishda xato!"); }
       }
+
+      var AC_KINDS = [
+        { id: "referat", name: "Referat" },
+        { id: "mustaqil", name: "Mustaqil ish" },
+        { id: "kurs", name: "Kurs ishi" },
+        { id: "maqola", name: "Ilmiy maqola" },
+        { id: "tezis", name: "Tezis" },
+        { id: "test", name: "Test" },
+        { id: "krossvord", name: "Krossvord" }
+      ];
+      var AC_REJA = { 3: "3 reja · 10–15 bet", 4: "4 reja · 15–25 bet", 5: "5 reja · 20–30 bet" };
+      var acKind = "referat", acReja = 3, acBusy = false;
+
+      function acKindName() {
+        for (var i = 0; i < AC_KINDS.length; i++) if (AC_KINDS[i].id === acKind) return AC_KINDS[i].name;
+        return acKind;
+      }
+      function acPriceValue() {
+        var p = docPrices[acKind];
+        if (p == null) return null;
+        if (typeof p === "object") return p[String(acReja)];
+        return p;
+      }
+      function acPriceLabel() {
+        if (freeUsed === 0) return "Bepul (1-marta)";
+        if (isSubscriber) return "Obuna ichida";
+        var v = acPriceValue();
+        return v == null ? "—" : fmt(v);
+      }
+      function acRender() {
+        var kinds = document.getElementById("ac-kinds");
+        if (!kinds) return;
+        kinds.textContent = "";
+        AC_KINDS.forEach(function (k) {
+          var b = el("button", "chip" + (k.id === acKind ? " active" : ""), k.name);
+          b.type = "button";
+          b.addEventListener("click", function () { acKind = k.id; haptic("select"); acRender(); });
+          kinds.appendChild(b);
+        });
+        var showReja = acKind === "referat" || acKind === "mustaqil";
+        document.getElementById("ac-reja-wrap").style.display = showReja ? "" : "none";
+        var rj = document.getElementById("ac-reja");
+        rj.textContent = "";
+        [3, 4, 5].forEach(function (n) {
+          var b = el("button", "chip" + (n === acReja ? " active" : ""), AC_REJA[n]);
+          b.type = "button";
+          b.addEventListener("click", function () { acReja = n; haptic("select"); acRender(); });
+          rj.appendChild(b);
+        });
+        document.getElementById("ac-price").textContent = acPriceLabel();
+        document.getElementById("ac-topic").placeholder = acKindName() + " mavzusini yozing...";
+      }
+      window.openAcademic = function () {
+        showPanel("panel-academic");
+        acRender();
+        haptic("select");
+      };
+
+      function setJobProgress(p) {
+        document.getElementById("job-bar").style.width = p + "%";
+        document.getElementById("job-percent").textContent = p + "%";
+      }
+
+      window.submitAcademic = async function () {
+        if (acBusy) return;
+        var topicValue = document.getElementById("ac-topic").value.trim();
+        var msgEl = document.getElementById("ac-msg");
+        var btn = document.getElementById("ac-submit");
+        function say(kind, t) { msgEl.className = "message show " + kind; msgEl.textContent = t; }
+        if (topicValue.length < 3) { say("error", "Mavzu kamida 3 ta belgi bo'lsin."); haptic("error"); return; }
+        if (!initData) { say("error", "Ilovani Telegram ichida oching."); return; }
+
+        acBusy = true;
+        btn.disabled = true;
+        say("info", "Yuborilmoqda...");
+        try {
+          var res = await fetch("/api/generate-doc", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              init_data: initData,
+              kind: acKind,
+              topic: topicValue,
+              reja: (acKind === "referat" || acKind === "mustaqil") ? acReja : null,
+              alphabet: selectedAlphabet
+            })
+          });
+          var d = null;
+          try { d = await res.json(); } catch (e) { }
+          if (!res.ok) {
+            if (res.status === 402) openModal();
+            say("error", extractError(d, res.status));
+            haptic("error");
+            return;
+          }
+          msgEl.className = "message";
+          document.getElementById("job-name").textContent = acKindName() + ": " + topicValue.slice(0, 80);
+          setJobProgress(0);
+          showPanel("panel-job");
+          var result = await pollJob(d.job_id, function (s) { setJobProgress(s.percent || 0); });
+          if (!result.ok) {
+            alert(result.error);
+            showPanel("panel-academic");
+            acRender();
+            haptic("error");
+            return;
+          }
+          addHistoryItem(acKindName() + ".docx", topicValue.slice(0, 20) + " · " + acKindName(), "docx");
+          haptic("success");
+          showPanel("panel-job-done");
+        } catch (e) {
+          say("error", "Serverga ulanib bo'lmadi.");
+        } finally {
+          acBusy = false;
+          btn.disabled = false;
+          loadUserData();
+        }
+      };
 
       topicEl.addEventListener("input", function () { updateCounter(); updateWizard(); });
       goStep(1);
