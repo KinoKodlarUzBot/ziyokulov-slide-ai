@@ -45,10 +45,12 @@ from google import genai
 from google.genai import types as genai_types
 from docx import Document
 from docx.enum.table import WD_ALIGN_VERTICAL, WD_ROW_HEIGHT_RULE, WD_TABLE_ALIGNMENT
+from docx.enum.section import WD_SECTION
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm
+from docx.shared import RGBColor as DocRGB
 from docx.shared import Pt as DocPt
 from PIL import Image
 from pptx import Presentation
@@ -213,6 +215,42 @@ PRICING = {
     "tezis": 3000,
     "krossvord": 3000,
 }
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, "") or default)
+    except ValueError:
+        return default
+
+
+# Test va krossvord: savol/so'z soniga qarab narx (eng ko'pi bilan N ta -> narx)
+TEST_TIERS = [(10, _env_int("PRICE_TEST_10", 2500)), (20, _env_int("PRICE_TEST_20", 3500)),
+              (30, _env_int("PRICE_TEST_30", 4500))]
+CROSSWORD_TIERS = [(10, _env_int("PRICE_CROSSWORD_10", 2500)), (20, _env_int("PRICE_CROSSWORD_20", 3500)),
+                   (30, _env_int("PRICE_CROSSWORD_30", 4500))]
+# Kurs ishi: PAGE_TIERS["kurs"] dagi 7 ta hajm uchun narxlar (PRICE_KURS_TIERS="10000,12000,...")
+_KURS_DEFAULT = [10000 + 2000 * i for i in range(7)]
+try:
+    KURS_PRICES = [int(x) for x in os.getenv("PRICE_KURS_TIERS", "").split(",") if x.strip()]
+except ValueError:
+    KURS_PRICES = []
+if len(KURS_PRICES) != 7:
+    KURS_PRICES = _KURS_DEFAULT
+
+TEST_MIN, TEST_MAX, CROSSWORD_MIN, CROSSWORD_MAX = 5, 30, 5, 30
+DIFFICULTY_TEXT = {
+    "easy": "OSON: asosiy tushunchalar va ta'riflar, umumiy bilim darajasi",
+    "medium": "O'RTA: tushunish va qo'llash darajasi",
+    "hard": "MURAKKAB: tahlil, taqqoslash va chuqur bilim talab qiladigan darajasi",
+}
+
+
+def tier_price(tiers: list, count: int) -> int:
+    for limit, price in tiers:
+        if count <= limit:
+            return price
+    return tiers[-1][1]
+
 
 def slide_price(slides: int) -> int:
     """Slayd soni bo'yicha narx: 3 ta reja = 10 slayd, 4 ta = 15, 5 ta = 20."""
@@ -1415,16 +1453,23 @@ COURSE_PARALLEL = int(os.getenv("COURSE_PARALLEL", "2"))
 ROMAN = ["I", "II", "III", "IV", "V", "VI"]
 
 
-def build_document_prompt(kind: str, topic: str, alphabet: str = LATIN) -> str:
+def build_document_prompt(kind: str, topic: str, alphabet: str = LATIN, opts: dict | None = None) -> str:
     rule = alphabet_rule(alphabet)
+    opts = opts or {}
+    level = DIFFICULTY_TEXT.get(opts.get("difficulty") or "medium", DIFFICULTY_TEXT["medium"])
 
     if kind == "test":
+        n_q = int(opts.get("count") or 10)
+        n_v = 3 if opts.get("variants") == 3 else 4
+        letters_txt = ", ".join("ABCD"[:n_v][:-1]) + " yoki " + "ABCD"[n_v - 1]
+        options_json = ", ".join(f'"Variant {i}"' for i in range(1, n_v + 1))
         answer_rule = (
-            '\n- "answer" maydoni lotin A, B, C yoki D harfi bo\'lib qolsin.' if alphabet == KIRILL else ""
+            f'\n- "answer" maydoni lotin {letters_txt} harfi bo\'lib qolsin.' if alphabet == KIRILL else ""
         )
         return f"""
 Siz o'zbek tilida test savollari tuzadigan tajribali o'qituvchisiz.
-Quyidagi mavzu bo'yicha AYNAN 10 ta test savoli tuzing: {topic!r}
+Quyidagi mavzu bo'yicha AYNAN {n_q} ta test savoli tuzing: {topic!r}
+Qiyinlik darajasi — {level}.
 
 {JSON_ONLY} Format:
 {{
@@ -1432,16 +1477,16 @@ Quyidagi mavzu bo'yicha AYNAN 10 ta test savoli tuzing: {topic!r}
   "questions": [
     {{
       "question": "Savol matni?",
-      "options": ["Variant 1", "Variant 2", "Variant 3", "Variant 4"],
+      "options": [{options_json}],
       "answer": "B"
     }}
   ]
 }}
 
 Talablar:
-- Har savolda aynan 4 ta variant, faqat bittasi to'g'ri.
-- "answer" maydonida to'g'ri variant harfi bo'lsin: A, B, C yoki D (variantlar tartibiga mos).
-- To'g'ri javoblar A, B, C, D orasida bir tekis taqsimlansin.
+- Har savolda aynan {n_v} ta variant, faqat bittasi to'g'ri.
+- "answer" maydonida to'g'ri variant harfi bo'lsin: {letters_txt} (variantlar tartibiga mos).
+- To'g'ri javoblar variantlar orasida bir tekis taqsimlansin.
 - Variantlar boshiga harf yoki raqam qo'shmang.
 - Savollar aniq, bir ma'noli bo'lsin.{answer_rule}{rule}
 {IGNORE_TOPIC_RULE}
@@ -1449,9 +1494,12 @@ Talablar:
 
     if kind == "krossvord":
         script = "KIRILL harflarida" if alphabet == KIRILL else "lotin harflarida (o', g' belgilari bilan)"
+        n_w = int(opts.get("count") or 14)
+        ask_w = n_w + max(2, math.ceil(n_w * 0.4))
         return f"""
 Siz o'qituvchilar uchun krossvord tuzuvchi mutaxassissiz.
-Quyidagi mavzu bo'yicha AYNAN 14 ta so'z va ta'rif tuzing: {topic!r}
+Quyidagi mavzu bo'yicha AYNAN {ask_w} ta so'z va ta'rif tuzing: {topic!r}
+Qiyinlik darajasi — {level}.
 
 {JSON_ONLY} Format:
 {{
@@ -1698,16 +1746,16 @@ def parse_thesis(raw_text: str) -> dict:
     }
 
 
-def parse_test(raw_text: str) -> dict:
+def parse_test(raw_text: str, count: int = 10, variants: int = 4) -> dict:
     payload = _load_json(raw_text)
     title = str(payload.get("title", "")).strip()[:160]
 
     questions_raw = payload.get("questions")
-    if not isinstance(questions_raw, list) or len(questions_raw) < 5:
+    if not isinstance(questions_raw, list) or len(questions_raw) < max(5, int(count * 0.8)):
         raise ValueError("Savollar yetarli emas")
 
     questions = []
-    for item in questions_raw[:20]:
+    for item in questions_raw[:count]:
         if not isinstance(item, dict):
             raise ValueError("Savol obyekt emas")
         question = str(item.get("question", "")).strip()[:400]
@@ -1715,18 +1763,18 @@ def parse_test(raw_text: str) -> dict:
         if not question or not isinstance(options_raw, list):
             raise ValueError("Savol yoki variantlar noto'g'ri")
         options = [OPTION_PREFIX.sub("", str(o).strip())[:200] for o in options_raw if str(o).strip()]
-        if len(options) != 4:
-            raise ValueError("Variantlar soni 4 ta emas")
+        if len(options) != variants:
+            raise ValueError(f"Variantlar soni {variants} ta emas")
         answer = str(item.get("answer", "")).strip().upper()[:1]
         answer = {"А": "A", "Б": "B", "В": "C", "Г": "D"}.get(answer, answer)
-        if not answer or answer not in "ABCD":
+        if not answer or answer not in "ABCD"[:variants]:
             raise ValueError("To'g'ri javob harfi noto'g'ri")
         questions.append({"question": question, "options": options, "answer": answer})
 
     return {"title": title, "questions": questions}
 
 
-def _process_crossword_sync(raw_text: str, alphabet: str) -> dict:
+def _process_crossword_sync(raw_text: str, alphabet: str, count: int = 14) -> dict:
     payload = _load_json(raw_text)
     words_raw = payload.get("words")
     if not isinstance(words_raw, list):
@@ -1739,7 +1787,7 @@ def _process_crossword_sync(raw_text: str, alphabet: str) -> dict:
         clue = fix_text(str(item.get("clue", "")).strip()[:200], alphabet)
         entries.append((word, clue))
     grid = build_crossword(entries, alphabet)
-    if grid is None or grid["placed"] < 8:
+    if grid is None or grid["placed"] < max(4, round(count * 0.55)):
         raise ValueError("Krossvord uchun yaroqli so'zlar yetarli emas")
     return {"title": str(payload.get("title", "")).strip()[:160], "grid": grid}
 
@@ -1997,22 +2045,27 @@ async def generate_course_work(topic: str, alphabet: str = LATIN, progress=None,
 
 
 async def generate_document_content(kind: str, topic: str, alphabet: str = LATIN,
-                                    progress=None, pages=None) -> dict:
+                                    progress=None, pages=None, opts: dict | None = None) -> dict:
+    opts = opts or {}
     if kind == "kurs":
         return await generate_course_work(topic, alphabet, progress, pages)
     if pages and kind in ("referat", "mustaqil"):
         return await generate_text_document(kind, topic, alphabet, pages, progress)
 
-    prompt = build_document_prompt(kind, topic, alphabet)
+    prompt = build_document_prompt(kind, topic, alphabet, opts)
     if kind == "test":
-        parser = parse_test
+        n_q = int(opts.get("count") or 10)
+        n_v = 3 if opts.get("variants") == 3 else 4
+
+        def parser(raw_text: str) -> dict:
+            return parse_test(raw_text, n_q, n_v)
     elif kind == "maqola":
         parser = parse_article
     elif kind == "tezis":
         parser = parse_thesis
     elif kind == "krossvord":
         raw_text = await call_gemini(prompt, timeout=GEMINI_DOC_TIMEOUT_SECONDS)
-        return await asyncio.to_thread(_process_crossword_sync, raw_text, alphabet)
+        return await asyncio.to_thread(_process_crossword_sync, raw_text, alphabet, int(opts.get("count") or 14))
     else:
         def parser(raw_text: str) -> dict:
             return parse_document(raw_text, kind)
@@ -2110,13 +2163,48 @@ def _roman(n: int) -> str:
     return ROMAN[n - 1] if 1 <= n <= len(ROMAN) else str(n)
 
 
-def _build_text_document(doc, kind: str, topic: str, data: dict, alphabet: str) -> None:
+def _title_page(doc, label: str, title: str, info: dict | None, alphabet: str) -> None:
+    """Titul sahifa. info bo'sh bo'lsa, oddiy (sarlavhali) titul chiqadi."""
+    info = {k: str(v).strip() for k, v in (info or {}).items() if str(v).strip()}
+    if not info:
+        _doc_heading(doc, label, size=20, center=True, space_before=170)
+        _doc_heading(doc, title, size=24 if len(title) <= 60 else 20, center=True, space_before=30)
+        doc.add_page_break()
+        return
+
+    def fx(key: str) -> str:
+        return fix_text(info[key], alphabet)
+
+    if info.get("university"):
+        _doc_heading(doc, fx("university").upper(), size=14, center=True, space_before=0)
+    if info.get("faculty"):
+        _para(doc, fx("faculty"), size=14, line=1.15, indent_cm=0, align=CENTER, after=6)
+    _doc_heading(doc, label, size=20, center=True, space_before=110)
+    _doc_heading(doc, title, size=22 if len(title) <= 60 else 18, center=True, space_before=24)
+
+    rows = []
+    if info.get("student"):
+        rows.append((ui("Bajardi:", alphabet), fx("student")))
+    if info.get("group"):
+        rows.append((ui("Guruh:", alphabet), fx("group")))
+    if info.get("supervisor"):
+        rows.append((ui("Tekshirdi:", alphabet), fx("supervisor")))
+    for index, (head, value) in enumerate(rows):
+        paragraph = _para(doc, value, size=14, line=1.15, indent_cm=0, align=LEFT,
+                          before=70 if index == 0 else 6, prefix=head)
+        paragraph.paragraph_format.left_indent = Cm(7.5)
+
+    footer = " – ".join(fx(k) for k in ("city", "year") if info.get(k))
+    if footer:
+        _para(doc, footer, size=14, line=1.0, indent_cm=0, align=CENTER, before=120 if rows else 200)
+    doc.add_page_break()
+
+
+def _build_text_document(doc, kind: str, topic: str, data: dict, alphabet: str, info: dict | None = None) -> None:
     label = ui(DOC_KINDS[kind]["label"].upper(), alphabet)
     title = fix_text(data.get("title") or topic, alphabet)
 
-    _doc_heading(doc, label, size=20, center=True, space_before=170)
-    _doc_heading(doc, title, size=24 if len(title) <= 60 else 20, center=True, space_before=30)
-    doc.add_page_break()
+    _title_page(doc, label, title, info, alphabet)
 
     _doc_heading(doc, ui("Reja", alphabet), size=16, center=True, space_before=0)
     for number, section in enumerate(data["sections"], start=1):
@@ -2133,11 +2221,9 @@ def _build_text_document(doc, kind: str, topic: str, data: dict, alphabet: str) 
         _numbered(doc, data["questions"], alphabet)
 
 
-def _build_course(doc, topic: str, data: dict, alphabet: str) -> None:
+def _build_course(doc, topic: str, data: dict, alphabet: str, info: dict | None = None) -> None:
     title = fix_text(data.get("title") or topic, alphabet)
-    _doc_heading(doc, ui("KURS ISHI", alphabet), size=20, center=True, space_before=170)
-    _doc_heading(doc, title, size=24 if len(title) <= 60 else 20, center=True, space_before=30)
-    doc.add_page_break()
+    _title_page(doc, ui("KURS ISHI", alphabet), title, info, alphabet)
 
     _doc_heading(doc, ui("MUNDARIJA", alphabet), size=16, center=True, space_before=0)
     _doc_list_item(doc, ui("Kirish", alphabet))
@@ -2215,32 +2301,54 @@ def _build_thesis(doc, topic: str, data: dict, alphabet: str) -> None:
               indent_cm=0, align=LEFT, before=8, prefix=ui("Kalit so'zlar:", alphabet))
 
 
-def _build_test(doc, topic: str, data: dict, alphabet: str) -> None:
-    letters = "АБВГ" if alphabet == KIRILL else "ABCD"
-    key_map = dict(zip("ABCD", letters))
+def _set_columns(section, number: int) -> None:
+    cols = section._sectPr.find(qn("w:cols"))
+    if cols is None:
+        cols = OxmlElement("w:cols")
+        section._sectPr.append(cols)
+    cols.set(qn("w:num"), str(number))
+    cols.set(qn("w:space"), "567")
+
+
+def _build_test(doc, topic: str, data: dict, alphabet: str, opts: dict | None = None) -> None:
+    opts = opts or {}
+    n_v = 3 if opts.get("variants") == 3 else 4
+    two_cols = bool(opts.get("two_columns"))
+    size = 12 if two_cols else 14
+    letters = ("АБВГ" if alphabet == KIRILL else "ABCD")[:n_v]
+    key_map = dict(zip("ABCD"[:n_v], letters))
     title = fix_text(data.get("title") or f"{topic} bo'yicha test", alphabet)
     _doc_heading(doc, title, size=18, center=True, space_before=0)
 
+    author = fix_text(str(opts.get("author") or "").strip(), alphabet)
+    if author:
+        _para(doc, author, size=12, line=1.0, indent_cm=0, align=CENTER, italic=True, after=4,
+              prefix=ui("Muallif:", alphabet))
     info = doc.add_paragraph()
     info.paragraph_format.space_after = DocPt(6)
-    info.add_run(ui("Ism-familiya: ______________________    Sana: ____________", alphabet))
+    info.add_run(ui("Ism-familiya: ______________________    Sana: ____________", alphabet)).font.size = DocPt(size)
+
+    if two_cols:
+        _set_columns(doc.add_section(WD_SECTION.CONTINUOUS), 2)
 
     for number, item in enumerate(data["questions"], start=1):
         question = doc.add_paragraph()
-        question.paragraph_format.space_before = DocPt(10)
+        question.paragraph_format.space_before = DocPt(8)
         question.paragraph_format.space_after = DocPt(2)
         question.paragraph_format.keep_with_next = True
         run = question.add_run(f"{number}. {fix_text(item['question'], alphabet)}")
         run.bold = True
+        run.font.size = DocPt(size)
 
         for index, (letter, option) in enumerate(zip(letters, item["options"])):
             line = doc.add_paragraph()
-            line.paragraph_format.left_indent = Cm(1.0)
+            line.paragraph_format.left_indent = Cm(0.8)
             line.paragraph_format.space_after = DocPt(0)
-            line.paragraph_format.keep_with_next = index != 3
-            line.add_run(f"{letter}) {fix_text(option, alphabet)}")
+            line.paragraph_format.keep_with_next = index != n_v - 1
+            line.add_run(f"{letter}) {fix_text(option, alphabet)}").font.size = DocPt(size)
 
-    doc.add_page_break()
+    key_section = doc.add_section(WD_SECTION.NEW_PAGE)
+    _set_columns(key_section, 1)
     _doc_heading(doc, ui("Javoblar kaliti", alphabet), size=16, center=True, space_before=0)
     table = doc.add_table(rows=1, cols=2)
     table.style = "Table Grid"
@@ -2267,7 +2375,28 @@ def _cell_borders(cell, visible: bool) -> None:
     tc_pr.append(borders)
 
 
-def _crossword_table(doc, grid: dict, show_letters: bool) -> None:
+# 6 ta rang uslubi: (sarlavha rangi, katak fon rangi, raqam rangi)
+CROSSWORD_DESIGNS = [
+    ("1F3A5F", "FFFFFF", "1F3A5F"),  # 0 klassik (oq)
+    ("1E6091", "DCEBF7", "1E6091"),  # 1 ko'k
+    ("2D6A4F", "DDF0E3", "2D6A4F"),  # 2 yashil
+    ("B5542B", "FBE6D8", "B5542B"),  # 3 to'q sariq
+    ("7B3F98", "EBDDF3", "7B3F98"),  # 4 binafsha
+    ("A3304B", "F9DDE3", "A3304B"),  # 5 qizil
+]
+
+
+def _cell_shade(cell, hex_fill: str) -> None:
+    tc_pr = cell._tc.get_or_add_tcPr()
+    shade = OxmlElement("w:shd")
+    shade.set(qn("w:val"), "clear")
+    shade.set(qn("w:color"), "auto")
+    shade.set(qn("w:fill"), hex_fill)
+    tc_pr.append(shade)
+
+
+def _crossword_table(doc, grid: dict, show_letters: bool, design: int = 0) -> None:
+    _title_c, fill_c, num_c = CROSSWORD_DESIGNS[design if 0 <= design < len(CROSSWORD_DESIGNS) else 0]
     side = Cm(0.9)
     table = doc.add_table(rows=grid["rows"], cols=grid["cols"])
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -2284,6 +2413,8 @@ def _crossword_table(doc, grid: dict, show_letters: bool) -> None:
                 _cell_borders(cell, False)
                 continue
             _cell_borders(cell, True)
+            if fill_c != "FFFFFF":
+                _cell_shade(cell, fill_c)
             paragraph = cell.paragraphs[0]
             paragraph.paragraph_format.space_before = DocPt(0)
             paragraph.paragraph_format.space_after = DocPt(0)
@@ -2299,16 +2430,25 @@ def _crossword_table(doc, grid: dict, show_letters: bool) -> None:
                 if number:
                     run = paragraph.add_run(str(number))
                     run.font.size = DocPt(7)
+                    run.font.color.rgb = DocRGB.from_string(num_c)
                 cell.vertical_alignment = WD_ALIGN_VERTICAL.TOP
 
 
-def _build_crossword(doc, topic: str, data: dict, alphabet: str) -> None:
+def _build_crossword(doc, topic: str, data: dict, alphabet: str, opts: dict | None = None) -> None:
+    opts = opts or {}
+    design = opts.get("design")
+    design = design if isinstance(design, int) and 0 <= design < len(CROSSWORD_DESIGNS) else 0
     grid = data["grid"]
     title = fix_text(data.get("title") or topic, alphabet)
-    _doc_heading(doc, f"{ui('KROSSVORD', alphabet)}: {title}", size=16, center=True, space_before=0)
+    heading = _doc_heading(doc, f"{ui('KROSSVORD', alphabet)}: {title}", size=16, center=True, space_before=0)
+    for run in heading.runs:
+        run.font.color.rgb = DocRGB.from_string(CROSSWORD_DESIGNS[design][0])
+    author = fix_text(str(opts.get("author") or "").strip(), alphabet)
+    if author:
+        _para(doc, author, size=11, line=1.0, indent_cm=0, align=CENTER, after=4, prefix=ui("Muallif:", alphabet))
     _para(doc, ui("Raqamli kataklarga savollarning javobini yozing.", alphabet), size=11, line=1.0,
           indent_cm=0, align=CENTER, italic=True, after=8)
-    _crossword_table(doc, grid, show_letters=False)
+    _crossword_table(doc, grid, show_letters=False, design=design)
 
     unit = ui("harf", alphabet)
     _doc_heading(doc, ui("Gorizontal →", alphabet), size=13, space_before=14)
@@ -2320,26 +2460,28 @@ def _build_crossword(doc, topic: str, data: dict, alphabet: str) -> None:
 
     doc.add_page_break()
     _doc_heading(doc, ui("Javoblar", alphabet), size=16, center=True, space_before=0)
-    _crossword_table(doc, grid, show_letters=True)
+    _crossword_table(doc, grid, show_letters=True, design=design)
     answers = [f"{e['number']}→ {e['word']}" for e in grid["across"]]
     answers += [f"{e['number']}↓ {e['word']}" for e in grid["down"]]
     _para(doc, "   ".join(answers), size=11, line=1.2, indent_cm=0, align=LEFT, before=12)
 
 
-def build_docx(kind: str, topic: str, data: dict, output_path: str, alphabet: str = LATIN) -> str:
+def build_docx(kind: str, topic: str, data: dict, output_path: str, alphabet: str = LATIN,
+               opts: dict | None = None) -> str:
+    opts = opts or {}
     doc = _new_document()
     if kind == "test":
-        _build_test(doc, topic, data, alphabet)
+        _build_test(doc, topic, data, alphabet, opts)
     elif kind == "kurs":
-        _build_course(doc, topic, data, alphabet)
+        _build_course(doc, topic, data, alphabet, opts.get("title_info"))
     elif kind == "maqola":
         _build_article(doc, topic, data, alphabet)
     elif kind == "tezis":
         _build_thesis(doc, topic, data, alphabet)
     elif kind == "krossvord":
-        _build_crossword(doc, topic, data, alphabet)
+        _build_crossword(doc, topic, data, alphabet, opts)
     else:
-        _build_text_document(doc, kind, topic, data, alphabet)
+        _build_text_document(doc, kind, topic, data, alphabet, opts.get("title_info"))
     doc.save(output_path)
     return output_path
 
@@ -3971,6 +4113,16 @@ async def api_me(req: MeRequest):
             kind: ({str(k): v for k, v in PRICING[kind].items()} if isinstance(PRICING[kind], dict) else PRICING[kind])
             for kind in ("referat", "mustaqil", "kurs", "maqola", "tezis", "test", "krossvord")
         },
+        "doc_tiers": {
+            "test": [{"max": m, "price": p} for m, p in TEST_TIERS],
+            "krossvord": [{"max": m, "price": p} for m, p in CROSSWORD_TIERS],
+            "test_range": [TEST_MIN, TEST_MAX],
+            "krossvord_range": [CROSSWORD_MIN, CROSSWORD_MAX],
+        },
+        "kurs_tiers": [
+            {"index": i, "pages": f"{lo}–{hi}", "price": KURS_PRICES[i]}
+            for i, (lo, hi) in enumerate(PAGE_TIERS["kurs"])
+        ],
     }
 
 
@@ -4114,6 +4266,17 @@ async def api_generate_slide(req: SlideRequest):
 REJA_PAGES = {3: (10, 15), 4: (15, 25), 5: (20, 30)}
 
 
+class TitleInfo(BaseModel):
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+    university: str = Field(default="", max_length=150)
+    faculty: str = Field(default="", max_length=150)
+    student: str = Field(default="", max_length=100)
+    group: str = Field(default="", max_length=40)
+    supervisor: str = Field(default="", max_length=100)
+    city: str = Field(default="", max_length=60)
+    year: str = Field(default="", max_length=10)
+
+
 class DocRequest(BaseModel):
     model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
     init_data: str = Field(min_length=1, max_length=10_000)
@@ -4121,9 +4284,23 @@ class DocRequest(BaseModel):
     topic: str = Field(min_length=3, max_length=MAX_TOPIC_LENGTH)
     reja: int | None = Field(default=None, ge=3, le=5)
     alphabet: Literal["latin", "kirill", "yangi"] | None = None
+    author: str = Field(default="", max_length=80)
+    difficulty: Literal["easy", "medium", "hard"] = "medium"
+    count: int | None = Field(default=None, ge=5, le=30)
+    variants: Literal[3, 4] = 4
+    two_columns: bool = False
+    design: int | None = Field(default=None, ge=0, le=5)
+    kurs_tier: int | None = Field(default=None, ge=0, le=6)
+    title_info: TitleInfo | None = None
 
 
-def doc_price(kind: str, reja: int | None) -> int:
+def doc_price(kind: str, reja: int | None, count: int | None = None, kurs_tier: int | None = None) -> int:
+    if kind == "test":
+        return tier_price(TEST_TIERS, count or 10)
+    if kind == "krossvord":
+        return tier_price(CROSSWORD_TIERS, count or 14)
+    if kind == "kurs" and kurs_tier is not None:
+        return KURS_PRICES[kurs_tier]
     value = PRICING[kind]
     if isinstance(value, dict):
         return value[reja or 3]
@@ -4131,7 +4308,8 @@ def doc_price(kind: str, reja: int | None) -> int:
 
 
 async def run_doc_job(job_id: str, user_id: int, kind: str, topic: str, alphabet: str, pages,
-                      price: int, charge_kind: str, pending_id: int | None, reservation_id: int) -> None:
+                      price: int, charge_kind: str, pending_id: int | None, reservation_id: int,
+                      opts: dict | None = None) -> None:
     job = JOBS[job_id]
     meta = DOC_KINDS[kind]
     started = time.monotonic()
@@ -4145,10 +4323,10 @@ async def run_doc_job(job_id: str, user_id: int, kind: str, topic: str, alphabet
         job["step"], job["percent"] = 2, 8
         use_progress = kind == "kurs" or bool(pages)
         data = await generate_document_content(
-            kind, topic, alphabet, progress=progress if use_progress else None, pages=pages
+            kind, topic, alphabet, progress=progress if use_progress else None, pages=pages, opts=opts
         )
         job["step"], job["percent"] = 3, 88
-        await asyncio.to_thread(build_docx, kind, topic, data, file_path, alphabet)
+        await asyncio.to_thread(build_docx, kind, topic, data, file_path, alphabet, opts)
         job["step"], job["percent"] = 4, 95
         caption = f"🎉 {meta['label']} tayyor!\n📌 Mavzu: {topic}\n🔤 Alifbo: {ALPHABET_NAMES[alphabet]}"
         if pages:
@@ -4193,7 +4371,21 @@ async def api_generate_doc(req: DocRequest):
     if req.kind in ("referat", "mustaqil") and reja is None:
         reja = 3
     pages = REJA_PAGES[reja] if reja else None
-    price = doc_price(req.kind, reja)
+    if req.kind == "kurs" and req.kurs_tier is not None:
+        pages = PAGE_TIERS["kurs"][req.kurs_tier]
+    count = req.count
+    if req.kind == "test":
+        count = min(max(count or 10, TEST_MIN), TEST_MAX)
+    elif req.kind == "krossvord":
+        count = min(max(count or 14, CROSSWORD_MIN), CROSSWORD_MAX)
+    price = doc_price(req.kind, reja, count, req.kurs_tier)
+    title_info = req.title_info.model_dump() if req.title_info else None
+    if title_info and not any(title_info.values()):
+        title_info = None
+    opts = {
+        "author": req.author, "difficulty": req.difficulty, "count": count, "variants": req.variants,
+        "two_columns": req.two_columns, "design": req.design, "title_info": title_info,
+    }
 
     requested = req.alphabet
     if requested in ALPHABETS:
@@ -4206,9 +4398,9 @@ async def api_generate_doc(req: DocRequest):
     job_id, _job = _new_job(user_id)
     _start_job(run_doc_job(
         job_id, user_id, req.kind, req.topic, alphabet, pages,
-        price, charge_kind, pending_id, reservation_id,
+        price, charge_kind, pending_id, reservation_id, opts=opts,
     ))
-    return {"success": True, "job_id": job_id}
+    return {"success": True, "job_id": job_id, "price": price}
 
 
 @app.post("/api/job-status")
@@ -4528,6 +4720,7 @@ async def api_ocr_to_docx(req: OcrDocxRequest):
     finally:
         if os.path.exists(file_path):
             os.remove(file_path)
+
 
 
 # 2.5 / 3. HUJJATNI TARJIMA QILISH (yangi: abzats bo'yicha, Gemini bilan, fon rejimida)
