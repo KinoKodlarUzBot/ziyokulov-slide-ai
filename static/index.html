@@ -550,6 +550,15 @@
     .wz-done h3 { margin: 8px 0 4px; font-size: 22px; }
     .wz-done p { margin: 0; color: var(--hint); }
     .wz-again { width: 100%; margin-top: 10px; padding: 14px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--text); font: inherit; font-weight: 800; font-size: 15px; cursor: pointer; }
+
+    .chips.wrap { flex-wrap: wrap; overflow: visible; margin: 0 0 12px; padding: 0; }
+    .ac-field { margin-top: 14px; }
+    .ac-field > label { display: block; font-size: 14px; font-weight: 800; margin: 0 2px 8px; }
+    .ac-field > label small { color: var(--hint); font-weight: 600; }
+    .ac-note { color: var(--hint); font-size: 13px; margin: 8px 2px 0; line-height: 1.45; }
+    .ac-sw { width: 46px; height: 46px; border-radius: 13px; border: 2px solid; cursor: pointer; padding: 0; }
+    .ac-sw.on { outline: 3px solid var(--gold); outline-offset: 2px; }
+    .ac-swrow { display: flex; gap: 12px; flex-wrap: wrap; padding: 4px 3px; }
     .wz-nav { display: flex; gap: 10px; margin-top: 18px; }
     .wz-nav button { flex: 1; padding: 15px; border-radius: 16px; font: inherit; font-weight: 800; font-size: 16px; cursor: pointer; border: 1px solid var(--line); }
     .wz-back { background: rgba(255,255,255,.06); color: var(--text); }
@@ -960,29 +969,18 @@
     <!-- ===== 7d. AKADEMIK ISHLAR ===== -->
     <section class="panel" id="panel-academic">
       <div class="subview-top">
-        <button class="btn-back-round" onclick="backToHub()">‹</button>
+        <button class="btn-back-round" type="button" onclick="acBack()">‹</button>
         <span style="font-size:14px; font-weight:700; color:var(--hint);">Akademik ishlar</span>
       </div>
-      <h1 class="h-title" style="margin-bottom:14px;">Nima<br>tayyorlaymiz?</h1>
-
-      <div class="chips" id="ac-kinds"></div>
-
-      <div class="search">
-        <input id="ac-topic" type="text" maxlength="200" autocomplete="off" placeholder="Mavzuni yozing...">
+      <div class="wz-progress" id="ac-progress"></div>
+      <div class="wz-head"><b id="ac-step-title"></b><span id="ac-step-count"></span></div>
+      <div id="ac-body"></div>
+      <div class="message" id="ac-msg" role="status" aria-live="polite"></div>
+      <div class="wz-nav">
+        <button class="wz-back" id="ac-prev" type="button">‹ Orqaga</button>
+        <button class="wz-next" id="ac-next" type="button">Keyingi qadam</button>
       </div>
-
-      <div id="ac-reja-wrap" style="margin-top:14px;">
-        <div style="font-size:14px; font-weight:800; margin-bottom:8px;">Reja soni (hajm)</div>
-        <div class="chips" id="ac-reja"></div>
-      </div>
-
-      <div style="display:flex; justify-content:space-between; margin:6px 2px 0; font-size:14px;">
-        <span style="color:var(--hint);">Narxi</span><b id="ac-price">—</b>
-      </div>
-
-      <button class="submit" id="ac-submit" type="button" onclick="submitAcademic()"><span>Tayyorlash</span></button>
-      <div class="message" id="ac-msg" role="status"></div>
-      <p class="history-note">Tayyor fayl Telegram chatingizga yuboriladi. Alifbo: hozirgi tanlovingiz bo'yicha.</p>
+      <p class="history-note">Tayyor fayl Telegram chatingizga yuboriladi.</p>
     </section>
 
     <!-- ===== 7e. ISH JARAYONI ===== -->
@@ -1131,6 +1129,8 @@
       var freeUsed = 0;
       var isSubscriber = false;
       var docPrices = {};
+      var docTiers = {};
+      var kursTiers = [];
       var toolInfo = null;
 
       var selectedPdfFiles = [];
@@ -1206,12 +1206,14 @@
         modalBalance.textContent = currentBalance.toLocaleString() + " so'm";
         if (data.prices) slidePrices = data.prices;
         if (data.doc_prices) docPrices = data.doc_prices;
+        if (data.doc_tiers) docTiers = data.doc_tiers;
+        if (data.kurs_tiers) kursTiers = data.kurs_tiers;
         if (data.tools) toolInfo = data.tools;
         var ocrHint = document.getElementById("ocr-hint");
         if (ocrHint && toolInfo) {
           ocrHint.textContent = "Suratdagi yozuvni o'qish · " + (freeUsed === 0 ? "bepul (1-marta)" : (isSubscriber ? "obuna ichida" : fmt(toolInfo.ocr)));
         }
-        if (typeof acRender === "function") acRender();
+        if (typeof acRender === "function" && ac && acSteps()[ac.step] === "confirm") acRender();
         if (data.slides) {
           var rg = document.getElementById("slides-range");
           if (rg) {
@@ -1964,130 +1966,6 @@
         }
       }
 
-      window.runDocumentTranslation = async function() {
-        if (!selectedTranslateFile) return;
-        var fd = new FormData();
-        fd.append("init_data", initData);
-        fd.append("target_lang", currentTranslateTarget);
-        fd.append("source_lang", currentTranslateSource);
-        fd.append("background", "1");
-        fd.append("file", selectedTranslateFile);
-        try {
-          var res = await fetch("/api/translate-doc", { method: "POST", body: fd });
-          var d = await res.json();
-          if (!res.ok) {
-            alert(d.detail || "Tarjima qilishda xatolik yuz berdi");
-            if (res.status === 402) openModal();
-            return;
-          }
-          setTrStep(1, 0);
-          showPanel("panel-tr-progress");
-          pollTranslate(d.job_id);
-        } catch (e) { alert("Serverga ulanishda xato!"); }
-      };
-
-      window.convertToLatin = function() {
-        currentTranslateSource = "uz"; currentTranslateTarget = "uz_lat";
-        manualSource = true; manualTarget = true;
-        applyLangs();
-        window.runDocumentTranslation();
-      };
-
-      window.openToolSubview = function(kind) {
-        var panels = document.querySelectorAll(".panel");
-        for (var j = 0; j < panels.length; j++) panels[j].classList.remove("active");
-        if (kind === "images_to_pdf") document.getElementById("panel-images-pdf").classList.add("active");
-        haptic("select");
-      };
-
-      document.getElementById("file-picker-imgs").addEventListener("change", function(e) {
-        var files = Array.from(e.target.files);
-        if (files.length) {
-          selectedPdfFiles = selectedPdfFiles.concat(files);
-          renderThumbs();
-        }
-        this.value = "";
-      });
-
-      window.setPdfSize = function(sz) {
-        selectedPdfSize = sz;
-        document.getElementById("sz-a4").classList.toggle("active", sz === "a4");
-        document.getElementById("sz-fit").classList.toggle("active", sz === "fit");
-        haptic("select");
-      };
-
-      function renderThumbs() {
-        var grid = document.getElementById("pdf-thumbs-grid");
-        grid.innerHTML = "";
-
-        selectedPdfFiles.forEach(function(file, index) {
-          var box = el("div", "img-box");
-          var img = el("img");
-          img.src = URL.createObjectURL(file);
-          var num = el("div", "img-num", (index + 1).toString());
-          var del = el("button", "img-del", "✕");
-          del.onclick = function(e) {
-            e.stopPropagation();
-            selectedPdfFiles.splice(index, 1);
-            renderThumbs();
-          };
-          box.appendChild(img);
-          box.appendChild(num);
-          box.appendChild(del);
-          grid.appendChild(box);
-        });
-
-        var addSlot = el("div", "btn-add-slot");
-        addSlot.innerHTML = `<span class="plus">+</span><span>Qo'shish</span>`;
-        addSlot.onclick = function() { document.getElementById("file-picker-imgs").click(); };
-        grid.appendChild(addSlot);
-
-        var btn = document.getElementById("btn-convert-pdf");
-        btn.disabled = selectedPdfFiles.length === 0;
-        document.getElementById("btn-convert-text").textContent = selectedPdfFiles.length > 0 ? "PDF yaratish (" + selectedPdfFiles.length + " ta)" : "PDF yaratish";
-      }
-
-      window.submitImagesToPdf = async function() {
-        if (!selectedPdfFiles.length) return;
-        var btn = document.getElementById("btn-convert-pdf");
-        var txt = document.getElementById("btn-convert-text");
-        btn.disabled = true;
-        txt.textContent = "Rasmlar yuklanmoqda...";
-
-        var formData = new FormData();
-        formData.append("init_data", initData);
-        formData.append("page_size", selectedPdfSize);
-        selectedPdfFiles.forEach(function(f) { formData.append("files", f); });
-
-        try {
-          var res = await fetch("/api/images-to-pdf", { method: "POST", body: formData });
-          var data = await res.json();
-          if (res.ok) {
-            var firstImgUrl = URL.createObjectURL(selectedPdfFiles[0]);
-            var docName = Math.floor(Math.random() * 90000 + 10000) + ".pdf";
-            addHistoryItem(docName, selectedPdfFiles.length + " ta rasm ➔ PDF", "pdf");
-            haptic("success");
-
-            var panels = document.querySelectorAll(".panel");
-            for (var j = 0; j < panels.length; j++) panels[j].classList.remove("active");
-            document.getElementById("panel-pdf-result").classList.add("active");
-            document.getElementById("stamp-file-preview").src = firstImgUrl;
-            document.getElementById("stamp-file-name").textContent = docName;
-            lastGeneratedPdfFile = selectedPdfFiles[0];
-
-            selectedPdfFiles = [];
-            renderThumbs();
-          } else {
-            alert(data.detail || "Xatolik yuz berdi");
-          }
-        } catch (e) {
-          alert("Serverga ulanib bo'lmadi");
-        } finally {
-          btn.disabled = false;
-          txt.textContent = "PDF yaratish";
-        }
-      };
-
       window.triggerPdfToTxtPicker = function() { activePdfOperation = "txt"; document.getElementById("picker-pdf").click(); };
       window.triggerSplitPdfPicker = function() { activePdfOperation = "split"; document.getElementById("picker-pdf").click(); };
       window.triggerPdfToImagesPicker = function() { activePdfOperation = "imgs"; document.getElementById("picker-pdf").click(); };
@@ -2164,17 +2042,44 @@
         { id: "krossvord", name: "Krossvord" }
       ];
       var AC_REJA = { 3: "3 reja · 10–15 bet", 4: "4 reja · 15–25 bet", 5: "5 reja · 20–30 bet" };
-      var acKind = "referat", acReja = 3, acBusy = false;
+      var AC_LEVELS = [["easy", "Oson"], ["medium", "O'rta"], ["hard", "Qiyin"]];
+      var AC_DESIGNS = [
+        ["Klassik", "#ffffff", "#1F3A5F"], ["Ko'k", "#DCEBF7", "#1E6091"], ["Yashil", "#DDF0E3", "#2D6A4F"],
+        ["To'q sariq", "#FBE6D8", "#B5542B"], ["Binafsha", "#EBDDF3", "#7B3F98"], ["Qizil", "#F9DDE3", "#A3304B"]
+      ];
+      var AC_STEP_NAMES = { info: "Ma'lumot", settings: "Sozlamalar", titul: "Titul sahifa", confirm: "Tasdiqlash" };
+      var ac = {
+        kind: "referat", step: 0, topic: "", author: "", reja: 3, tier: 0, difficulty: "medium",
+        count: 10, variants: 4, two: false, design: 0,
+        ti: { university: "", faculty: "", student: "", group: "", supervisor: "", city: "", year: String(new Date().getFullYear()) }
+      };
+      var acBusy = false;
 
       function acKindName() {
-        for (var i = 0; i < AC_KINDS.length; i++) if (AC_KINDS[i].id === acKind) return AC_KINDS[i].name;
-        return acKind;
+        for (var i = 0; i < AC_KINDS.length; i++) if (AC_KINDS[i].id === ac.kind) return AC_KINDS[i].name;
+        return ac.kind;
+      }
+      function acSteps() {
+        if (ac.kind === "referat" || ac.kind === "mustaqil" || ac.kind === "kurs") return ["info", "settings", "titul", "confirm"];
+        if (ac.kind === "test" || ac.kind === "krossvord") return ["info", "settings", "confirm"];
+        return ["info", "confirm"];
       }
       function acPriceValue() {
-        var p = docPrices[acKind];
+        var k = ac.kind, i;
+        if (k === "test" || k === "krossvord") {
+          var t = docTiers[k] || [];
+          for (i = 0; i < t.length; i++) if (ac.count <= t[i].max) return t[i].price;
+          return t.length ? t[t.length - 1].price : (typeof docPrices[k] === "number" ? docPrices[k] : null);
+        }
+        if (k === "kurs" && kursTiers[ac.tier]) return kursTiers[ac.tier].price;
+        var p = docPrices[k];
         if (p == null) return null;
-        if (typeof p === "object") return p[String(acReja)];
+        if (typeof p === "object") return p[String(ac.reja)];
         return p;
+      }
+      function acPayNeeded() {
+        if (freeUsed === 0 || isSubscriber) return 0;
+        return acPriceValue() || 0;
       }
       function acPriceLabel() {
         if (freeUsed === 0) return "Bepul (1-marta)";
@@ -2182,30 +2087,218 @@
         var v = acPriceValue();
         return v == null ? "—" : fmt(v);
       }
-      function acRender() {
-        var kinds = document.getElementById("ac-kinds");
-        if (!kinds) return;
-        kinds.textContent = "";
-        AC_KINDS.forEach(function (k) {
-          var b = el("button", "chip" + (k.id === acKind ? " active" : ""), k.name);
+      function acAlphaName() {
+        return selectedAlphabet === "kirill" ? "Кирилл" : (selectedAlphabet === "yangi" ? "Yangi alifbo" : "Joriy alifbo (lotin)");
+      }
+      function acSay(kind, t) {
+        var m = document.getElementById("ac-msg");
+        m.className = kind ? "message show " + kind : "message";
+        m.textContent = t || "";
+      }
+      function acField(label, hint, value, maxlen, onInput, placeholder) {
+        var wrap = el("div", "ac-field");
+        var lb = el("label", "", label);
+        if (hint) { lb.appendChild(document.createTextNode(" ")); lb.appendChild(el("small", "", hint)); }
+        wrap.appendChild(lb);
+        var box = el("div", "search");
+        var inp = document.createElement("input");
+        inp.type = "text"; inp.maxLength = maxlen; inp.value = value; inp.autocomplete = "off";
+        if (placeholder) inp.placeholder = placeholder;
+        inp.addEventListener("input", function () { onInput(inp.value); });
+        box.appendChild(inp); wrap.appendChild(box);
+        return { wrap: wrap, input: inp };
+      }
+      function acChips(options, current, onPick) {
+        var row = el("div", "chips wrap");
+        options.forEach(function (o) {
+          var b = el("button", "chip" + (String(o[0]) === String(current) ? " active" : ""), o[1]);
           b.type = "button";
-          b.addEventListener("click", function () { acKind = k.id; haptic("select"); acRender(); });
+          b.addEventListener("click", function () { haptic("select"); onPick(o[0]); acRender(); });
+          row.appendChild(b);
+        });
+        return row;
+      }
+      function acGroup(title, node, note) {
+        var wrap = el("div", "ac-field");
+        wrap.appendChild(el("label", "", title));
+        wrap.appendChild(node);
+        if (note) wrap.appendChild(el("p", "ac-note", note));
+        return wrap;
+      }
+      function acSlider(title, min, max, value, onChange) {
+        var wrap = el("div", "block");
+        wrap.style.marginTop = "18px";
+        var head = el("div", "sec-head");
+        head.appendChild(el("h2", "", title));
+        var big = el("b", "wz-big", String(value));
+        head.appendChild(big); wrap.appendChild(head);
+        var r = el("div", "wz-range");
+        var inp = document.createElement("input");
+        inp.type = "range"; inp.min = min; inp.max = max; inp.step = 1; inp.value = value;
+        inp.addEventListener("input", function () { big.textContent = inp.value; onChange(parseInt(inp.value, 10)); });
+        r.appendChild(inp);
+        var ticks = el("div", "wz-ticks");
+        [min, Math.round((min + max) / 2), max].forEach(function (n) { ticks.appendChild(el("span", "", String(n))); });
+        r.appendChild(ticks); wrap.appendChild(r);
+        return wrap;
+      }
+
+      function acBuildInfo(body) {
+        var kinds = el("div", "chips wrap");
+        AC_KINDS.forEach(function (k) {
+          var b = el("button", "chip" + (k.id === ac.kind ? " active" : ""), k.name);
+          b.type = "button";
+          b.addEventListener("click", function () {
+            if (ac.kind !== k.id) {
+              ac.kind = k.id;
+              ac.count = k.id === "krossvord" ? 14 : 10;
+              if (ac.step >= acSteps().length) ac.step = 0;
+            }
+            haptic("select"); acRender();
+          });
           kinds.appendChild(b);
         });
-        var showReja = acKind === "referat" || acKind === "mustaqil";
-        document.getElementById("ac-reja-wrap").style.display = showReja ? "" : "none";
-        var rj = document.getElementById("ac-reja");
-        rj.textContent = "";
-        [3, 4, 5].forEach(function (n) {
-          var b = el("button", "chip" + (n === acReja ? " active" : ""), AC_REJA[n]);
-          b.type = "button";
-          b.addEventListener("click", function () { acReja = n; haptic("select"); acRender(); });
-          rj.appendChild(b);
-        });
-        document.getElementById("ac-price").textContent = acPriceLabel();
-        document.getElementById("ac-topic").placeholder = acKindName() + " mavzusini yozing...";
+        body.appendChild(kinds);
+        var t = acField("Mavzu", "", ac.topic, 200, function (v) { ac.topic = v; }, acKindName() + " mavzusini yozing...");
+        t.input.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); acNext(); } });
+        body.appendChild(t.wrap);
+        if (ac.kind === "test" || ac.kind === "krossvord") {
+          body.appendChild(acField("Muallif", "(ixtiyoriy)", ac.author, 80, function (v) { ac.author = v; }, "F.I.Sh. yoki o'qituvchi ismi").wrap);
+        }
       }
+      function acBuildSettings(body) {
+        var k = ac.kind;
+        if (k === "referat" || k === "mustaqil") {
+          body.appendChild(acGroup("Hajm", acChips([[3, AC_REJA[3]], [4, AC_REJA[4]], [5, AC_REJA[5]]], ac.reja, function (v) { ac.reja = v; })));
+        } else if (k === "kurs") {
+          if (!kursTiers.length) {
+            body.appendChild(el("p", "ac-note", "Kurs ishi standart hajmda tayyorlanadi."));
+          } else {
+            var opts = kursTiers.map(function (t) { return [t.index, t.pages + " bet"]; });
+            body.appendChild(acGroup("Hajm", acChips(opts, ac.tier, function (v) { ac.tier = v; }), "Hajm oshgani sari ish uzoqroq tayyorlanadi."));
+          }
+        } else if (k === "test") {
+          body.appendChild(acGroup("Qiyinlik", acChips(AC_LEVELS, ac.difficulty, function (v) { ac.difficulty = v; })));
+          body.appendChild(acSlider("Savollar soni", 5, 30, ac.count, function (v) { ac.count = v; }));
+          body.appendChild(acGroup("Variantlar", acChips([[3, "A B C"], [4, "A B C D"]], ac.variants, function (v) { ac.variants = v; })));
+          body.appendChild(acGroup("Joylashuv", acChips([[0, "1 ustun"], [1, "2 ustun"]], ac.two ? 1 : 0, function (v) { ac.two = v === 1; })));
+        } else if (k === "krossvord") {
+          body.appendChild(acGroup("Qiyinlik", acChips(AC_LEVELS, ac.difficulty, function (v) { ac.difficulty = v; })));
+          body.appendChild(acSlider("So'zlar soni", 5, 30, ac.count, function (v) { ac.count = v; }));
+          var row = el("div", "ac-swrow");
+          AC_DESIGNS.forEach(function (d, i) {
+            var b = el("button", "ac-sw" + (i === ac.design ? " on" : ""));
+            b.type = "button"; b.title = d[0];
+            b.style.background = d[1]; b.style.borderColor = d[2];
+            b.addEventListener("click", function () { ac.design = i; haptic("select"); acRender(); });
+            row.appendChild(b);
+          });
+          body.appendChild(acGroup("Rang uslubi: " + AC_DESIGNS[ac.design][0], row));
+        }
+      }
+      function acBuildTitul(body) {
+        body.appendChild(el("p", "ac-note", "Hammasi ixtiyoriy. Hech narsa yozmasangiz, oddiy titul sahifa chiqadi."));
+        var f = [
+          ["university", "Universitet / oliy ta'lim muassasasi", "", 150],
+          ["faculty", "Fakultet", "", 150],
+          ["student", "Talaba (F.I.Sh.)", "", 100],
+          ["group", "Guruh", "", 40],
+          ["supervisor", "Ilmiy rahbar (F.I.Sh.)", "", 100],
+          ["city", "Shahar", "", 60],
+          ["year", "Yil", "", 10]
+        ];
+        f.forEach(function (x) {
+          body.appendChild(acField(x[1], x[2], ac.ti[x[0]], x[3], function (v) { ac.ti[x[0]] = v; }).wrap);
+        });
+      }
+      function acSummaryRow(box, label, value) {
+        var d = el("div"); d.appendChild(el("span", "", label)); d.appendChild(el("b", "", value)); box.appendChild(d);
+      }
+      function acBuildConfirm(body) {
+        var k = ac.kind;
+        var sum = el("div", "wz-sum");
+        acSummaryRow(sum, "Turi", acKindName());
+        acSummaryRow(sum, "Mavzu", ac.topic.trim() || "—");
+        acSummaryRow(sum, "Alifbo", acAlphaName());
+        if (k === "referat" || k === "mustaqil") acSummaryRow(sum, "Hajm", AC_REJA[ac.reja]);
+        if (k === "kurs" && kursTiers[ac.tier]) acSummaryRow(sum, "Hajm", kursTiers[ac.tier].pages + " bet");
+        if (k === "test" || k === "krossvord") {
+          acSummaryRow(sum, "Qiyinlik", (AC_LEVELS.filter(function (l) { return l[0] === ac.difficulty; })[0] || ["", ""])[1]);
+          acSummaryRow(sum, k === "test" ? "Savollar" : "So'zlar", ac.count + " ta");
+        }
+        if (k === "test") {
+          acSummaryRow(sum, "Variantlar", ac.variants === 3 ? "A B C" : "A B C D");
+          acSummaryRow(sum, "Joylashuv", ac.two ? "2 ustun" : "1 ustun");
+        }
+        if (k === "krossvord") acSummaryRow(sum, "Rang", AC_DESIGNS[ac.design][0]);
+        if ((k === "test" || k === "krossvord") && ac.author.trim()) acSummaryRow(sum, "Muallif", ac.author.trim());
+        if ((k === "referat" || k === "mustaqil" || k === "kurs") && (ac.ti.university.trim() || ac.ti.student.trim())) {
+          acSummaryRow(sum, "Titul", [ac.ti.university.trim(), ac.ti.student.trim()].filter(Boolean).join(" · "));
+        }
+        body.appendChild(sum);
+
+        var pr = el("div", "wz-price"); pr.appendChild(el("span", "", "Narxi")); pr.appendChild(el("b", "", acPriceLabel()));
+        body.appendChild(pr);
+        var bal = el("div", "wz-price"); bal.style.marginTop = "8px";
+        bal.appendChild(el("span", "", "Balansingiz")); bal.appendChild(el("b", "", fmt(currentBalance)));
+        body.appendChild(bal);
+
+        var lack = acPayNeeded() - currentBalance;
+        if (acPayNeeded() > 0 && lack > 0) {
+          var w = el("div", "wz-warn", "Balansingizda mablag' yetarli emas. Iltimos, avval balansingizni to'ldiring.");
+          w.appendChild(el("b", "", "Yetishmayotgan: " + fmt(lack)));
+          body.appendChild(w);
+          var tb = el("button", "wz-topup", "💳 Balans to'ldirish"); tb.type = "button";
+          tb.addEventListener("click", openModal);
+          body.appendChild(tb);
+        }
+      }
+
+      function acRender() {
+        var body = document.getElementById("ac-body");
+        if (!body) return;
+        var steps = acSteps();
+        if (ac.step >= steps.length) ac.step = steps.length - 1;
+        var cur = steps[ac.step];
+        body.textContent = "";
+        var prog = document.getElementById("ac-progress");
+        prog.textContent = "";
+        prog.style.gridTemplateColumns = "repeat(" + steps.length + ", 1fr)";
+        steps.forEach(function (s, i) { prog.appendChild(el("i", i <= ac.step ? "on" : "")); });
+        document.getElementById("ac-step-title").textContent = AC_STEP_NAMES[cur];
+        document.getElementById("ac-step-count").textContent = (ac.step + 1) + " / " + steps.length;
+        if (cur === "info") acBuildInfo(body);
+        else if (cur === "settings") acBuildSettings(body);
+        else if (cur === "titul") acBuildTitul(body);
+        else acBuildConfirm(body);
+
+        var last = cur === "confirm";
+        var needTopup = last && acPayNeeded() > 0 && acPayNeeded() > currentBalance;
+        document.getElementById("ac-prev").style.visibility = ac.step === 0 ? "hidden" : "visible";
+        var nx = document.getElementById("ac-next");
+        nx.textContent = last ? "Tayyorlash" : "Keyingi qadam";
+        nx.style.display = needTopup ? "none" : "";
+        nx.disabled = acBusy;
+      }
+      function acNext() {
+        if (acBusy) return;
+        var cur = acSteps()[ac.step];
+        if (cur === "info" && ac.topic.trim().length < 3) { acSay("error", "Mavzu kamida 3 ta belgi bo'lsin."); haptic("error"); return; }
+        acSay("");
+        if (cur === "confirm") { acSubmit(); return; }
+        ac.step += 1; haptic("select"); acRender(); window.scrollTo(0, 0);
+      }
+      function acPrev() {
+        if (acBusy || ac.step === 0) return;
+        acSay(""); ac.step -= 1; haptic("select"); acRender();
+      }
+      window.acBack = function () { if (ac.step > 0) acPrev(); else backToHub(); };
+      document.getElementById("ac-next").addEventListener("click", acNext);
+      document.getElementById("ac-prev").addEventListener("click", acPrev);
+
       window.openAcademic = function () {
+        ac.step = 0; ac.topic = "";
+        acSay("");
         showPanel("panel-academic");
         acRender();
         haptic("select");
@@ -2216,39 +2309,49 @@
         document.getElementById("job-percent").textContent = p + "%";
       }
 
-      window.submitAcademic = async function () {
+      async function acSubmit() {
         if (acBusy) return;
-        var topicValue = document.getElementById("ac-topic").value.trim();
-        var msgEl = document.getElementById("ac-msg");
-        var btn = document.getElementById("ac-submit");
-        function say(kind, t) { msgEl.className = "message show " + kind; msgEl.textContent = t; }
-        if (topicValue.length < 3) { say("error", "Mavzu kamida 3 ta belgi bo'lsin."); haptic("error"); return; }
-        if (!initData) { say("error", "Ilovani Telegram ichida oching."); return; }
-
+        var topicValue = ac.topic.trim();
+        if (!initData) { acSay("error", "Ilovani Telegram ichida oching."); return; }
+        var k = ac.kind;
+        var isText = (k === "referat" || k === "mustaqil" || k === "kurs");
+        var ti = null;
+        if (isText) {
+          ti = {};
+          Object.keys(ac.ti).forEach(function (key) { ti[key] = ac.ti[key].trim(); });
+        }
         acBusy = true;
-        btn.disabled = true;
-        say("info", "Yuborilmoqda...");
+        document.getElementById("ac-next").disabled = true;
+        acSay("info", "Yuborilmoqda...");
         try {
           var res = await fetch("/api/generate-doc", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               init_data: initData,
-              kind: acKind,
+              kind: k,
               topic: topicValue,
-              reja: (acKind === "referat" || acKind === "mustaqil") ? acReja : null,
-              alphabet: selectedAlphabet
+              reja: (k === "referat" || k === "mustaqil") ? ac.reja : null,
+              alphabet: selectedAlphabet,
+              author: (k === "test" || k === "krossvord") ? ac.author.trim() : "",
+              difficulty: ac.difficulty,
+              count: (k === "test" || k === "krossvord") ? ac.count : null,
+              variants: ac.variants,
+              two_columns: k === "test" ? ac.two : false,
+              design: k === "krossvord" ? ac.design : null,
+              kurs_tier: (k === "kurs" && kursTiers.length) ? ac.tier : null,
+              title_info: ti
             })
           });
           var d = null;
           try { d = await res.json(); } catch (e) { }
           if (!res.ok) {
             if (res.status === 402) openModal();
-            say("error", extractError(d, res.status));
+            acSay("error", extractError(d, res.status));
             haptic("error");
             return;
           }
-          msgEl.className = "message";
+          acSay("");
           document.getElementById("job-name").textContent = acKindName() + ": " + topicValue.slice(0, 80);
           setJobProgress(0);
           showPanel("panel-job");
@@ -2264,13 +2367,13 @@
           haptic("success");
           showPanel("panel-job-done");
         } catch (e) {
-          say("error", "Serverga ulanib bo'lmadi.");
+          acSay("error", "Serverga ulanib bo'lmadi.");
         } finally {
           acBusy = false;
-          btn.disabled = false;
+          acRender();
           loadUserData();
         }
-      };
+      }
 
       topicEl.addEventListener("input", function () { updateCounter(); updateWizard(); });
       goStep(1);
