@@ -558,6 +558,18 @@
     .ac-note { color: var(--hint); font-size: 13px; margin: 8px 2px 0; line-height: 1.45; }
     .ac-sw { width: 46px; height: 46px; border-radius: 13px; border: 2px solid; cursor: pointer; padding: 0; }
     .ac-sw.on { outline: 3px solid var(--gold); outline-offset: 2px; }
+    .ac-opt { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 13px 14px; margin-bottom: 10px; border: 2px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text); font: inherit; cursor: pointer; }
+    .ac-opt.on { border-color: var(--gold); background: rgba(245, 183, 61, .1); }
+    .ac-opt-l { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+    .ac-opt-l b { font-size: 15px; }
+    .ac-opt-l span { font-size: 12.5px; color: var(--hint); line-height: 1.35; }
+    .ac-opt em { font-style: normal; color: var(--hint); font-weight: 700; font-size: 14px; }
+    .ac-ind { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 14px; font-style: normal; font-weight: 800; color: var(--gold-ink); flex: none; }
+    .ac-ind.sq { border-radius: 7px; }
+    .ac-ind.on { background: var(--gold); border-color: var(--gold); }
+    .ac-ta { width: 100%; min-height: 110px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--text); padding: 12px; font: inherit; resize: vertical; box-sizing: border-box; }
+    .ac-fold { display: flex; justify-content: space-between; align-items: center; width: 100%; text-align: left; padding: 13px 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--text); font: inherit; cursor: pointer; }
+    .ac-fold small { display: block; color: var(--hint); margin-top: 3px; }
     .ac-swrow { display: flex; gap: 12px; flex-wrap: wrap; padding: 4px 3px; }
     .wz-nav { display: flex; gap: 10px; margin-top: 18px; }
     .wz-nav button { flex: 1; padding: 15px; border-radius: 16px; font: inherit; font-weight: 800; font-size: 16px; cursor: pointer; border: 1px solid var(--line); }
@@ -573,7 +585,36 @@
     .alpha-cards button.on { border-color: var(--gold); background: rgba(245,183,61,.12); }
     .alpha-cards button.on .ac-title { color: var(--gold-soft); }
     .alpha-cards button.on .ac-dot { border-color: var(--gold); background: var(--gold); box-shadow: inset 0 0 0 5px var(--gold-ink); }
-  </style>
+  
+    .cg-status { text-align: center; font-weight: 800; font-size: 15px; margin: 4px 0 12px; min-height: 22px; }
+    .cg-status.win { color: var(--gold); }
+    .cg-status.end { color: var(--hint); }
+    .cg-wrap { position: relative; display: flex; justify-content: center; --cb: min(calc(100vw - 28px), 440px); }
+    .cb { width: var(--cb); height: var(--cb); display: grid; grid-template-columns: repeat(8, 1fr); border-radius: 12px; overflow: hidden; border: 2px solid var(--line); touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+    .cb .cell { position: relative; display: flex; align-items: center; justify-content: center; font-size: calc(var(--cb) / 8 * 0.82); line-height: 1; cursor: pointer; }
+    .cb .cell.lt { background: #ecdcb8; }
+    .cb .cell.dk { background: #b58863; }
+    .cb .cell.lm::before { content: ""; position: absolute; inset: 0; background: rgba(246, 224, 94, .45); }
+    .cb .cell.sel::before { content: ""; position: absolute; inset: 0; background: rgba(80, 180, 255, .5); }
+    .cb .cell.chk::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle, rgba(229, 83, 75, .9) 0%, rgba(229, 83, 75, 0) 75%); }
+    .cb .cell.dot::after { content: ""; position: absolute; width: 28%; height: 28%; border-radius: 50%; background: rgba(20, 20, 20, .32); }
+    .cb .cell.cap::after { content: ""; position: absolute; inset: 4%; border-radius: 50%; border: 4px solid rgba(20, 20, 20, .35); }
+    .cb .pw, .cb .pb, .cg-pbtn.pw, .cg-pbtn.pb { position: relative; z-index: 1; }
+    .pw { color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 2px #000; }
+    .pb { color: #151515; text-shadow: 0 0 1px rgba(255, 255, 255, .55); }
+    .cb .rk, .cb .fl { position: absolute; font-size: 10px; font-style: normal; font-weight: 700; opacity: .65; z-index: 2; pointer-events: none; color: #5a4632; }
+    .cb .rk { top: 2px; left: 3px; }
+    .cb .fl { bottom: 1px; right: 3px; }
+    .cg-promo { position: absolute; inset: 0; margin: auto; width: min(100%, 320px); height: fit-content; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; text-align: center; z-index: 5; box-shadow: 0 10px 40px rgba(0, 0, 0, .5); }
+    .cg-promo[hidden] { display: none; }
+    .cg-promo p { margin: 0 0 12px; font-weight: 700; }
+    .cg-prow { display: flex; gap: 10px; justify-content: center; margin-bottom: 12px; }
+    .cg-pbtn { width: 56px; height: 56px; font-size: 40px; line-height: 1; border-radius: 14px; border: 2px solid var(--line); background: #b58863; cursor: pointer; }
+    .cg-pcancel { background: none; border: none; color: var(--hint); font: inherit; cursor: pointer; padding: 6px; }
+    .cg-actions { display: flex; gap: 12px; margin-top: 16px; }
+    .cg-actions button { flex: 1; }
+    .cg-actions button:disabled { opacity: .45; }
+</style>
 </head>
 <body>
   <main class="app">
@@ -582,6 +623,7 @@
         <button class="tab active" type="button" data-tab="create"><span class="ic">✨</span><span class="lb">Yaratish</span></button>
         <button class="tab" type="button" data-tab="docs"><span class="ic">📄</span><span class="lb">Hujjatlar</span></button>
         <button class="tab" type="button" data-tab="topics"><span class="ic">🔥</span><span class="lb">Mavzular</span></button>
+        <button class="tab" type="button" data-tab="game"><span class="ic">♞&#xFE0E;</span><span class="lb">Shaxmat</span></button>
         <button class="tab" type="button" data-tab="help"><span class="ic">❓</span><span class="lb">Yordam</span></button>
       </nav>
       <button class="limit" id="limit-btn" type="button" title="Balansni to'ldirish">
@@ -1011,12 +1053,28 @@
     </section>
 
     <!-- ===== 9. Yordam ===== -->
+    <section class="panel" id="panel-game">
+      <div class="sec-head"><h2>Shaxmat — kompyuterga qarshi</h2></div>
+      <div class="chips wrap" id="cg-levels"></div>
+      <div class="chips wrap" id="cg-colors"></div>
+      <p class="cg-status" id="cg-status"></p>
+      <div class="cg-wrap">
+        <div class="cb" id="cg-board"></div>
+        <div class="cg-promo" id="cg-promo" hidden></div>
+      </div>
+      <div class="cg-actions">
+        <button class="wz-back" id="cg-undo" type="button">↶ Qaytarish</button>
+        <button class="wz-next" id="cg-new" type="button">Yangi o'yin</button>
+      </div>
+    </section>
+
     <section class="panel" id="panel-help">
       <div class="sec-head"><h2>Nimalar qila olaman</h2></div>
       <ul class="help-list">
         <li><span class="hi">✨</span><div><b>Slayd yaratish</b><span>Mavzuni yozasiz, PowerPoint taqdimot fayli to'g'ridan-to'g'ri Telegram chatingizga keladi.</span></div></li>
         <li><span class="hi">📄</span><div><b>Hujjat asboblari</b><span>Rasmlardan PDF, rasmdan matn (OCR), Kirill ↔ Lotin va til tarjimalari.</span></div></li>
         <li><span class="hi">🎨</span><div><b>15 xil uslub va tuzilish</b><span>2 ustun, gorizontal bosqichlar, iqtibos, asimmetrik va minimal ro'yxatlar.</span></div></li>
+        <li><span class="hi">♞&#xFE0E;</span><div><b>Shaxmat</b><span>Kompyuterga qarshi o'ynang: oson, o'rta yoki qiyin daraja. Bepul.</span></div></li>
         <li><span class="hi">🎁</span><div><b>1-martalik Bepul sinov</b><span>Har bir yangi foydalanuvchi birinchi buyurtmasini mutlaqo bepul oladi!</span></div></li>
         <li><span class="hi">💳</span><div><b>Click orqali to'lov</b><span>Balansingizni yuqoridagi tugma orqali osongina to'ldirishingiz mumkin.</span></div></li>
       </ul>
@@ -1131,6 +1189,8 @@
       var docPrices = {};
       var docTiers = {};
       var kursTiers = [];
+      var articleTiers = [];
+      var thesisTiers = [];
       var toolInfo = null;
 
       var selectedPdfFiles = [];
@@ -1208,6 +1268,8 @@
         if (data.doc_prices) docPrices = data.doc_prices;
         if (data.doc_tiers) docTiers = data.doc_tiers;
         if (data.kurs_tiers) kursTiers = data.kurs_tiers;
+        if (data.article_tiers) articleTiers = data.article_tiers;
+        if (data.thesis_tiers) thesisTiers = data.thesis_tiers;
         if (data.tools) toolInfo = data.tools;
         var ocrHint = document.getElementById("ocr-hint");
         if (ocrHint && toolInfo) {
@@ -1339,7 +1401,7 @@
         }
         var panels = document.querySelectorAll(".panel");
         for (var j = 0; j < panels.length; j++) panels[j].classList.toggle("active", panels[j].id === "panel-" + name);
-        countEl.style.display = (name === "help" || name === "docs") ? "none" : "";
+        countEl.style.display = (name === "help" || name === "docs" || name === "game") ? "none" : "";
         window.scrollTo(0, 0);
         haptic("select");
       }
@@ -1966,6 +2028,130 @@
         }
       }
 
+      window.runDocumentTranslation = async function() {
+        if (!selectedTranslateFile) return;
+        var fd = new FormData();
+        fd.append("init_data", initData);
+        fd.append("target_lang", currentTranslateTarget);
+        fd.append("source_lang", currentTranslateSource);
+        fd.append("background", "1");
+        fd.append("file", selectedTranslateFile);
+        try {
+          var res = await fetch("/api/translate-doc", { method: "POST", body: fd });
+          var d = await res.json();
+          if (!res.ok) {
+            alert(d.detail || "Tarjima qilishda xatolik yuz berdi");
+            if (res.status === 402) openModal();
+            return;
+          }
+          setTrStep(1, 0);
+          showPanel("panel-tr-progress");
+          pollTranslate(d.job_id);
+        } catch (e) { alert("Serverga ulanishda xato!"); }
+      };
+
+      window.convertToLatin = function() {
+        currentTranslateSource = "uz"; currentTranslateTarget = "uz_lat";
+        manualSource = true; manualTarget = true;
+        applyLangs();
+        window.runDocumentTranslation();
+      };
+
+      window.openToolSubview = function(kind) {
+        var panels = document.querySelectorAll(".panel");
+        for (var j = 0; j < panels.length; j++) panels[j].classList.remove("active");
+        if (kind === "images_to_pdf") document.getElementById("panel-images-pdf").classList.add("active");
+        haptic("select");
+      };
+
+      document.getElementById("file-picker-imgs").addEventListener("change", function(e) {
+        var files = Array.from(e.target.files);
+        if (files.length) {
+          selectedPdfFiles = selectedPdfFiles.concat(files);
+          renderThumbs();
+        }
+        this.value = "";
+      });
+
+      window.setPdfSize = function(sz) {
+        selectedPdfSize = sz;
+        document.getElementById("sz-a4").classList.toggle("active", sz === "a4");
+        document.getElementById("sz-fit").classList.toggle("active", sz === "fit");
+        haptic("select");
+      };
+
+      function renderThumbs() {
+        var grid = document.getElementById("pdf-thumbs-grid");
+        grid.innerHTML = "";
+
+        selectedPdfFiles.forEach(function(file, index) {
+          var box = el("div", "img-box");
+          var img = el("img");
+          img.src = URL.createObjectURL(file);
+          var num = el("div", "img-num", (index + 1).toString());
+          var del = el("button", "img-del", "✕");
+          del.onclick = function(e) {
+            e.stopPropagation();
+            selectedPdfFiles.splice(index, 1);
+            renderThumbs();
+          };
+          box.appendChild(img);
+          box.appendChild(num);
+          box.appendChild(del);
+          grid.appendChild(box);
+        });
+
+        var addSlot = el("div", "btn-add-slot");
+        addSlot.innerHTML = `<span class="plus">+</span><span>Qo'shish</span>`;
+        addSlot.onclick = function() { document.getElementById("file-picker-imgs").click(); };
+        grid.appendChild(addSlot);
+
+        var btn = document.getElementById("btn-convert-pdf");
+        btn.disabled = selectedPdfFiles.length === 0;
+        document.getElementById("btn-convert-text").textContent = selectedPdfFiles.length > 0 ? "PDF yaratish (" + selectedPdfFiles.length + " ta)" : "PDF yaratish";
+      }
+
+      window.submitImagesToPdf = async function() {
+        if (!selectedPdfFiles.length) return;
+        var btn = document.getElementById("btn-convert-pdf");
+        var txt = document.getElementById("btn-convert-text");
+        btn.disabled = true;
+        txt.textContent = "Rasmlar yuklanmoqda...";
+
+        var formData = new FormData();
+        formData.append("init_data", initData);
+        formData.append("page_size", selectedPdfSize);
+        selectedPdfFiles.forEach(function(f) { formData.append("files", f); });
+
+        try {
+          var res = await fetch("/api/images-to-pdf", { method: "POST", body: formData });
+          var data = await res.json();
+          if (res.ok) {
+            var firstImgUrl = URL.createObjectURL(selectedPdfFiles[0]);
+            var docName = Math.floor(Math.random() * 90000 + 10000) + ".pdf";
+            addHistoryItem(docName, selectedPdfFiles.length + " ta rasm ➔ PDF", "pdf");
+            haptic("success");
+
+            var panels = document.querySelectorAll(".panel");
+            for (var j = 0; j < panels.length; j++) panels[j].classList.remove("active");
+            document.getElementById("panel-pdf-result").classList.add("active");
+            document.getElementById("stamp-file-preview").src = firstImgUrl;
+            document.getElementById("stamp-file-name").textContent = docName;
+            lastGeneratedPdfFile = selectedPdfFiles[0];
+
+            selectedPdfFiles = [];
+            renderThumbs();
+          } else {
+            alert(data.detail || "Xatolik yuz berdi");
+          }
+        } catch (e) {
+          alert("Serverga ulanib bo'lmadi");
+        } finally {
+          btn.disabled = false;
+          txt.textContent = "PDF yaratish";
+        }
+      };
+
       window.triggerPdfToTxtPicker = function() { activePdfOperation = "txt"; document.getElementById("picker-pdf").click(); };
       window.triggerSplitPdfPicker = function() { activePdfOperation = "split"; document.getElementById("picker-pdf").click(); };
       window.triggerPdfToImagesPicker = function() { activePdfOperation = "imgs"; document.getElementById("picker-pdf").click(); };
@@ -2051,6 +2237,7 @@
       var ac = {
         kind: "referat", step: 0, topic: "", author: "", reja: 3, tier: 0, difficulty: "medium",
         count: 10, variants: 4, two: false, design: 0,
+        detail: "", detailOpen: false, structure: "traditional", size: 0, langs: { ru: false, en: false }, udk: "",
         ti: { university: "", faculty: "", student: "", group: "", supervisor: "", city: "", year: String(new Date().getFullYear()) }
       };
       var acBusy = false;
@@ -2062,10 +2249,12 @@
       function acSteps() {
         if (ac.kind === "referat" || ac.kind === "mustaqil" || ac.kind === "kurs") return ["info", "settings", "titul", "confirm"];
         if (ac.kind === "test" || ac.kind === "krossvord") return ["info", "settings", "confirm"];
-        return ["info", "confirm"];
+        return ["info", "settings", "confirm"];
       }
       function acPriceValue() {
         var k = ac.kind, i;
+        if (k === "maqola" && articleTiers[ac.size]) return articleTiers[ac.size].price;
+        if (k === "tezis" && thesisTiers[ac.size]) return thesisTiers[ac.size].price;
         if (k === "test" || k === "krossvord") {
           var t = docTiers[k] || [];
           for (i = 0; i < t.length; i++) if (ac.count <= t[i].max) return t[i].price;
@@ -2143,6 +2332,67 @@
         return wrap;
       }
 
+      function acOpt(title, sub, right, on, square, onClick) {
+        var b = el("button", "ac-opt" + (on ? " on" : "")); b.type = "button";
+        var l = el("div", "ac-opt-l"); l.appendChild(el("b", "", title));
+        if (sub) l.appendChild(el("span", "", sub));
+        b.appendChild(l);
+        if (right) b.appendChild(el("em", "", right));
+        b.appendChild(el("i", "ac-ind" + (square ? " sq" : "") + (on ? " on" : ""), on ? "✓" : ""));
+        b.addEventListener("click", function () { haptic("select"); onClick(); });
+        return b;
+      }
+      function acPaperInfo(body) {
+        var fold = el("button", "ac-fold"); fold.type = "button";
+        fold.style.marginTop = "14px";
+        var tx = el("div"); tx.appendChild(el("b", "", "Mavzu haqida batafsil"));
+        tx.appendChild(el("small", "", "Ixtiyoriy — bo'sh qoldirsangiz ham bo'ladi."));
+        fold.appendChild(tx); fold.appendChild(el("span", "", ac.detailOpen ? "▴" : "▾"));
+        fold.addEventListener("click", function () { ac.detailOpen = !ac.detailOpen; acRender(); });
+        body.appendChild(fold);
+        if (ac.detailOpen) {
+          var ta = document.createElement("textarea");
+          ta.className = "ac-ta"; ta.maxLength = 1000; ta.value = ac.detail;
+          ta.placeholder = "Maqola/tezis nimaga e'tibor qaratishi kerakligini yozing...";
+          ta.style.marginTop = "10px";
+          ta.addEventListener("input", function () { ac.detail = ta.value; });
+          body.appendChild(ta);
+        }
+        var cards = el("div"); cards.style.marginTop = "16px";
+        [["latin", "Joriy alifbo", "O‘zbekiston, shahar"], ["yangi", "Yangi alifbo", "Özbekiston, şahar"],
+         ["kirill", "Кирилл", "Ўзбекистон, шаҳар"]].forEach(function (a) {
+          cards.appendChild(acOpt(a[1], a[2], "", selectedAlphabet === a[0], false, function () { setAlphabet(a[0]); acRender(); }));
+        });
+        body.appendChild(acGroup("Alifbo", cards));
+      }
+      function acPaperSettings(body) {
+        var k = ac.kind, tiers = k === "maqola" ? articleTiers : thesisTiers;
+        if (k === "maqola") {
+          var st = el("div");
+          st.appendChild(acOpt("IMRAD", "Kirish, adabiyotlar tahlili, metodologiya, natijalar, xulosa", "", ac.structure === "imrad", false, function () { ac.structure = "imrad"; acRender(); }));
+          st.appendChild(acOpt("An'anaviy", "Kirish, asosiy qism (bo'limlar), xulosa", "", ac.structure === "traditional", false, function () { ac.structure = "traditional"; acRender(); }));
+          body.appendChild(acGroup("Maqola tuzilmasi", st));
+        }
+        if (tiers.length) {
+          var sz = el("div");
+          tiers.forEach(function (t) {
+            sz.appendChild(acOpt(t.pages + " bet", "", fmt(t.price), ac.size === t.index, false, function () { ac.size = t.index; acRender(); }));
+          });
+          body.appendChild(acGroup("Hajmi", sz));
+        }
+        var lg = el("div");
+        var uz = acOpt("O'zbekcha", "asosiy til", "", true, true, function () { });
+        uz.style.opacity = ".8";
+        lg.appendChild(uz);
+        lg.appendChild(acOpt("Русский", "", "", ac.langs.ru, true, function () { ac.langs.ru = !ac.langs.ru; acRender(); }));
+        lg.appendChild(acOpt("English", "", "", ac.langs.en, true, function () { ac.langs.en = !ac.langs.en; acRender(); }));
+        body.appendChild(acGroup("Annotatsiya tillari", lg, "Annotatsiya va kalit so'zlar tanlangan tillarda ham yoziladi"));
+        if (k === "maqola") {
+          var u = acField("UDK", "(ixtiyoriy)", ac.udk, 40, function (v) { ac.udk = v; }, "Masalan: 378.147");
+          body.appendChild(u.wrap);
+          body.appendChild(el("p", "ac-note", "Bo'sh qoldirsangiz, mavzuga mos UDK kodini AI tavsiya qiladi."));
+        }
+      }
       function acBuildInfo(body) {
         var kinds = el("div", "chips wrap");
         AC_KINDS.forEach(function (k) {
@@ -2152,6 +2402,7 @@
             if (ac.kind !== k.id) {
               ac.kind = k.id;
               ac.count = k.id === "krossvord" ? 14 : 10;
+              ac.size = 0;
               if (ac.step >= acSteps().length) ac.step = 0;
             }
             haptic("select"); acRender();
@@ -2165,9 +2416,11 @@
         if (ac.kind === "test" || ac.kind === "krossvord") {
           body.appendChild(acField("Muallif", "(ixtiyoriy)", ac.author, 80, function (v) { ac.author = v; }, "F.I.Sh. yoki o'qituvchi ismi").wrap);
         }
+        if (ac.kind === "maqola" || ac.kind === "tezis") acPaperInfo(body);
       }
       function acBuildSettings(body) {
         var k = ac.kind;
+        if (k === "maqola" || k === "tezis") { acPaperSettings(body); return; }
         if (k === "referat" || k === "mustaqil") {
           body.appendChild(acGroup("Hajm", acChips([[3, AC_REJA[3]], [4, AC_REJA[4]], [5, AC_REJA[5]]], ac.reja, function (v) { ac.reja = v; })));
         } else if (k === "kurs") {
@@ -2231,6 +2484,14 @@
           acSummaryRow(sum, "Joylashuv", ac.two ? "2 ustun" : "1 ustun");
         }
         if (k === "krossvord") acSummaryRow(sum, "Rang", AC_DESIGNS[ac.design][0]);
+        if (k === "maqola" || k === "tezis") {
+          var tl = k === "maqola" ? articleTiers : thesisTiers;
+          if (tl[ac.size]) acSummaryRow(sum, "Hajm", tl[ac.size].pages + " bet");
+          if (k === "maqola") acSummaryRow(sum, "Tuzilma", ac.structure === "imrad" ? "IMRAD" : "An'anaviy");
+          var lgs = ["O'zbekcha"]; if (ac.langs.ru) lgs.push("Русский"); if (ac.langs.en) lgs.push("English");
+          acSummaryRow(sum, "Annotatsiya", lgs.join(", "));
+          if (k === "maqola" && ac.udk.trim()) acSummaryRow(sum, "UDK", ac.udk.trim());
+        }
         if ((k === "test" || k === "krossvord") && ac.author.trim()) acSummaryRow(sum, "Muallif", ac.author.trim());
         if ((k === "referat" || k === "mustaqil" || k === "kurs") && (ac.ti.university.trim() || ac.ti.student.trim())) {
           acSummaryRow(sum, "Titul", [ac.ti.university.trim(), ac.ti.student.trim()].filter(Boolean).join(" · "));
@@ -2340,7 +2601,12 @@
               two_columns: k === "test" ? ac.two : false,
               design: k === "krossvord" ? ac.design : null,
               kurs_tier: (k === "kurs" && kursTiers.length) ? ac.tier : null,
-              title_info: ti
+              title_info: ti,
+              detail: (k === "maqola" || k === "tezis") ? ac.detail.trim() : "",
+              structure: ac.structure,
+              size: ((k === "maqola" && articleTiers.length) || (k === "tezis" && thesisTiers.length)) ? ac.size : null,
+              langs: (k === "maqola" || k === "tezis") ? ["ru", "en"].filter(function (l) { return ac.langs[l]; }) : [],
+              udk: k === "maqola" ? ac.udk.trim() : ""
             })
           });
           var d = null;
@@ -2387,5 +2653,520 @@
       loadHistory();
     })();
   </script>
+
+<script>
+(function (global) {
+  "use strict";
+  var P = 1, N = 2, B = 3, R = 4, Q = 5, K = 6;
+  var KNIGHT = [-33, -31, -18, -14, 14, 18, 31, 33];
+  var KING = [-17, -16, -15, -1, 1, 15, 16, 17];
+  var BISH = [-17, -15, 15, 17];
+  var ROOK = [-16, -1, 1, 16];
+  var VAL = [0, 100, 320, 330, 500, 900, 0];
+  var MATE = 30000;
+  var MASK = new Array(128).fill(15);
+  MASK[0] = ~2; MASK[4] = ~3; MASK[7] = ~1; MASK[112] = ~8; MASK[116] = ~12; MASK[119] = ~4;
+
+  var PST = {
+    1: [0,0,0,0,0,0,0,0, 50,50,50,50,50,50,50,50, 10,10,20,30,30,20,10,10, 5,5,10,25,25,10,5,5, 0,0,0,20,20,0,0,0, 5,-5,-10,0,0,-10,-5,5, 5,10,10,-20,-20,10,10,5, 0,0,0,0,0,0,0,0],
+    2: [-50,-40,-30,-30,-30,-30,-40,-50, -40,-20,0,0,0,0,-20,-40, -30,0,10,15,15,10,0,-30, -30,5,15,20,20,15,5,-30, -30,0,15,20,20,15,0,-30, -30,5,10,15,15,10,5,-30, -40,-20,0,5,5,0,-20,-40, -50,-40,-30,-30,-30,-30,-40,-50],
+    3: [-20,-10,-10,-10,-10,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,10,10,5,0,-10, -10,5,5,10,10,5,5,-10, -10,0,10,10,10,10,0,-10, -10,10,10,10,10,10,10,-10, -10,5,0,0,0,0,5,-10, -20,-10,-10,-10,-10,-10,-10,-20],
+    4: [0,0,0,0,0,0,0,0, 5,10,10,10,10,10,10,5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, 0,0,0,5,5,0,0,0],
+    5: [-20,-10,-10,-5,-5,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,5,5,5,0,-10, -5,0,5,5,5,5,0,-5, 0,0,5,5,5,5,0,-5, -10,5,5,5,5,5,0,-10, -10,0,5,0,0,0,0,-10, -20,-10,-10,-5,-5,-10,-10,-20],
+    6: [-30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -20,-30,-30,-40,-40,-30,-30,-20, -10,-20,-20,-20,-20,-20,-20,-10, 20,20,0,0,0,0,20,20, 20,30,10,0,0,10,30,20],
+    7: [-50,-40,-30,-20,-20,-30,-40,-50, -30,-20,-10,0,0,-10,-20,-30, -30,-10,20,30,30,20,-10,-30, -30,-10,30,40,40,30,-10,-30, -30,-10,30,40,40,30,-10,-30, -30,-10,20,30,30,20,-10,-30, -30,-30,0,0,0,0,-30,-30, -50,-30,-30,-30,-30,-30,-30,-50]
+  };
+
+  function Position() {
+    this.b = new Array(128).fill(0);
+    this.side = 0; this.castle = 15; this.ep = -1; this.half = 0; this.full = 1;
+    this.king = [4, 116]; this.hist = [];
+  }
+  var START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  Position.prototype.setFen = function (fen) {
+    var parts = fen.split(" "), rows = parts[0].split("/"), map = { p: 1, n: 2, b: 3, r: 4, q: 5, k: 6 };
+    this.b.fill(0); this.hist = [];
+    for (var i = 0; i < 8; i++) {
+      var r = 7 - i, f = 0;
+      for (var j = 0; j < rows[i].length; j++) {
+        var ch = rows[i][j];
+        if (ch >= "1" && ch <= "8") { f += +ch; continue; }
+        var low = ch.toLowerCase(), color = ch === low ? 1 : 0, sq = r * 16 + f;
+        this.b[sq] = map[low] | (color << 3);
+        if (map[low] === 6) this.king[color] = sq;
+        f++;
+      }
+    }
+    this.side = parts[1] === "b" ? 1 : 0;
+    this.castle = 0;
+    var c = parts[2] || "-";
+    if (c.indexOf("K") >= 0) this.castle |= 1;
+    if (c.indexOf("Q") >= 0) this.castle |= 2;
+    if (c.indexOf("k") >= 0) this.castle |= 4;
+    if (c.indexOf("q") >= 0) this.castle |= 8;
+    this.ep = (parts[3] && parts[3] !== "-") ? (parseInt(parts[3][1], 10) - 1) * 16 + (parts[3].charCodeAt(0) - 97) : -1;
+    this.half = parseInt(parts[4] || "0", 10); this.full = parseInt(parts[5] || "1", 10);
+    return this;
+  };
+  Position.prototype.key = function () {
+    return this.b.join("") + "|" + this.side + this.castle + this.ep;
+  };
+
+  function attacked(pos, sq, by) {
+    var b = pos.b, i, t, s, o;
+    if (by === 0) { if (b[sq - 15] === 1 && !((sq - 15) & 0x88)) return true; if (b[sq - 17] === 1 && !((sq - 17) & 0x88)) return true; }
+    else { if (b[sq + 15] === 9 && !((sq + 15) & 0x88)) return true; if (b[sq + 17] === 9 && !((sq + 17) & 0x88)) return true; }
+    var c = by << 3;
+    for (i = 0; i < 8; i++) { s = sq + KNIGHT[i]; if (!(s & 0x88) && b[s] === (N | c)) return true; }
+    for (i = 0; i < 8; i++) { s = sq + KING[i]; if (!(s & 0x88) && b[s] === (K | c)) return true; }
+    for (i = 0; i < 4; i++) {
+      o = BISH[i]; s = sq + o;
+      while (!(s & 0x88)) { t = b[s]; if (t) { if (t === (B | c) || t === (Q | c)) return true; break; } s += o; }
+      o = ROOK[i]; s = sq + o;
+      while (!(s & 0x88)) { t = b[s]; if (t) { if (t === (R | c) || t === (Q | c)) return true; break; } s += o; }
+    }
+    return false;
+  }
+  function inCheck(pos) { return attacked(pos, pos.king[pos.side], pos.side ^ 1); }
+
+  function mv(from, to, promo, flag) { return from | (to << 7) | (promo << 14) | (flag << 17); }
+
+  function gen(pos, capsOnly) {
+    var out = [], b = pos.b, side = pos.side, c = side << 3, s, p, t, i, o, to, tg;
+    var dir = side === 0 ? 16 : -16, startR = side === 0 ? 1 : 6, promoR = side === 0 ? 6 : 1;
+    for (s = 0; s < 128; s++) {
+      if (s & 0x88) { s += 7; continue; }
+      p = b[s];
+      if (!p || (p & 8) !== c) continue;
+      t = p & 7;
+      if (t === P) {
+        var rank = s >> 4;
+        to = s + dir;
+        if (!b[to]) {
+          if (rank === promoR) {
+            out.push(mv(s, to, Q, 0));
+            if (!capsOnly) { out.push(mv(s, to, R, 0)); out.push(mv(s, to, B, 0)); out.push(mv(s, to, N, 0)); }
+          } else if (!capsOnly) {
+            out.push(mv(s, to, 0, 0));
+            if (rank === startR && !b[to + dir]) out.push(mv(s, to + dir, 0, 8));
+          }
+        }
+        for (i = -1; i <= 1; i += 2) {
+          to = s + dir + i;
+          if (to & 0x88) continue;
+          tg = b[to];
+          if (tg && (tg & 8) !== c) {
+            if (rank === promoR) {
+              out.push(mv(s, to, Q, 1));
+              if (!capsOnly) { out.push(mv(s, to, R, 1)); out.push(mv(s, to, B, 1)); out.push(mv(s, to, N, 1)); }
+            } else out.push(mv(s, to, 0, 1));
+          } else if (!tg && to === pos.ep) out.push(mv(s, to, 0, 3));
+        }
+      } else if (t === N || t === K) {
+        var offs = t === N ? KNIGHT : KING;
+        for (i = 0; i < 8; i++) {
+          to = s + offs[i];
+          if (to & 0x88) continue;
+          tg = b[to];
+          if (!tg) { if (!capsOnly) out.push(mv(s, to, 0, 0)); }
+          else if ((tg & 8) !== c) out.push(mv(s, to, 0, 1));
+        }
+      } else {
+        var dirs = t === B ? BISH : t === R ? ROOK : null, n = dirs ? 4 : 8;
+        for (i = 0; i < n; i++) {
+          o = dirs ? dirs[i] : (i < 4 ? BISH[i] : ROOK[i - 4]);
+          to = s + o;
+          while (!(to & 0x88)) {
+            tg = b[to];
+            if (!tg) { if (!capsOnly) out.push(mv(s, to, 0, 0)); }
+            else { if ((tg & 8) !== c) out.push(mv(s, to, 0, 1)); break; }
+            to += o;
+          }
+        }
+      }
+    }
+    if (!capsOnly) {
+      var e = side === 0 ? 4 : 116, opp = side ^ 1;
+      if (b[e] === (K | c) && !attacked(pos, e, opp)) {
+        if ((pos.castle & (side === 0 ? 1 : 4)) && !b[e + 1] && !b[e + 2] && b[e + 3] === (R | c) &&
+            !attacked(pos, e + 1, opp) && !attacked(pos, e + 2, opp)) out.push(mv(e, e + 2, 0, 4));
+        if ((pos.castle & (side === 0 ? 2 : 8)) && !b[e - 1] && !b[e - 2] && !b[e - 3] && b[e - 4] === (R | c) &&
+            !attacked(pos, e - 1, opp) && !attacked(pos, e - 2, opp)) out.push(mv(e, e - 2, 0, 4));
+      }
+    }
+    return out;
+  }
+
+  function make(pos, m) {
+    var b = pos.b, from = m & 127, to = (m >> 7) & 127, promo = (m >> 14) & 7, flag = m >> 17;
+    var side = pos.side, piece = b[from], captured = b[to], dir = side === 0 ? 16 : -16;
+    pos.hist.push({ m: m, cap: captured, castle: pos.castle, ep: pos.ep, half: pos.half });
+    b[to] = piece; b[from] = 0;
+    if (flag & 2) { captured = b[to - dir]; pos.hist[pos.hist.length - 1].cap = captured; b[to - dir] = 0; }
+    if (flag & 4) {
+      if (to > from) { b[to - 1] = b[to + 1]; b[to + 1] = 0; } else { b[to + 1] = b[to - 2]; b[to - 2] = 0; }
+    }
+    if (promo) b[to] = promo | (side << 3);
+    if ((piece & 7) === K) pos.king[side] = to;
+    pos.castle &= MASK[from] & MASK[to];
+    pos.ep = (flag & 8) ? (from + to) >> 1 : -1;
+    pos.half = ((piece & 7) === P || captured) ? 0 : pos.half + 1;
+    if (side === 1) pos.full++;
+    pos.side ^= 1;
+  }
+  function unmake(pos) {
+    var h = pos.hist.pop(), m = h.m, b = pos.b;
+    var from = m & 127, to = (m >> 7) & 127, promo = (m >> 14) & 7, flag = m >> 17;
+    pos.side ^= 1;
+    var side = pos.side, dir = side === 0 ? 16 : -16, piece = b[to];
+    if (promo) piece = P | (side << 3);
+    b[from] = piece;
+    if (flag & 2) { b[to] = 0; b[to - dir] = h.cap; } else b[to] = h.cap;
+    if (flag & 4) {
+      if (to > from) { b[to + 1] = b[to - 1]; b[to - 1] = 0; } else { b[to - 2] = b[to + 1]; b[to + 1] = 0; }
+    }
+    if ((piece & 7) === K) pos.king[side] = from;
+    pos.castle = h.castle; pos.ep = h.ep; pos.half = h.half;
+    if (side === 1) pos.full--;
+  }
+  function legal(pos) {
+    var list = gen(pos, false), out = [], side = pos.side;
+    for (var i = 0; i < list.length; i++) {
+      make(pos, list[i]);
+      if (!attacked(pos, pos.king[side], side ^ 1)) out.push(list[i]);
+      unmake(pos);
+    }
+    return out;
+  }
+  function perft(pos, d) {
+    if (d === 0) return 1;
+    var list = gen(pos, false), n = 0, side = pos.side;
+    for (var i = 0; i < list.length; i++) {
+      make(pos, list[i]);
+      if (!attacked(pos, pos.king[side], side ^ 1)) n += perft(pos, d - 1);
+      unmake(pos);
+    }
+    return n;
+  }
+
+  function evaluate(pos) {
+    var b = pos.b, score = 0, np = 0, s, p, t, i, w = [], bl = [];
+    for (s = 0; s < 128; s++) {
+      if (s & 0x88) { s += 7; continue; }
+      p = b[s];
+      if (!p) continue;
+      t = p & 7;
+      if (t !== P && t !== K) np += VAL[t];
+    }
+    var end = np < 2600;
+    for (s = 0; s < 128; s++) {
+      if (s & 0x88) { s += 7; continue; }
+      p = b[s];
+      if (!p) continue;
+      t = p & 7;
+      var table = (t === K && end) ? PST[7] : PST[t], r = s >> 4, f = s & 7;
+      if ((p & 8) === 0) score += VAL[t] + table[(7 - r) * 8 + f];
+      else score -= VAL[t] + table[r * 8 + f];
+    }
+    return pos.side === 0 ? score : -score;
+  }
+
+  function order(pos, list, first) {
+    var b = pos.b, scores = new Array(list.length), i, m, sc;
+    for (i = 0; i < list.length; i++) {
+      m = list[i]; sc = 0;
+      if (m === first) sc = 100000;
+      else {
+        var flag = m >> 17, promo = (m >> 14) & 7;
+        if (flag & 1) { var v = (flag & 2) ? P : (b[(m >> 7) & 127] & 7); sc = 1000 + 10 * VAL[v] - VAL[b[m & 127] & 7] / 10; }
+        if (promo) sc += 800 + VAL[promo];
+      }
+      scores[i] = sc;
+    }
+    var idx = list.map(function (_, k) { return k; }).sort(function (x, y) { return scores[y] - scores[x]; });
+    return idx.map(function (k) { return list[k]; });
+  }
+
+  function qsearch(pos, alpha, beta, ctx, depth) {
+    ctx.nodes++;
+    if ((ctx.nodes & 1023) === 0 && Date.now() > ctx.deadline) ctx.stop = true;
+    if (ctx.stop) return 0;
+    var stand = evaluate(pos);
+    if (depth <= 0 || stand >= beta) return stand;
+    if (stand > alpha) alpha = stand;
+    var list = order(pos, gen(pos, true), 0), side = pos.side;
+    for (var i = 0; i < list.length; i++) {
+      make(pos, list[i]);
+      if (attacked(pos, pos.king[side], side ^ 1)) { unmake(pos); continue; }
+      var sc = -qsearch(pos, -beta, -alpha, ctx, depth - 1);
+      unmake(pos);
+      if (ctx.stop) return 0;
+      if (sc >= beta) return sc;
+      if (sc > alpha) alpha = sc;
+    }
+    return alpha;
+  }
+
+  function search(pos, depth, alpha, beta, ply, ctx) {
+    ctx.nodes++;
+    if ((ctx.nodes & 1023) === 0 && Date.now() > ctx.deadline) ctx.stop = true;
+    if (ctx.stop) return 0;
+    if (pos.half >= 100) return 0;
+    if (depth <= 0) return qsearch(pos, alpha, beta, ctx, 6);
+    var list = order(pos, gen(pos, false), 0), side = pos.side, legalCount = 0, best = -MATE - 1;
+    for (var i = 0; i < list.length; i++) {
+      make(pos, list[i]);
+      if (attacked(pos, pos.king[side], side ^ 1)) { unmake(pos); continue; }
+      legalCount++;
+      var sc = -search(pos, depth - 1, -beta, -alpha, ply + 1, ctx);
+      unmake(pos);
+      if (ctx.stop) return 0;
+      if (sc > best) best = sc;
+      if (sc > alpha) alpha = sc;
+      if (alpha >= beta) break;
+    }
+    if (!legalCount) return attacked(pos, pos.king[side], side ^ 1) ? -MATE + ply : 0;
+    return best;
+  }
+
+  var LEVELS = {
+    easy: { depth: 1, noise: 90, random: 0.25, time: 400 },
+    medium: { depth: 3, noise: 12, random: 0, time: 1200 },
+    hard: { depth: 4, noise: 0, random: 0, time: 2500 }
+  };
+
+  function findBest(pos, level) {
+    var cfg = LEVELS[level] || LEVELS.medium, moves = legal(pos);
+    if (!moves.length) return 0;
+    if (moves.length === 1) return moves[0];
+    if (cfg.random && Math.random() < cfg.random) return moves[Math.floor(Math.random() * moves.length)];
+    var deadline = Date.now() + cfg.time, bestMove = moves[0], d, ctx;
+    var ordered = order(pos, moves, 0);
+    for (d = 1; d <= cfg.depth; d++) {
+      ctx = { nodes: 0, stop: false, deadline: deadline };
+      var alpha = -MATE - 1, iterBest = 0, iterScore = -MATE - 1, scored = [];
+      for (var i = 0; i < ordered.length; i++) {
+        make(pos, ordered[i]);
+        var sc = -search(pos, d - 1, -MATE - 1, -alpha, 1, ctx);
+        unmake(pos);
+        if (ctx.stop) break;
+        if (cfg.noise) sc += (Math.random() * 2 - 1) * cfg.noise;
+        scored.push([ordered[i], sc]);
+        if (sc > iterScore) { iterScore = sc; iterBest = ordered[i]; }
+        if (!cfg.noise && sc > alpha) alpha = sc;
+      }
+      if (!ctx.stop && iterBest) {
+        bestMove = iterBest;
+        scored.sort(function (x, y) { return y[1] - x[1]; });
+        ordered = scored.map(function (x) { return x[0]; });
+        if (iterScore > MATE - 100) break;
+      } else break;
+    }
+    return bestMove;
+  }
+
+  function status(pos, seen) {
+    var moves = legal(pos), chk = inCheck(pos);
+    if (!moves.length) return chk ? { over: true, result: "mate", check: true, loser: pos.side } : { over: true, result: "stalemate" };
+    if (pos.half >= 100) return { over: true, result: "fifty" };
+    var b = pos.b, minors = 0, other = 0;
+    for (var s = 0; s < 128; s++) {
+      if (s & 0x88) { s += 7; continue; }
+      var t = b[s] & 7;
+      if (t === N || t === B) minors++; else if (t === P || t === R || t === Q) other++;
+    }
+    if (!other && minors <= 1) return { over: true, result: "material" };
+    if (seen && seen[pos.key()] >= 3) return { over: true, result: "repetition" };
+    return { over: false, check: chk };
+  }
+
+  global.Chess = { Position: Position, START: START, legal: legal, make: make, unmake: unmake, perft: perft,
+    findBest: findBest, status: status, inCheck: inCheck, evaluate: evaluate };
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+<script>
+(function () {
+  "use strict";
+  var C = window.Chess;
+  if (!C) return;
+  var G = { pos: null, level: "medium", human: 0, sel: -1, targets: [], last: 0, moves: [], seen: {},
+            thinking: false, over: null, check: false, promo: null, token: 0 };
+  var GLYPH = ["", "\u265F\uFE0E", "\u265E\uFE0E", "\u265D\uFE0E", "\u265C\uFE0E", "\u265B\uFE0E", "\u265A\uFE0E"];
+  var LEVELS = [["easy", "Oson"], ["medium", "O'rta"], ["hard", "Qiyin"]];
+  var hasDom = typeof document !== "undefined" && document.getElementById("cg-board");
+
+  function buzz(kind) {
+    try {
+      var h = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback;
+      if (!h) return;
+      if (kind === "move") h.impactOccurred("light"); else if (kind === "end") h.notificationOccurred("success");
+    } catch (e) { }
+  }
+  function legalFrom(sq) { return C.legal(G.pos).filter(function (m) { return (m & 127) === sq; }); }
+
+  function newGame(color) {
+    G.token++;
+    G.human = color; G.pos = new C.Position().setFen(C.START);
+    G.sel = -1; G.targets = []; G.last = 0; G.moves = []; G.seen = {}; G.seen[G.pos.key()] = 1;
+    G.thinking = false; G.over = null; G.check = false; G.promo = null;
+    render();
+    if (G.human === 1) aiMove();
+  }
+  function click(sq) {
+    if (G.thinking || G.over || G.promo || !G.pos || G.pos.side !== G.human) return;
+    var piece = G.pos.b[sq];
+    if (G.sel >= 0) {
+      var cand = G.targets.filter(function (m) { return ((m >> 7) & 127) === sq; });
+      if (cand.length) {
+        if (cand.length > 1) { G.promo = cand; render(); return; }
+        play(cand[0]); return;
+      }
+    }
+    if (piece && (piece >> 3) === G.human) { G.sel = sq; G.targets = legalFrom(sq); }
+    else { G.sel = -1; G.targets = []; }
+    render();
+  }
+  function choosePromo(type) {
+    var m = G.promo && G.promo.filter(function (x) { return ((x >> 14) & 7) === type; })[0];
+    G.promo = null;
+    if (m) play(m); else render();
+  }
+  function play(m) {
+    C.make(G.pos, m); G.moves.push(m); G.last = m;
+    var k = G.pos.key(); G.seen[k] = (G.seen[k] || 0) + 1;
+    G.sel = -1; G.targets = [];
+    var st = C.status(G.pos, G.seen);
+    G.over = st.over ? st : null; G.check = !!st.check;
+    buzz(G.over ? "end" : "move");
+    render();
+    if (!G.over && G.pos.side !== G.human) aiMove();
+  }
+  function aiMove() {
+    G.thinking = true; render();
+    var t = G.token;
+    setTimeout(function () {
+      if (t !== G.token) return;
+      var m = C.findBest(G.pos, G.level);
+      if (t !== G.token) return;
+      G.thinking = false;
+      if (m) play(m); else render();
+    }, 350);
+  }
+  function popOne() {
+    var k = G.pos.key();
+    G.seen[k] = Math.max(0, (G.seen[k] || 1) - 1);
+    C.unmake(G.pos); G.moves.pop();
+  }
+  function canUndo() {
+    if (G.thinking || !G.pos) return false;
+    if (G.pos.side === G.human) return G.moves.length >= (G.human === 1 ? 3 : 2);
+    return G.moves.length >= 1 && !!G.over;
+  }
+  function undo() {
+    if (!canUndo()) return;
+    G.token++;
+    if (G.pos.side === G.human) { popOne(); popOne(); } else popOne();
+    G.last = G.moves.length ? G.moves[G.moves.length - 1] : 0;
+    G.sel = -1; G.targets = []; G.promo = null; G.over = null;
+    G.check = C.inCheck(G.pos);
+    render();
+  }
+  function statusText() {
+    if (G.over) {
+      var r = G.over.result;
+      if (r === "mate") return G.over.loser === G.human ? "Mat! Kompyuter yutdi" : "Mat! Siz yutdingiz 🎉";
+      if (r === "stalemate") return "Pat — durang";
+      if (r === "material") return "Durang: material yetarli emas";
+      if (r === "repetition") return "Durang: pozitsiya 3 marta takrorlandi";
+      return "Durang";
+    }
+    if (G.thinking) return "Kompyuter o'ylayapti...";
+    return G.check ? "Shoh! Sizning yurishingiz" : "Sizning yurishingiz";
+  }
+  function btn(text, cls, fn) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = cls; b.textContent = text;
+    b.addEventListener("click", fn);
+    return b;
+  }
+  function renderChips() {
+    var lv = document.getElementById("cg-levels"), co = document.getElementById("cg-colors");
+    lv.textContent = ""; co.textContent = "";
+    LEVELS.forEach(function (l) {
+      lv.appendChild(btn(l[1], "chip" + (G.level === l[0] ? " active" : ""), function () { G.level = l[0]; renderChips(); }));
+    });
+    [[0, "Oq bilan"], [1, "Qora bilan"]].forEach(function (c) {
+      co.appendChild(btn(c[1], "chip" + (G.human === c[0] ? " active" : ""), function () {
+        if (G.human !== c[0]) askNew(c[0]);
+      }));
+    });
+  }
+  function askNew(color) {
+    var risky = G.moves.length > 1 && !G.over;
+    if (risky && !window.confirm("Joriy o'yin yo'qoladi. Davom etasizmi?")) return;
+    newGame(color === undefined ? G.human : color);
+  }
+  function render() {
+    if (!hasDom) return;
+    var board = document.getElementById("cg-board");
+    board.textContent = "";
+    var tset = {}; G.targets.forEach(function (m) { tset[(m >> 7) & 127] = 1; });
+    var from = G.last ? (G.last & 127) : -1, to = G.last ? ((G.last >> 7) & 127) : -1;
+    var checkSq = (G.check || (G.over && G.over.result === "mate")) ? G.pos.king[G.pos.side] : -1;
+    for (var i = 0; i < 8; i++) {
+      var r = G.human === 0 ? 7 - i : i;
+      for (var j = 0; j < 8; j++) {
+        var f = G.human === 0 ? j : 7 - j, sq = r * 16 + f, p = G.pos.b[sq];
+        var cell = document.createElement("div");
+        var cls = "cell " + (((r + f) % 2 === 0) ? "dk" : "lt");
+        if (sq === from || sq === to) cls += " lm";
+        if (sq === G.sel) cls += " sel";
+        if (sq === checkSq) cls += " chk";
+        if (tset[sq]) cls += p ? " cap" : " dot";
+        cell.className = cls; cell.setAttribute("data-sq", sq);
+        if (p) {
+          var pc = document.createElement("span");
+          pc.className = (p & 8) ? "pb" : "pw"; pc.textContent = GLYPH[p & 7];
+          cell.appendChild(pc);
+        }
+        if (j === 0) { var rk = document.createElement("i"); rk.className = "rk"; rk.textContent = String(r + 1); cell.appendChild(rk); }
+        if (i === 7) { var fl = document.createElement("i"); fl.className = "fl"; fl.textContent = "abcdefgh"[f]; cell.appendChild(fl); }
+        board.appendChild(cell);
+      }
+    }
+    var st = document.getElementById("cg-status");
+    st.textContent = statusText();
+    st.className = "cg-status" + (G.over ? (G.over.result === "mate" && G.over.loser !== G.human ? " win" : " end") : "");
+    document.getElementById("cg-undo").disabled = !canUndo();
+    var pr = document.getElementById("cg-promo");
+    pr.textContent = "";
+    pr.hidden = !G.promo;
+    if (G.promo) {
+      pr.appendChild(Object.assign(document.createElement("p"), { textContent: "Piyodani qaysi donaga aylantirasiz?" }));
+      var row = document.createElement("div"); row.className = "cg-prow";
+      [5, 4, 3, 2].forEach(function (t) {
+        var b = btn(GLYPH[t], "cg-pbtn " + (G.human ? "pb" : "pw"), function () { choosePromo(t); });
+        row.appendChild(b);
+      });
+      pr.appendChild(row);
+      pr.appendChild(btn("Bekor qilish", "cg-pcancel", function () { G.promo = null; render(); }));
+    }
+  }
+
+  if (hasDom) {
+    document.getElementById("cg-board").addEventListener("click", function (e) {
+      var c = e.target.closest(".cell");
+      if (c) click(parseInt(c.getAttribute("data-sq"), 10));
+    });
+    document.getElementById("cg-new").addEventListener("click", function () { askNew(); });
+    document.getElementById("cg-undo").addEventListener("click", undo);
+    renderChips();
+  }
+  newGame(0);
+  window.ChessGame = { G: G, newGame: newGame, click: click, undo: undo, choosePromo: choosePromo, canUndo: canUndo };
+})();
+
+</script>
 </body>
 </html>
