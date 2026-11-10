@@ -477,6 +477,15 @@ TEMPLATE_STYLES = {
 }
 
 
+# --- 30 ta yangi premium uslub: slide_templates.py faylida ---
+import slide_templates as ST
+
+_CLASSIC_STYLE = TEMPLATE_STYLES["classic"]
+TEMPLATE_STYLES = {"classic": _CLASSIC_STYLE}
+for _sid in ST.STYLES:
+    TEMPLATE_STYLES[_sid] = {"premium": True}
+
+
 # =========================================================
 # REQUEST MODELS
 # =========================================================
@@ -1430,7 +1439,6 @@ async def generate_slide_content(topic: str, alphabet: str = LATIN, count: int =
 # Hujjatlar formati
 # ---------------------------------------------------------
 SOURCES_NOTE = "📚 Adabiyotlar ro'yxatini tekshiring: AI mavjud bo'lmagan manbani yozib yuborishi mumkin."
-
 DOC_KINDS = {
     "referat": {"label": "Referat", "file": "referat", "sections": 6},
     "mustaqil": {"label": "Mustaqil ish", "file": "mustaqil_ish", "sections": 5},
@@ -2768,18 +2776,22 @@ def generate_pptx(topic: str, slide_data: list[dict], template_style: str, outpu
     prs = Presentation()
     prs.slide_width = Inches(13.333)
     prs.slide_height = Inches(7.5)
+    subtitle = "AI ёрдамида тайёрланган тақдимот" if alphabet == KIRILL else "AI yordamida tayyorlangan taqdimot"
+
+    if ST.has_style(template_style):
+        tag = "ТАҚДИМОТ" if alphabet == KIRILL else "TAQDIMOT"
+        ST.build_presentation(prs, topic, slide_data, template_style, subtitle, tag)
+        prs.save(output_path)
+        return output_path
+
     style = TEMPLATE_STYLES.get(template_style, TEMPLATE_STYLES["classic"])
     total = len(slide_data) + 1
-
-    subtitle = "AI ёрдамида тайёрланган тақдимот" if alphabet == KIRILL else "AI yordamida tayyorlangan taqdimot"
     build_cover(prs, topic, style, subtitle)
     for index, data in enumerate(slide_data, start=2):
         build_content(prs, data, style, index, total)
 
     prs.save(output_path)
     return output_path
-
-
 # =========================================================
 # BOT HANDLERS & INLINE KEYBOARDS
 # =========================================================
@@ -3426,26 +3438,46 @@ async def receive_topic(message: types.Message, state: FSMContext):
     await check_and_run_order(message, kind, topic, reja_count=None, price=price)
 
 
-TEMPLATE_NAMES = {
-    "classic": "Klassik", "business": "Biznes", "dark": "Qorong'i", "minimal": "Minimal",
-    "swiss_clean": "Shveysariya", "cyber_tech": "Cyber Tech", "warm_editorial": "Editorial",
-    "sunset_punch": "Sunset", "ocean_breeze": "Ocean", "monochrome": "Monoxrom",
-    "emerald_wealth": "Zumrad", "berry_creative": "Berry", "titanium_slate": "Titanium",
-    "midnight_gold": "Tungi Oltin", "nordic_frost": "Nordic",
+TEMPLATE_NAMES = {"classic": "Klassik"}
+TEMPLATE_NAMES.update(ST.STYLE_NAMES)
+
+TEMPLATE_GROUP_TITLES = {
+    "uni": "🎓 Universitet / kollej",
+    "lit": "📚 Litsey / maktab",
+    "teach": "👩‍🏫 O'qituvchi",
+    "trend": "🔥 Trend dizaynlar",
 }
 
 
-def template_keyboard() -> InlineKeyboardMarkup:
-    keys = list(TEMPLATE_STYLES.keys())
+def template_keyboard(group: str | None = None) -> InlineKeyboardMarkup:
     rows = []
-    for i in range(0, len(keys), 2):
+    if group in ST.STYLE_GROUPS:
+        keys = ST.STYLE_GROUPS[group]
+        for i in range(0, len(keys), 2):
+            rows.append([
+                InlineKeyboardButton(text=TEMPLATE_NAMES.get(k, k), callback_data=f"tpl_{k}")
+                for k in keys[i:i + 2]
+            ])
+        rows.append([InlineKeyboardButton(text="⬅️ Orqaga", callback_data="tplg_back")])
+    else:
+        for g, title in TEMPLATE_GROUP_TITLES.items():
+            rows.append([InlineKeyboardButton(text=f"{title} ({len(ST.STYLE_GROUPS[g])})", callback_data=f"tplg_{g}")])
         rows.append([
-            InlineKeyboardButton(text=TEMPLATE_NAMES.get(k, k), callback_data=f"tpl_{k}")
-            for k in keys[i:i + 2]
+            InlineKeyboardButton(text="📄 Klassik", callback_data="tpl_classic"),
+            InlineKeyboardButton(text="🎲 Tasodifiy", callback_data="tpl_random"),
         ])
-    rows.append([InlineKeyboardButton(text="🎲 Tasodifiy dizayn", callback_data="tpl_random")])
     rows.append([InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel_order")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+@dp.callback_query(DocOrder.waiting_template, F.data.startswith("tplg_"))
+async def receive_template_group(call: types.CallbackQuery, state: FSMContext):
+    group = call.data[len("tplg_"):]
+    try:
+        await call.message.edit_reply_markup(reply_markup=template_keyboard(group if group in ST.STYLE_GROUPS else None))
+    except Exception:
+        pass
+    await call.answer()
 
 
 @dp.callback_query(DocOrder.waiting_outline, F.data.startswith("reja_"))
